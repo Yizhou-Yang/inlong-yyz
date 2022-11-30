@@ -231,12 +231,10 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
 
     private boolean enableBatchDelete() {
         try {
-            LOG.info("batch delete{}, schema{}",executionOptions.getEnableDelete(), RestService.getSchema(options, readOptions, LOG));
             Schema schema = RestService.getSchema(options, readOptions, LOG);
             return executionOptions.getEnableDelete() || UNIQUE_KEYS_TYPE.equals(schema.getKeysType());
         } catch (DorisException e) {
-            LOG.warn("Failed fetch doris table schema: " + options.getTableIdentifier(), e);
-            return executionOptions.getEnableDelete()
+            return executionOptions.getEnableDelete();
         }
     }
 
