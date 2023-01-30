@@ -58,6 +58,7 @@ import org.apache.iceberg.relocated.com.google.common.base.MoreObjects;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableList;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
+import org.apache.inlong.sort.iceberg.utils.DLCUtils;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,7 +100,14 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
             CosNConfigKeys.COSN_CREDENTIALS_PROVIDER,
             "fs.lakefs.impl",
             "fs.cosn.impl",
-            "fs.cosn.posix_bucket.fs.impl"
+            "fs.cosn.posix_bucket.fs.impl",
+            DLCUtils.JWT_SECRET,
+            DLCUtils.EXECUTOR_SECRET_ID,
+            DLCUtils.EXECUTOR_SECRET_KEY,
+            DLCUtils.GATEWAY_URL,
+            DLCUtils.OWNER_UIN,
+            DLCUtils.OPERATOR_UIN,
+            Constants.DLC_CREDENTIAL_PROVIDER_CLASS_CONF
     ).collect(Collectors.toSet());
 
     private static final Logger LOG = LoggerFactory.getLogger(DlcWrappedHybrisCatalog.class);
