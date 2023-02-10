@@ -17,12 +17,14 @@
 
 package org.apache.inlong.sort.iceberg.actions;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.actions.RewriteDataFiles;
 import org.apache.inlong.sort.iceberg.FlinkActions;
 
 import java.util.Map;
 
+@Slf4j
 public class SparkActions implements FlinkActions {
     private static final long serialVersionUID = 1L;
 
@@ -35,6 +37,7 @@ public class SparkActions implements FlinkActions {
 
     @Override
     public RewriteDataFiles rewriteDataFiles(Table table) {
+        log.info("emhui rewriteDataFiles actionProperties is [{}]", actionProperties);
         return new SyncRewriteDataFilesAction(
                 new SyncRewriteDataFilesActionOption(actionProperties),
                 table);

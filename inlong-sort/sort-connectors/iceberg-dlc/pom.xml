@@ -45,12 +45,6 @@
             <groupId>com.tencent.cloud.wedata</groupId>
             <artifactId>wedata-credential-utils</artifactId>
             <version>1.0-SNAPSHOT</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>tencentcloud-sdk-java-common</artifactId>
-                    <groupId>com.tencentcloudapi</groupId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.qcloud.cos</groupId>
@@ -63,16 +57,24 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>com.qcloud</groupId>
+            <groupId>com.tencent.cloud.dlc</groupId>
             <artifactId>dlc-jdbc</artifactId>
             <exclusions>
                 <exclusion>
-                    <artifactId>cos_api</artifactId>
-                    <groupId>com.qcloud</groupId>
+                    <groupId>com.tencentcloudapi</groupId>
+                    <artifactId>tencentcloud-sdk-java</artifactId>
                 </exclusion>
                 <exclusion>
-                    <artifactId>tencentcloud-sdk-java</artifactId>
+                    <artifactId>tencentcloud-sdk-java-common</artifactId>
                     <groupId>com.tencentcloudapi</groupId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.tencent.cloud.wedata</groupId>
+                    <artifactId>wedata-credential-utils</artifactId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>cos_api</artifactId>
+                    <groupId>com.qcloud</groupId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -217,6 +219,12 @@
                                     <pattern>org.apache.inlong.sort.base</pattern>
                                     <shadedPattern>
                                         org.apache.inlong.sort.iceberg.shaded.org.apache.inlong.sort.base
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.codec.digest</pattern>
+                                    <shadedPattern>
+                                        org.apache.inlong.sort.iceberg.shaded.org.apache.commons.codec.digest
                                     </shadedPattern>
                                 </relocation>
                             </relocations>

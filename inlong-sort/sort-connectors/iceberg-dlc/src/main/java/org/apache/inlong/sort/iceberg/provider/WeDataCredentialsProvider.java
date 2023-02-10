@@ -3,7 +3,6 @@ package org.apache.inlong.sort.iceberg.provider;
 import com.qcloud.cos.auth.COSCredentials;
 import com.qcloud.cos.auth.InstanceProfileCredentials;
 import com.tencent.cloud.wedata.credential.WedataCredential;
-import com.tencentcloudapi.common.Credential;
 import com.tencentcloudapi.common.exception.TencentCloudSDKException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
@@ -81,9 +80,6 @@ public class WeDataCredentialsProvider extends AbstractCOSCredentialProvider {
 
     private InstanceProfileCredentials fetch(String path) {
         String endPoint = getConf().get(END_POINT, END_POINT_DEFAULT);
-        String secretId = getConf().get(SECRET_ID, "");
-        String secretKey = getConf().get(SECRET_KEY, "");
-        String secretToken = getConf().get(SECRET_TOKEN, "");
         String region = getConf().get(REGION, "");
         String userAppId = getConf().get(USER_APPID, "");
 
@@ -91,15 +87,12 @@ public class WeDataCredentialsProvider extends AbstractCOSCredentialProvider {
         Map<String, String> options = DLCUtils.getTmpTokenOptions(getConf());
         LOG.info("emhui fetch is [{}], options is [{}]", getConf(), options);
         WedataCredential wedataCredential = new WedataCredential(options);
-//        String secretKey1 = wedataCredential.getSecretKey();
-
-        checkConfigItem(blankString(secretId), "cannot find config for %s", SECRET_ID);
-        checkConfigItem(blankString(secretKey), "cannot find config for %s", SECRET_KEY);
-        checkConfigItem(blankString(region), "cannot find config for %s", REGION);
-        checkConfigItem(blankString(userAppId), "cannot find config for %s", USER_APPID);
-
         LOG.info("init dlc service client: {}, {}, {}", endPoint, serviceClient, region);
-        InstanceProfileCredentials userCred = new InstanceProfileCredentials(userAppId, secretId, secretKey, secretToken, 0);
+        InstanceProfileCredentials userCred = new InstanceProfileCredentials(userAppId,
+                wedataCredential.getSecretId(),
+                wedataCredential.getSecretKey(),
+                wedataCredential.getToken(),
+                wedataCredential.getExpiredTime());
 
         String bkt = getBucket();
         checkConfigItem(blankString(bkt), "request path invalid, %s", path);
@@ -108,8 +101,7 @@ public class WeDataCredentialsProvider extends AbstractCOSCredentialProvider {
             return userCred;
         }
 
-        serviceClient = DlcServiceClient.buildServiceClient(endPoint, region, new Credential(secretId, secretKey, secretToken));
-//        serviceClient = DlcServiceClient.buildServiceClient(endPoint, region, wedataCredential);
+        serviceClient = DlcServiceClient.buildServiceClient(endPoint, region, wedataCredential);
 
         DescribeLakeFsAccessRequest request = new DescribeLakeFsAccessRequest();
         request.setFsPath(path);

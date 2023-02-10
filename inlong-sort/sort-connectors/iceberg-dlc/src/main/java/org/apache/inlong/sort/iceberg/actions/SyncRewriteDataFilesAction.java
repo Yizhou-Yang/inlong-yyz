@@ -18,6 +18,7 @@
 
 package org.apache.inlong.sort.iceberg.actions;
 
+import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.actions.RewriteDataFiles;
@@ -152,10 +153,12 @@ public class SyncRewriteDataFilesAction implements RewriteDataFiles {
         String url = options.url();
         try {
             Class.forName(DLC_JDBC_CLASS);
-            connection = DriverManager.getConnection(
-                    url,
-                    options.secretId(),
-                    options.secretKey());
+            Properties properties = new Properties();
+            connection = DriverManager.getConnection(url, properties);
+//            connection = DriverManager.getConnection(
+//                    url,
+//                    options.secretId(),
+//                    options.secretKey());
             // get meta data
             DatabaseMetaData metaData = connection.getMetaData();
             LOG.info("DLC product = {}, DLC jdbc version = {}, DLC jdbc = '{}'",

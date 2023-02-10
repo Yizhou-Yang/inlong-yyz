@@ -250,7 +250,7 @@
         <cos.hadoop.version>2.7.5-5.9.3</cos.hadoop.version>
         <cos.bundle.version>5.6.35</cos.bundle.version>
         <dlc.client.version>2.1.0-SNAPSHOT</dlc.client.version>
-        <dlc.jdbc.version>2.2.6</dlc.jdbc.version>
+        <dlc.jdbc.version>2.2.6.8-wedata</dlc.jdbc.version>
         <cos.lakefs.plugin.version>1.0</cos.lakefs.plugin.version>
         <esri-geometry-api.version>2.0.0</esri-geometry-api.version>
         <HikariCP.version>4.0.3</HikariCP.version>
@@ -1620,7 +1620,7 @@
                 <version>${cos.lakefs.plugin.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.qcloud</groupId>
+                <groupId>com.tencent.cloud.dlc</groupId>
                 <artifactId>dlc-jdbc</artifactId>
                 <version>${dlc.jdbc.version}</version>
             </dependency>
