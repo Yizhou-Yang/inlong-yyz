@@ -37,7 +37,6 @@ public class SparkActions implements FlinkActions {
 
     @Override
     public RewriteDataFiles rewriteDataFiles(Table table) {
-        log.info("emhui rewriteDataFiles actionProperties is [{}]", actionProperties);
         return new SyncRewriteDataFilesAction(
                 new SyncRewriteDataFilesActionOption(actionProperties),
                 table);

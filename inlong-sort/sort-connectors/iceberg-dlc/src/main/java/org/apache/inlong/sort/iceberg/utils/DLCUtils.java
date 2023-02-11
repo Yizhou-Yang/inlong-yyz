@@ -28,4 +28,17 @@ public class DLCUtils {
         options.put(Constants.SECRET_ID, conf.get(EXECUTOR_SECRET_ID));
         return options;
     }
+
+    public static Map<String, String> getTmpTokenOptions(Map<String, String> conf) {
+        Map<String, String> options = new HashMap<>();
+        options.put(Constants.GATEWAY_URL, conf.get(GATEWAY_URL));
+        options.put(Constants.JWT_SECRET, conf.get(JWT_SECRET));
+        options.put(Constants.TENANT_ID, conf.get(USER_APPID));
+        options.put(Constants.USER_ID, conf.get(OPERATOR_UIN));
+        options.put(Constants.OWNER_USER_ID, conf.get(OWNER_UIN));
+        options.put(Constants.REGION, conf.get(REGION));
+        options.put(Constants.SECRET_KEY, conf.get(EXECUTOR_SECRET_KEY));
+        options.put(Constants.SECRET_ID, conf.get(EXECUTOR_SECRET_ID));
+        return options;
+    }
 }
