@@ -154,10 +154,18 @@ public class SyncRewriteDataFilesAction implements RewriteDataFiles {
         String url = options.url();
         try {
             Class.forName(DLC_JDBC_CLASS);
-            Properties properties = new Properties();
-            Map<String, String> tmpTokenOptions = DLCUtils.getTmpTokenOptions(this.options.getTableProperties());
-            properties.putAll(tmpTokenOptions);
-            connection = DriverManager.getConnection(url, properties);
+            boolean tmpTokenOpen = Boolean.valueOf(this.options.getTableProperties().getOrDefault("tmp.token.open", "false"));
+            if (tmpTokenOpen) {
+                Properties properties = new Properties();
+                Map<String, String> tmpTokenOptions = DLCUtils.getTmpTokenOptions(this.options.getTableProperties());
+                properties.putAll(tmpTokenOptions);
+                connection = DriverManager.getConnection(url, properties);
+            } else {
+                connection = DriverManager.getConnection(
+                    url,
+                    options.secretId(),
+                    options.secretKey());
+            }
             // get meta data
             DatabaseMetaData metaData = connection.getMetaData();
             LOG.info("DLC product = {}, DLC jdbc version = {}, DLC jdbc = '{}'",
