@@ -153,8 +153,11 @@ public class FlinkSink {
         private Table table;
         private TableSchema tableSchema;
         private ActionsProvider actionProvider;
+        private boolean overwrite = false;
         private boolean appendMode = false;
+        private DistributionMode distributionMode = null;
         private Integer writeParallelism = null;
+        private boolean upsert = false;
         private List<String> equalityFieldColumns = null;
         private String uidPrefix = null;
         private ReadableConfig readableConfig = new Configuration();
@@ -263,6 +266,7 @@ public class FlinkSink {
         }
 
         public Builder overwrite(boolean newOverwrite) {
+            this.overwrite = newOverwrite;
             writeOptions.put(FlinkWriteOptions.OVERWRITE_MODE.key(), Boolean.toString(newOverwrite));
             return this;
         }
@@ -323,6 +327,7 @@ public class FlinkSink {
                     !DistributionMode.RANGE.equals(mode),
                     "Flink does not support 'range' write distribution mode now.");
             if (mode != null) {
+                this.distributionMode = mode;
                 writeOptions.put(FlinkWriteOptions.DISTRIBUTION_MODE.key(), mode.modeName());
             }
             return this;
@@ -349,6 +354,7 @@ public class FlinkSink {
          * @return {@link Builder} to connect the iceberg table.
          */
         public Builder upsert(boolean enabled) {
+            this.upsert = enabled;
             writeOptions.put(FlinkWriteOptions.WRITE_UPSERT_ENABLED.key(), Boolean.toString(enabled));
             return this;
         }
@@ -540,8 +546,8 @@ public class FlinkSink {
         private SingleOutputStreamOperator<Void> appendMultipleCommitter(
                 SingleOutputStreamOperator<MultipleWriteResult> writerStream) {
             IcebergProcessOperator<MultipleWriteResult, Void> multipleFilesCommiter =
-                    new IcebergProcessOperator<>(new IcebergMultipleFilesCommiter(catalogLoader,
-                            flinkWriteConf.overwriteMode(), actionProvider, tableOptions));
+                    new IcebergProcessOperator<>(new IcebergMultipleFilesCommiter(catalogLoader, overwrite,
+                            actionProvider, tableOptions));
             SingleOutputStreamOperator<Void> committerStream = writerStream
                     .transform(operatorName(ICEBERG_MULTIPLE_FILES_COMMITTER_NAME), Types.VOID, multipleFilesCommiter)
                     .setParallelism(1)
