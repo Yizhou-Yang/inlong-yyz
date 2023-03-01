@@ -20,8 +20,8 @@ import org.apache.inlong.sort.iceberg.utils.DLCUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class WeDataCredentialsProvider extends AbstractCOSCredentialProvider {
-    private static final Logger LOG = LoggerFactory.getLogger(WeDataCredentialsProvider.class);
+public class WeDataFsCosCredentialsProvider extends AbstractCOSCredentialProvider {
+    private static final Logger LOG = LoggerFactory.getLogger(WeDataFsCosCredentialsProvider.class);
 
     public static final String END_POINT = "service.endpoint";
     public static final String END_POINT_DEFAULT = "dlc.tencentcloudapi.com";
@@ -45,7 +45,7 @@ public class WeDataCredentialsProvider extends AbstractCOSCredentialProvider {
 
     private InstanceProfileCredentials credentials;
 
-    public WeDataCredentialsProvider(URI uri, Configuration conf) {
+    public WeDataFsCosCredentialsProvider(URI uri, Configuration conf) {
         super(uri, conf);
     }
 
