@@ -25,9 +25,6 @@ public class WeDataFsCosCredentialsProvider extends AbstractCOSCredentialProvide
 
     public static final String END_POINT = "service.endpoint";
     public static final String END_POINT_DEFAULT = "dlc.tencentcloudapi.com";
-    public static final String SECRET_ID = "service.secret.id";
-    public static final String SECRET_KEY = "service.secret.key";
-    public static final String SECRET_TOKEN = "service.secret.token";
     public static final String REGION = "service.region";
     public static final String USER_APPID = "user.appid";
     public static final String FETCH_RETRY = "service.fetch.retry";
@@ -51,7 +48,7 @@ public class WeDataFsCosCredentialsProvider extends AbstractCOSCredentialProvide
 
     @Override
     public COSCredentials getCredentials() {
-        LOG.info("emhui WeDataFsCosCredentialsProvider getCredentials");
+        LOG.info("WeDataFsCosCredentialsProvider getCredentials");
         if (this.credentials == null || this.credentials.isExpired()) {
             try {
                 this.lock.lock();
@@ -85,7 +82,6 @@ public class WeDataFsCosCredentialsProvider extends AbstractCOSCredentialProvide
 
         // 请求临时密钥参数
         Map<String, String> options = DLCUtils.getTmpTokenOptions(getConf());
-        LOG.info("emhui fetch is [{}], options is [{}]", getConf(), options);
         WedataCredential wedataCredential = new WedataCredential(options);
         LOG.info("init dlc service client: {}, {}, {}", endPoint, serviceClient, region);
         InstanceProfileCredentials userCred = new InstanceProfileCredentials(userAppId,

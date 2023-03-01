@@ -28,7 +28,6 @@ public class WedataDLCCredentialProvider extends AbstractDLCCredentialProvider i
         Preconditions.checkArgument(secretKey != null, "qcloud.dlc.secret-key must be set.");
 
         Map<String, String> options = DLCUtils.getTmpTokenOptions(conf);
-        log.info("emhui WedataDLCCredentialProvider is [{}], options is [{}]", conf, options);
         this.options = options;
 
     }
