@@ -44,7 +44,7 @@
         <dependency>
             <groupId>com.tencent.cloud.wedata</groupId>
             <artifactId>wedata-credential-utils</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>1.0</version>
         </dependency>
         <dependency>
             <groupId>com.qcloud.cos</groupId>
