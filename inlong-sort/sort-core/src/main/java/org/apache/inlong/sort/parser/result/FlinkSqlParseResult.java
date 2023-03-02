@@ -26,6 +26,7 @@ import org.apache.flink.table.api.TableResult;
 
 import java.io.Serializable;
 import java.util.List;
+import org.apache.inlong.common.util.MaskDataUtils;
 
 /**
  * Flink sql parse result, It is a concrete implementation of ParseResult
@@ -84,7 +85,7 @@ public class FlinkSqlParseResult implements ParseResult, Serializable {
 
     private void executeCreateTableSqls(List<String> sqls) {
         for (String sql : sqls) {
-            log.info("execute createSql:\n{}", sql);
+            log.info("execute createSql:\n{}", MaskDataUtils.removeMaskMsg(sql));
             tableEnv.executeSql(sql);
         }
     }
