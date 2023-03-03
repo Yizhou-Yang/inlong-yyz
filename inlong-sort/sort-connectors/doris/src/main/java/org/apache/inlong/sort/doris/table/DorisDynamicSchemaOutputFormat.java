@@ -573,7 +573,9 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         String table = rawData.remove(TABLE);
         String content = OBJECT_MAPPER.writeValueAsString(rawData);
 
-        dirtySinkHelper.invoke(OBJECT_MAPPER.readTree(content), dirtyType, label, logTag, identifier, e);
+        if (dirtySinkHelper.getDirtyOptions().ignoreDirty()) {
+            dirtySinkHelper.invoke(OBJECT_MAPPER.readTree(content), dirtyType, label, logTag, identifier, e);
+        }
 
         try {
             metricData.outputDirtyMetricsWithEstimate(database, table, 1,
