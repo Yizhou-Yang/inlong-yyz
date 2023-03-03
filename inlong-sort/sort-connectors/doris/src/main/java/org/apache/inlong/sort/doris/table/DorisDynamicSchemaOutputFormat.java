@@ -550,8 +550,10 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         }
 
         DirtyOptions dirtyOptions = dirtySinkHelper.getDirtyOptions();
-        dirtySinkHelper.invoke(dirtyData, dirtyType, dirtyOptions.getLabels(), dirtyOptions.getLogTag(),
-                dirtyOptions.getIdentifier(), e);
+        if (dirtyOptions.ignoreDirty()) {
+            dirtySinkHelper.invoke(dirtyData, dirtyType, dirtyOptions.getLabels(), dirtyOptions.getLogTag(),
+                    dirtyOptions.getIdentifier(), e);
+        }
 
         metricData.invokeDirty(1, dirtyData.toString().getBytes(StandardCharsets.UTF_8).length);
     }
