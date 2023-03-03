@@ -755,7 +755,7 @@ public class FlinkSink {
 
         return new IcebergProcessOperator<>(new IcebergSingleStreamWriter<>(
                 table.name(), taskWriterFactory, inlongMetric, auditHostAndPorts,
-                null, dirtyOptions, dirtySink));
+                null, dirtyOptions, dirtySink, false));
     }
 
 }

@@ -44,7 +44,6 @@ import org.apache.iceberg.flink.CatalogLoader;
 import org.apache.iceberg.flink.FlinkSchemaUtil;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableMap;
 import org.apache.iceberg.types.Types.NestedField;
-import org.apache.inlong.sort.base.dirty.DirtyData;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
 import org.apache.inlong.sort.base.dirty.DirtySinkHelper;
 import org.apache.inlong.sort.base.dirty.DirtyType;
@@ -64,6 +63,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import javax.ws.rs.NotSupportedException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collections;
@@ -208,6 +208,29 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         }
     }
 
+    private void handleDirtyDataOfLogWithIgnore(JsonNode jsonNode, Schema dataSchema,
+                                                TableIdentifier tableId, Exception e) {
+        List<RowData> rowDataForDataSchemaList = Collections.emptyList();
+        try {
+            rowDataForDataSchemaList = dynamicSchemaFormat
+                    .extractRowData(jsonNode, FlinkSchemaUtil.convert(dataSchema));
+        } catch (Throwable ee) {
+            LOG.error("extractRowData {} failed!", jsonNode, ee);
+        }
+
+        for (RowData rowData : rowDataForDataSchemaList) {
+            DirtyOptions dirtyOptions = dirtySinkHelper.getDirtyOptions();
+            if (!dirtyOptions.ignoreDirty()) {
+                if (metricData != null) {
+                    metricData.outputDirtyMetricsWithEstimate(tableId.namespace().toString(),
+                            null, tableId.name(), rowData.toString());
+                }
+            } else {
+                handleDirtyData(rowData.toString(), jsonNode, DirtyType.EXTRACT_ROWDATA_ERROR, e, tableId);
+            }
+        }
+    }
+
     private void handleDirtyData(Object dirtyData,
             JsonNode rootNode,
             DirtyType dirtyType,
@@ -288,8 +311,16 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
                 handleTableCreateEventFromOperator(record.getTableId(), dataSchema);
             } catch (Exception e) {
                 LOGGER.error("Table create error, tableId: {}, schema: {}", record.getTableId(), dataSchema);
-                if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE == multipleSinkOption.getSchemaUpdatePolicy()) {
-                    handleDirtyData(jsonNode, jsonNode, DirtyType.EXTRACT_SCHEMA_ERROR, e, tableId);
+                if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE == multipleSinkOption
+                        .getSchemaUpdatePolicy()) {
+                    handleDirtyDataOfLogWithIgnore(jsonNode, dataSchema, tableId, e);
+                } else if (SchemaUpdateExceptionPolicy.STOP_PARTIAL == multipleSinkOption
+                        .getSchemaUpdatePolicy()) {
+                    blacklist.add(tableId);
+                } else {
+                    LOGGER.error("Table create error, tableId: {}, schema: {}, schemaUpdatePolicy: {}",
+                            record.getTableId(), dataSchema, multipleSinkOption.getSchemaUpdatePolicy(), e);
+                    throw e;
                 }
             }
         } else {
@@ -313,20 +344,43 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
                             try {
                                 return dynamicSchemaFormat.extractRowData(jsonNode, FlinkSchemaUtil.convert(schema1));
                             } catch (Exception e) {
-                                LOG.warn("Ignore table {} schema change, old: {} new: {}.",
-                                        tableId, dataSchema, latestSchema, e);
-                                blacklist.add(tableId);
-                                if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE
-                                        == multipleSinkOption.getSchemaUpdatePolicy()) {
-                                    handleDirtyData(jsonNode, jsonNode, DirtyType.EXTRACT_ROWDATA_ERROR, e, tableId);
+                                if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE == multipleSinkOption
+                                        .getSchemaUpdatePolicy()) {
+                                    handleDirtyDataOfLogWithIgnore(jsonNode, dataSchema, tableId, e);
+                                } else if (SchemaUpdateExceptionPolicy.STOP_PARTIAL == multipleSinkOption
+                                        .getSchemaUpdatePolicy()) {
+                                    blacklist.add(tableId);
+                                } else {
+                                    LOG.error("Table {} schema change, schemaUpdatePolicy:{} old: {} new: {}.",
+                                            tableId, multipleSinkOption.getSchemaUpdatePolicy(), dataSchema,
+                                            latestSchema, e);
+                                    throw e;
                                 }
                             }
                             return Collections.emptyList();
                         });
                 output.collect(new StreamRecord<>(recordWithSchema));
             } else {
-                handldAlterSchemaEventFromOperator(tableId, latestSchema, dataSchema);
-                break;
+                if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE == multipleSinkOption
+                        .getSchemaUpdatePolicy()) {
+                    RecordWithSchema recordWithSchema = queue.poll();
+                    handleDirtyDataOfLogWithIgnore(recordWithSchema.getOriginalData(), dataSchema, tableId,
+                            new NotSupportedException(
+                                    String.format("SchemaUpdatePolicy %s does not support schema dynamic update!",
+                                            multipleSinkOption.getSchemaUpdatePolicy())));
+                } else if (SchemaUpdateExceptionPolicy.STOP_PARTIAL == multipleSinkOption
+                        .getSchemaUpdatePolicy()) {
+                    blacklist.add(tableId);
+                    break;
+                } else if (SchemaUpdateExceptionPolicy.TRY_IT_BEST == multipleSinkOption
+                        .getSchemaUpdatePolicy()) {
+                    handldAlterSchemaEventFromOperator(tableId, latestSchema, dataSchema);
+                    break;
+                } else {
+                    throw new NotSupportedException(
+                            String.format("SchemaUpdatePolicy %s does not support schema dynamic update!",
+                            multipleSinkOption.getSchemaUpdatePolicy()));
+                }
             }
         }
     }
@@ -355,11 +409,6 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             } catch (AlreadyExistsException e) {
                 LOG.warn("Table({}) already exist in Database({}) in Catalog({})!",
                         tableId.name(), tableId.namespace(), catalog.name());
-            } catch (Exception e) {
-                // default strategy for auto create table fail, just ignore this table datas.
-                LOG.warn("Table({}) create fail, add it to blackList!", tableId.name());
-                blacklist.add(tableId);
-                return;
             }
         }
         handleSchemaInfoEvent(tableId, catalog.loadTable(tableId).schema());
@@ -374,9 +423,12 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         Transaction transaction = table.newTransaction();
         if (table.schema().sameSchema(oldSchema)) {
             List<TableChange> tableChanges = SchemaChangeUtils.diffSchema(oldSchema, newSchema);
-            if (!canHandleWithSchemaUpdatePolicy(tableId, tableChanges)) {
-                // If can not handle this schema update, should not push data into next operator
-                return;
+            for (TableChange tableChange : tableChanges) {
+                if (!(tableChange instanceof AddColumn)) {
+                    // todo:currently iceberg can only handle addColumn, so always return false
+                    throw new UnsupportedOperationException(
+                            String.format("Unsupported table %s schema change: %s.", tableId.toString(), tableChange));
+                }
             }
             SchemaChangeUtils.applySchemaChanges(transaction.updateSchema(), tableChanges);
             LOG.info("Schema evolution in table({}) for table change: {}", tableId, tableChanges);
@@ -419,24 +471,5 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         return null;
     }
 
-    private boolean canHandleWithSchemaUpdatePolicy(TableIdentifier tableId, List<TableChange> tableChanges) {
-        boolean canHandle = true;
-        for (TableChange tableChange : tableChanges) {
-            canHandle &= MultipleSinkOption.canHandleWithSchemaUpdate(tableId.toString(), tableChange,
-                    multipleSinkOption.getSchemaUpdatePolicy());
-            if (!(tableChange instanceof AddColumn)) {
-                // todo:currently iceberg can only handle addColumn, so always return false
-                LOG.info("Ignore table {} schema change: {} because iceberg can't handle it.",
-                        tableId, tableChange);
-                canHandle = false;
-            }
-            if (!canHandle) {
-                if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE != multipleSinkOption.getSchemaUpdatePolicy()) {
-                    blacklist.add(tableId);
-                }
-                break;
-            }
-        }
-        return canHandle;
-    }
+
 }

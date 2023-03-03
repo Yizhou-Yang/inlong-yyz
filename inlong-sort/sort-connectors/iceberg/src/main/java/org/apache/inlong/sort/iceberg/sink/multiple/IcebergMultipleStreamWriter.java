@@ -42,6 +42,8 @@ import org.apache.iceberg.util.PropertyUtil;
 import org.apache.inlong.sort.base.Constants;
 import org.apache.inlong.sort.base.dirty.DirtyData;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
+import org.apache.inlong.sort.base.dirty.DirtySinkHelper;
+import org.apache.inlong.sort.base.dirty.DirtyType;
 import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.apache.inlong.sort.base.metric.MetricOption;
 import org.apache.inlong.sort.base.metric.MetricState;
@@ -220,7 +222,7 @@ public class IcebergMultipleStreamWriter extends IcebergProcessFunction<RecordWi
                         .append(Constants.TABLE_NAME).append("=").append(tableId.name());
                 IcebergSingleStreamWriter<RowData> writer = new IcebergSingleStreamWriter<>(
                         tableId.toString(), taskWriterFactory, subWriterInlongMetric.toString(),
-                        auditHostAndPorts, flinkRowType, dirtyOptions, dirtySink);
+                        auditHostAndPorts, flinkRowType, dirtyOptions, dirtySink, true);
                 writer.setup(getRuntimeContext(),
                         new CallbackCollector<>(
                                 writeResult -> collector.collect(new MultipleWriteResult(tableId, writeResult))),
@@ -238,6 +240,10 @@ public class IcebergMultipleStreamWriter extends IcebergProcessFunction<RecordWi
 
         if (multipleWriters.get(tableId) != null) {
             for (RowData data : recordWithSchema.getData()) {
+                String dataBaseName = tableId.namespace().toString();
+                String tableName = tableId.name();
+                long size = data == null ? 0 : data.toString().getBytes(StandardCharsets.UTF_8).length;
+
                 try {
                     multipleWriters.get(tableId).processElement(data);
                 } catch (Exception e) {
@@ -248,10 +254,21 @@ public class IcebergMultipleStreamWriter extends IcebergProcessFunction<RecordWi
                     if (dirtySink != null) {
                         DirtyData.Builder<Object> builder = DirtyData.builder();
                         try {
+                            String dirtyLabel = DirtySinkHelper.regexReplace(dirtyOptions.getLabels(),
+                                    DirtyType.BATCH_LOAD_ERROR, null,
+                                    dataBaseName, tableName, null);
+                            String dirtyLogTag =
+                                    DirtySinkHelper.regexReplace(dirtyOptions.getLogTag(),
+                                            DirtyType.BATCH_LOAD_ERROR, null,
+                                            dataBaseName, tableName, null);
+                            String dirtyIdentifier =
+                                    DirtySinkHelper.regexReplace(dirtyOptions.getIdentifier(),
+                                            DirtyType.BATCH_LOAD_ERROR, null,
+                                            dataBaseName, tableName, null);
                             builder.setData(data)
-                                    .setLabels(dirtyOptions.getLabels())
-                                    .setLogTag(dirtyOptions.getLogTag())
-                                    .setIdentifier(dirtyOptions.getIdentifier())
+                                    .setLabels(dirtyLabel)
+                                    .setLogTag(dirtyLogTag)
+                                    .setIdentifier(dirtyIdentifier)
                                     .setRowType( multipleWriters.get(tableId).getFlinkRowType())
                                     .setDirtyMessage(e.getMessage());
                             dirtySink.invoke(builder.build());
@@ -265,12 +282,10 @@ public class IcebergMultipleStreamWriter extends IcebergProcessFunction<RecordWi
                             LOG.warn("Dirty sink failed", ex);
                         }
                     }
+                    return;
                 }
 
                 if (sinkMetricData != null) {
-                    String dataBaseName = tableId.namespace().toString();
-                    String tableName = tableId.name();
-                    long size = data.toString().getBytes(StandardCharsets.UTF_8).length;
                     sinkMetricData.outputMetrics(dataBaseName, tableName, 1, size);
                 }
             }
@@ -288,11 +303,9 @@ public class IcebergMultipleStreamWriter extends IcebergProcessFunction<RecordWi
 
     @Override
     public void snapshotState(FunctionSnapshotContext context) throws Exception {
-        for (Entry<TableIdentifier, IcebergSingleStreamWriter<RowData>> entry : multipleWriters.entrySet()) {
-            if (sinkMetricData != null && metricStateListState != null) {
-                MetricStateUtils.snapshotMetricStateForSinkMetricData(metricStateListState, sinkMetricData,
-                        getRuntimeContext().getIndexOfThisSubtask());
-            }
+        if (sinkMetricData != null && metricStateListState != null) {
+            MetricStateUtils.snapshotMetricStateForSinkMetricData(metricStateListState, sinkMetricData,
+                    getRuntimeContext().getIndexOfThisSubtask());
         }
     }
 
