@@ -198,8 +198,7 @@ public class AgentServiceImpl implements AgentService {
     }
 
     @Override
-    @Transactional(rollbackFor = Throwable.class, isolation = Isolation.READ_COMMITTED,
-            propagation = Propagation.REQUIRES_NEW)
+    @Transactional(rollbackFor = Throwable.class, isolation = Isolation.READ_COMMITTED, propagation = Propagation.REQUIRES_NEW)
     public Boolean bindGroup(AgentClusterNodeBindGroupRequest request) {
         HashSet<String> bindSet = Sets.newHashSet();
         HashSet<String> unbindSet = Sets.newHashSet();
