@@ -517,8 +517,10 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                             public void deserialize(SourceRecord record, Collector<T> out, Boolean isStreamingPhase)
                                     throws Exception {
                                 if (sourceMetricData != null && record != null && migrateAll) {
-                                    if (MongoRecordUtils.isHeartbeatEvent(record) && isStreamingPhase) {
-                                        sourceMetricData.outputReadPhaseMetrics(ReadPhase.INCREASE_PHASE);
+                                    if (MongoRecordUtils.isHeartbeatEvent(record)) {
+                                        if (isStreamingPhase) {
+                                            sourceMetricData.outputReadPhaseMetrics(ReadPhase.INCREASE_PHASE);
+                                        }
                                         return;
                                     }
                                     Struct value = (Struct) record.value();
