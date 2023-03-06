@@ -220,7 +220,6 @@ public class HeartbeatManager implements AbstractHeartbeatManager {
         clusterNode.setPort(Integer.valueOf(heartbeat.getPort()));
         clusterNode.setProtocolType(heartbeat.getProtocolType());
         clusterNode.setNodeLoad(heartbeat.getLoad());
-        clusterNode.setNodeTags(heartbeat.getNodeTag());
         clusterNode.setStatus(ClusterStatus.NORMAL.getStatus());
         clusterNode.setCreator(creator);
         clusterNode.setModifier(creator);
@@ -232,7 +231,6 @@ public class HeartbeatManager implements AbstractHeartbeatManager {
     private int updateClusterNode(InlongClusterNodeEntity clusterNode, HeartbeatMsg heartbeat) {
         clusterNode.setStatus(ClusterStatus.NORMAL.getStatus());
         clusterNode.setNodeLoad(heartbeat.getLoad());
-        clusterNode.setNodeTags(heartbeat.getNodeTag());
         insertOrUpdateLabel(clusterNode, heartbeat);
         return clusterNodeMapper.updateById(clusterNode);
     }

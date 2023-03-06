@@ -236,42 +236,9 @@ public class InlongGroupServiceImpl implements InlongGroupService {
 
     @Override
     public InlongGroupInfo get(String groupId, UserInfo opInfo) {
-        // check group id
-        if (StringUtils.isBlank(groupId)) {
-            throw new BusinessException(ErrorCodeEnum.GROUP_ID_IS_EMPTY);
-        }
-        // check operator info
-        if (opInfo == null) {
-            throw new BusinessException(ErrorCodeEnum.LOGIN_USER_EMPTY);
-        }
-        LOGGER.info("test size={}", briefInfos.size());
-        for (InlongGroupBriefInfo briefInfo : briefInfos) {
-            LOGGER.info("test groupId={}, status={}", briefInfo.getInlongGroupId(), briefInfo.getStatus());
-        }
-        PageResult<InlongGroupBriefInfo> pageResult = new PageResult<>(briefInfos,
-                entityPage.getTotal(), entityPage.getPageNum(), entityPage.getPageSize());
-
-        LOGGER.debug("success to list inlong group for {}", request);
-        return pageResult;
-    }
-
-    @Override
-    @Transactional(rollbackFor = Throwable.class, isolation = Isolation.REPEATABLE_READ,
-            propagation = Propagation.REQUIRES_NEW)
-    public String update(InlongGroupRequest request, String operator) {
-        LOGGER.debug("begin to update inlong group={} by user={}", request, operator);
-
-        String groupId = request.getInlongGroupId();
         InlongGroupEntity entity = groupMapper.selectByGroupId(groupId);
         if (entity == null) {
             throw new BusinessException(ErrorCodeEnum.GROUP_NOT_FOUND);
-        }
-        // only the person in charges can query
-        if (!opInfo.getRoles().contains(UserTypeEnum.ADMIN.name())) {
-            List<String> inCharges = Arrays.asList(entity.getInCharges().split(InlongConstants.COMMA));
-            if (!inCharges.contains(opInfo.getName())) {
-                throw new BusinessException(ErrorCodeEnum.GROUP_PERMISSION_DENIED);
-            }
         }
         // query mq information
         InlongGroupOperator instance = groupOperatorFactory.getInstance(entity.getMqType());
@@ -706,7 +673,7 @@ public class InlongGroupServiceImpl implements InlongGroupService {
             Map<String, String> authProperties = JsonUtils.parseObject(authentication,
                     new TypeReference<Map<String, String>>() {
                     });
-         f   SecretTokenAuthentication secretTokenAuthentication = new SecretTokenAuthentication();
+            SecretTokenAuthentication secretTokenAuthentication = new SecretTokenAuthentication();
             secretTokenAuthentication.configure(authProperties);
             sortConf.setAuthentication(secretTokenAuthentication);
         }

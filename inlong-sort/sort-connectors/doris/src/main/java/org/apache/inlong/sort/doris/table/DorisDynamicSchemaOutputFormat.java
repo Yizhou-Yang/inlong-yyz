@@ -165,6 +165,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
     private String columns;
     private final LogicalType[] logicalTypes;
     private DirtySinkHelper<Object> dirtySinkHelper;
+    private transient Schema schema;
 
     public DorisDynamicSchemaOutputFormat(DorisOptions option,
             DorisReadOptions readOptions,
@@ -210,15 +211,6 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         return new DorisDynamicSchemaOutputFormat.Builder();
     }
 
-    private String parseKeysType() {
-        try {
-            Schema schema = RestService.getSchema(options, readOptions, LOG);
-            return schema.getKeysType();
-        } catch (DorisException e) {
-            throw new RuntimeException("Failed fetch doris table schema: " + options.getTableIdentifier());
-        }
-    }
-
     private void handleStreamLoadProp() {
         Properties props = executionOptions.getStreamLoadProp();
         boolean ifEscape = Boolean.parseBoolean(props.getProperty(ESCAPE_DELIMITERS_KEY, ESCAPE_DELIMITERS_DEFAULT));
@@ -254,12 +246,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         if (multipleSink) {
             return executionOptions.getEnableDelete();
         }
-        try {
-            Schema schema = RestService.getSchema(options, readOptions, LOG);
-            return executionOptions.getEnableDelete() || UNIQUE_KEYS_TYPE.equals(schema.getKeysType());
-        } catch (DorisException e) {
-            throw new RuntimeException("Failed fetch doris single table schema: " + options.getTableIdentifier(), e);
-        }
+        return executionOptions.getEnableDelete() || UNIQUE_KEYS_TYPE.equals(schema.getKeysType());
     }
 
     @Override
@@ -275,24 +262,21 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             // handleStreamLoadProp();
             this.fieldGetters = new RowData.FieldGetter[logicalTypes.length];
             for (int i = 0; i < logicalTypes.length; i++) {
-                fieldGetters[i] = RowData.createFieldGetter(logicalTypes[i], i);
-                if ("DATE".equalsIgnoreCase(logicalTypes[i].toString())) {
-                    int finalI = i;
-                    fieldGetters[i] = row -> {
-                        if (row.isNullAt(finalI)) {
-                            return null;
-                        }
-                        return DorisParseUtils.epochToDate(row.getInt(finalI));
-                    };
-                }
+                fieldGetters[i] = DorisParseUtils.createFieldGetter(logicalTypes[i], i);
+            }
+            try {
+                schema = RestService.getSchema(options, readOptions, LOG);
+            } catch (DorisException e) {
+                throw new RuntimeException(e);
             }
         }
 
         if (multipleSink && StringUtils.isNotBlank(dynamicSchemaFormat)) {
-            jsonDynamicSchemaFormat = (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(
-                    dynamicSchemaFormat);
+            jsonDynamicSchemaFormat =
+                    (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(dynamicSchemaFormat);
         }
-        MetricOption metricOption = MetricOption.builder().withInlongLabels(inlongMetric)
+        MetricOption metricOption = MetricOption.builder()
+                .withInlongLabels(inlongMetric)
                 .withInlongAudit(auditHostAndPorts)
                 .withInitRecords(metricState != null ? metricState.getMetricValue(NUM_RECORDS_OUT) : 0L)
                 .withInitBytes(metricState != null ? metricState.getMetricValue(NUM_BYTES_OUT) : 0L)
@@ -417,7 +401,6 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                 // Ignore ddl change for now
                 return;
             }
-
             String tableIdentifier;
             List<RowKind> rowKinds;
             JsonNode physicalData;
@@ -525,12 +508,17 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             Map<String, String> updateBeforeData, String database, String table)
             throws IOException {
         DirtyOptions dirtyOptions = dirtySinkHelper.getDirtyOptions();
-        String dirtyLabel = jsonDynamicSchemaFormat.parse(rootNode,
-                DirtySinkHelper.regexReplace(dirtyOptions.getLabels(), DirtyType.BATCH_LOAD_ERROR, null));
-        String dirtyLogTag = jsonDynamicSchemaFormat.parse(rootNode,
-                DirtySinkHelper.regexReplace(dirtyOptions.getLogTag(), DirtyType.BATCH_LOAD_ERROR, null));
-        String dirtyIdentifier = jsonDynamicSchemaFormat.parse(rootNode,
-                DirtySinkHelper.regexReplace(dirtyOptions.getIdentifier(), DirtyType.BATCH_LOAD_ERROR, null));
+        String dirtyLabel = null;
+        String dirtyLogTag = null;
+        String dirtyIdentifier = null;
+        if (dirtyOptions.ignoreDirty()) {
+            dirtyLabel = jsonDynamicSchemaFormat.parse(rootNode,
+                    DirtySinkHelper.regexReplace(dirtyOptions.getLabels(), DirtyType.BATCH_LOAD_ERROR, null));
+            dirtyLogTag = jsonDynamicSchemaFormat.parse(rootNode,
+                    DirtySinkHelper.regexReplace(dirtyOptions.getLogTag(), DirtyType.BATCH_LOAD_ERROR, null));
+            dirtyIdentifier = jsonDynamicSchemaFormat.parse(rootNode,
+                    DirtySinkHelper.regexReplace(dirtyOptions.getIdentifier(), DirtyType.BATCH_LOAD_ERROR, null));
+        }
         physicalData.put(DIRTY_LOG_TAG, dirtyLogTag);
         physicalData.put(DIRTY_IDENTIFIER, dirtyIdentifier);
         physicalData.put(DIRTY_LABEL, dirtyLabel);
@@ -562,8 +550,10 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         }
 
         DirtyOptions dirtyOptions = dirtySinkHelper.getDirtyOptions();
-        dirtySinkHelper.invoke(dirtyData, dirtyType, dirtyOptions.getLabels(), dirtyOptions.getLogTag(),
-                dirtyOptions.getIdentifier(), e);
+        if (dirtyOptions.ignoreDirty()) {
+            dirtySinkHelper.invoke(dirtyData, dirtyType, dirtyOptions.getLabels(), dirtyOptions.getLogTag(),
+                    dirtyOptions.getIdentifier(), e);
+        }
 
         metricData.invokeDirty(1, dirtyData.toString().getBytes(StandardCharsets.UTF_8).length);
     }
@@ -583,7 +573,9 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         String table = rawData.remove(TABLE);
         String content = OBJECT_MAPPER.writeValueAsString(rawData);
 
-        dirtySinkHelper.invoke(OBJECT_MAPPER.readTree(content), dirtyType, label, logTag, identifier, e);
+        if (dirtySinkHelper.getDirtyOptions().ignoreDirty()) {
+            dirtySinkHelper.invoke(OBJECT_MAPPER.readTree(content), dirtyType, label, logTag, identifier, e);
+        }
 
         try {
             metricData.outputDirtyMetricsWithEstimate(database, table, 1,
@@ -631,7 +623,8 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             StringBuilder sb = new StringBuilder();
             while (fieldNames.hasNext()) {
                 String item = fieldNames.next();
-                sb.append("`").append(item.trim().replace("`", "")).append("`,");
+                sb.append("`").append(item.trim()
+                        .replace("`", "")).append("`,");
             }
             if (enableBatchDelete()) {
                 sb.append(DORIS_DELETE_SIGN);
@@ -680,8 +673,8 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         }
         batchBytes = 0;
         size = 0;
-        LOG.info("Doris sink statistics: readInNum: {}, writeOutNum: {}, errorNum: {}, ddlNum: {}", readInNum.get(),
-                writeOutNum.get(), readInNum.get() - writeOutNum.get(), ddlNum.get());
+        LOG.info("Doris sink statistics: readInNum: {}, writeOutNum: {}, errorNum: {}, ddlNum: {}",
+                readInNum.get(), writeOutNum.get(), errorNum.get(), ddlNum.get());
         flushing = false;
     }
 
@@ -894,8 +887,9 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
     public void initializeState(FunctionInitializationContext context) throws Exception {
         if (this.inlongMetric != null) {
             this.metricStateListState = context.getOperatorStateStore().getUnionListState(
-                    new ListStateDescriptor<>(INLONG_METRIC_STATE_NAME, TypeInformation.of(new TypeHint<MetricState>() {
-                    })));
+                    new ListStateDescriptor<>(
+                            INLONG_METRIC_STATE_NAME, TypeInformation.of(new TypeHint<MetricState>() {
+                            })));
         }
         if (context.isRestored()) {
             metricState = MetricStateUtils.restoreMetricState(metricStateListState,
