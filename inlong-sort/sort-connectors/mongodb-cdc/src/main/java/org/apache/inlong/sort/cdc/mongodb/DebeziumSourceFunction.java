@@ -516,13 +516,13 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                             @Override
                             public void deserialize(SourceRecord record, Collector<T> out, Boolean isStreamingPhase)
                                     throws Exception {
-                                if (sourceMetricData != null && record != null && migrateAll) {
-                                    if (MongoRecordUtils.isHeartbeatEvent(record)) {
-                                        if (isStreamingPhase) {
-                                            sourceMetricData.outputReadPhaseMetrics(ReadPhase.INCREASE_PHASE);
-                                        }
-                                        return;
+                                if (record != null && MongoRecordUtils.isHeartbeatEvent(record)) {
+                                    if (sourceMetricData != null && isStreamingPhase) {
+                                        sourceMetricData.outputReadPhaseMetrics(ReadPhase.INCREASE_PHASE);
                                     }
+                                    return;
+                                }
+                                if (sourceMetricData != null && record != null && migrateAll) {
                                     Struct value = (Struct) record.value();
                                     Struct ns = value.getStruct(MongoDBEnvelope.NAMESPACE_FIELD);
                                     if (null == ns) {
