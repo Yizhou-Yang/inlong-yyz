@@ -199,7 +199,9 @@ public final class TableMetricStatementExecutor implements JdbcBatchStatementExe
             dirtySinkHelper.invoke(rowData.toString(), DirtyType.BATCH_LOAD_ERROR, e);
             sinkMetricData.invokeDirty(1, rowData.toString().getBytes().length);
         } else {
-            dirtySinkHelper.invoke(rowData.toString(), DirtyType.BATCH_LOAD_ERROR, label, logtag, identifier, e);
+            if (label != null) {
+                dirtySinkHelper.invoke(rowData.toString(), DirtyType.BATCH_LOAD_ERROR, label, logtag, identifier, e);
+            }
             metric[2] += 1;
             metric[3] += rowData.toString().getBytes().length;
         }
@@ -207,9 +209,9 @@ public final class TableMetricStatementExecutor implements JdbcBatchStatementExe
 
     private List<Integer> parseError(SQLException e) throws SQLException {
         List<Integer> errors = new ArrayList<>();
-        int pos = getPosFromMessage(e.getMessage());
+        int pos = getPosFromMessage(e.toString());
         if (pos != -1) {
-            errors.add(getPosFromMessage(e.getMessage()));
+            errors.add(getPosFromMessage(e.toString()));
         } else {
             throw new SQLException(e);
         }

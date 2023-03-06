@@ -94,9 +94,9 @@ import java.util.regex.Pattern;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.inlong.sort.base.Constants.DIRTY_BYTES_OUT;
 import static org.apache.inlong.sort.base.Constants.DIRTY_RECORDS_OUT;
-import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_OUT;
-import static org.apache.inlong.sort.base.Constants.NUM_BYTES_OUT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC_STATE_NAME;
+import static org.apache.inlong.sort.base.Constants.NUM_BYTES_OUT;
+import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_OUT;
 
 /**
  * A JDBC multi-table outputFormat that supports batching records before writing records to databases.
@@ -104,39 +104,10 @@ import static org.apache.inlong.sort.base.Constants.INLONG_METRIC_STATE_NAME;
  */
 public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatchStatementExecutor<JdbcIn>>
         extends
-        AbstractJdbcOutputFormat<In> {
+            AbstractJdbcOutputFormat<In> {
 
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(JdbcMultiBatchingOutputFormat.class);
-    private final JdbcExecutionOptions executionOptions;
-    private final String inlongMetric;
-    private final String auditHostAndPorts;
-    private transient int batchCount = 0;
-    private transient volatile boolean closed = false;
-    private transient ScheduledExecutorService scheduler;
-    private transient ScheduledFuture<?> scheduledFuture;
-    private transient RuntimeContext runtimeContext;
-    private transient JsonDynamicSchemaFormat jsonDynamicSchemaFormat;
-    private JdbcDmlOptions dmlOptions;
-    private JdbcOptions jdbcOptions;
-    private boolean appendMode;
-    private transient Map<String, JdbcExec> jdbcExecMap = new HashMap<>();
-    private transient Map<String, SimpleJdbcConnectionProvider> connectionExecProviderMap = new HashMap<>();
-    private transient Map<String, RowType> rowTypeMap = new HashMap<>();
-    private transient Map<String, List<String>> pkNameMap = new HashMap<>();
-    private transient Map<String, List<GenericRowData>> recordsMap = new HashMap<>();
-    private transient Map<String, Exception> tableExceptionMap = new HashMap<>();
-    private transient Boolean stopWritingWhenTableException;
-    private transient ListState<MetricState> metricStateListState;
-    private final String sinkMultipleFormat;
-    private final String databasePattern;
-    private final String tablePattern;
-    private final String schemaPattern;
-    private transient MetricState metricState;
-    private SinkTableMetricData sinkMetricData;
-    private final SchemaUpdateExceptionPolicy schemaUpdateExceptionPolicy;
-    private final DirtySinkHelper<Object> dirtySinkHelper;
-
     private static final DateTimeFormatter SQL_TIMESTAMP_WITH_LOCAL_TIMEZONE_FORMAT;
     private static final DateTimeFormatter SQL_TIME_FORMAT;
 
@@ -147,6 +118,36 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 (new DateTimeFormatterBuilder()).append(DateTimeFormatter.ISO_LOCAL_DATE).appendLiteral('T')
                         .append(SQL_TIME_FORMAT).appendPattern("'Z'").toFormatter();
     }
+
+    private final JdbcExecutionOptions executionOptions;
+    private final String inlongMetric;
+    private final String auditHostAndPorts;
+    private final String sinkMultipleFormat;
+    private final String databasePattern;
+    private final String tablePattern;
+    private final String schemaPattern;
+    private final SchemaUpdateExceptionPolicy schemaUpdateExceptionPolicy;
+    private final DirtySinkHelper<Object> dirtySinkHelper;
+    private final JdbcDmlOptions dmlOptions;
+    private final JdbcOptions jdbcOptions;
+    private final boolean appendMode;
+    private final long totalDataSize = 0L;
+    private transient int batchCount = 0;
+    private transient volatile boolean closed = false;
+    private transient ScheduledExecutorService scheduler;
+    private transient ScheduledFuture<?> scheduledFuture;
+    private transient RuntimeContext runtimeContext;
+    private transient JsonDynamicSchemaFormat jsonDynamicSchemaFormat;
+    private transient Map<String, JdbcExec> jdbcExecMap = new HashMap<>();
+    private transient Map<String, SimpleJdbcConnectionProvider> connectionExecProviderMap = new HashMap<>();
+    private transient Map<String, RowType> rowTypeMap = new HashMap<>();
+    private transient Map<String, List<String>> pkNameMap = new HashMap<>();
+    private transient Map<String, List<GenericRowData>> recordsMap = new HashMap<>();
+    private transient Map<String, Exception> tableExceptionMap = new HashMap<>();
+    private transient Boolean stopWritingWhenTableException;
+    private transient ListState<MetricState> metricStateListState;
+    private transient MetricState metricState;
+    private SinkTableMetricData sinkMetricData;
 
     public JdbcMultiBatchingOutputFormat(
             @Nonnull JdbcConnectionProvider connectionProvider,
@@ -238,7 +239,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     /**
      * get or create  StatementExecutor for one table.
      *
-     * @param tableIdentifier The table identifier for which to get statementExecutor.
+     * @param tableIdentifier The tabxle identifier for which to get statementExecutor.
      */
     private JdbcExec getOrCreateStatementExecutor(
             String tableIdentifier) throws IOException {
@@ -303,7 +304,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             }
             connectionExecProviderMap.put(tableIdentifier, tableConnectionProvider);
 
-            if (!stopWritingWhenTableException && dirtySinkHelper.getDirtySink() != null) {
+            if (schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE)) {
                 try {
                     JdbcExec newExecutor = enhanceExecutor(jdbcExec);
                     if (newExecutor != null) {
@@ -324,9 +325,6 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     }
 
     private JdbcExec enhanceExecutor(JdbcExec exec) throws NoSuchFieldException, IllegalAccessException {
-        if (dirtySinkHelper.getDirtySink() == null) {
-            return null;
-        }
         // enhance the actual executor to tablemetricstatementexecutor
         Field subExecutor;
         if (exec instanceof TableBufferReducedStatementExecutor) {
@@ -396,7 +394,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             String tableIdentifier;
             String database;
             String table;
-            String schema = null;
+            String schema;
             try {
                 if (StringUtils.isBlank(schemaPattern)) {
                     database = jsonDynamicSchemaFormat.parse(rootNode, databasePattern);
@@ -440,6 +438,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 LOG.warn("Extract schema failed", e);
                 return;
             }
+
             try {
                 recordsMap.computeIfAbsent(tableIdentifier, k -> new ArrayList<>())
                         .add(record);
@@ -590,7 +589,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             this.metricStateListState = context.getOperatorStateStore().getUnionListState(
                     new ListStateDescriptor<>(
                             INLONG_METRIC_STATE_NAME, TypeInformation.of(new TypeHint<MetricState>() {
-                    })));
+                            })));
 
         }
         if (context.isRestored()) {
@@ -629,9 +628,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             Exception tableException = null;
             try {
                 jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);
-                Long totalDataSize = 0L;
                 for (GenericRowData record : tableIdRecordList) {
-                    totalDataSize = totalDataSize + record.toString().getBytes(StandardCharsets.UTF_8).length;
                     jdbcStatementExecutor.addToBatch((JdbcIn) record);
                 }
                 if (dirtySinkHelper.getDirtySink() != null) {
@@ -639,14 +636,15 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 }
                 jdbcStatementExecutor.executeBatch();
                 flushFlag = true;
-                if (dirtySinkHelper.getDirtySink() == null) {
-                    outputMetrics(tableIdentifier, Long.valueOf(tableIdRecordList.size()),
+                if (!schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE)) {
+                    outputMetrics(tableIdentifier, (long) tableIdRecordList.size(),
                             totalDataSize, false);
                 } else {
                     try {
-                        outputMetrics(tableIdentifier);
+                        outputMetrics(tableIdRecordList.size(), tableIdentifier);
                     } catch (Exception e) {
-                        outputMetrics(tableIdentifier, Long.valueOf(tableIdRecordList.size()),
+                        LOG.error("dirty metric calculation exception:{}", e);
+                        outputMetrics(tableIdentifier, (long) tableIdRecordList.size(),
                                 totalDataSize, false);
                     }
                 }
@@ -667,33 +665,29 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             }
 
             if (!flushFlag) {
+                if (schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.STOP_PARTIAL)) {
+                    LOG.error("exception detected, skipping table " + tableIdentifier);
+                    tableExceptionMap.put(tableIdentifier, tableException);
+                    tableIdRecordList.clear();
+                    continue;
+                }
+
+                if (schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.THROW_WITH_STOP)) {
+                    LOG.error("exception detected, restarting entire task");
+                    throw new RuntimeException(tableException);
+                }
+
                 for (GenericRowData record : tableIdRecordList) {
                     for (int retryTimes = 1; retryTimes <= executionOptions.getMaxRetries(); retryTimes++) {
                         try {
                             jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);
                             jdbcStatementExecutor.addToBatch((JdbcIn) record);
                             jdbcStatementExecutor.executeBatch();
-                            Long totalDataSize =
-                                    Long.valueOf(record.toString().getBytes(StandardCharsets.UTF_8).length);
-                            if (dirtySinkHelper.getDirtySink() == null) {
-                                outputMetrics(tableIdentifier, (long) tableIdRecordList.size(),
-                                        totalDataSize, false);
-                            } else {
-                                try {
-                                    outputMetrics(tableIdentifier);
-                                } catch (Exception e) {
-                                    LOG.error("JDBC table metric calculation exception" + e);
-                                    outputMetrics(tableIdentifier, (long) tableIdRecordList.size(),
-                                            totalDataSize, false);
-                                }
-                            }
-                            flushFlag = true;
                             break;
                         } catch (Exception e) {
                             LOG.warn("Flush one record tableIdentifier:{} ,retryTimes:{} get err:",
                                     tableIdentifier, retryTimes, e);
                             getAndSetPkFromErrMsg(e.getMessage(), tableIdentifier);
-                            tableException = e;
                             updateOneExecutor(true, tableIdentifier);
                             try {
                                 Thread.sleep(1000 * retryTimes);
@@ -704,22 +698,8 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                             }
                         }
                     }
-                    if (!flushFlag && null != tableException) {
-                        LOG.info("Put tableIdentifier:{} exception:{}",
-                                tableIdentifier, tableException.getMessage());
-                        if (dirtySinkHelper.getDirtySink() == null &&
-                                !schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.THROW_WITH_STOP)) {
-                            outputMetrics(tableIdentifier, Long.valueOf(tableIdRecordList.size()),
-                                    1L, true);
-                        }
-                        tableExceptionMap.put(tableIdentifier, tableException);
-                        if (stopWritingWhenTableException) {
-                            LOG.info("Stop write table:{} because occur exception",
-                                    tableIdentifier);
-                            break;
-                        }
-                    }
                 }
+                outputMetrics(tableIdentifier, (long) tableIdRecordList.size(), totalDataSize, false);
             }
             tableIdRecordList.clear();
         }
@@ -750,7 +730,8 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         }
     }
 
-    private void outputMetrics(String tableIdentifier) throws NoSuchFieldException, IllegalAccessException {
+    private void outputMetrics(long totalCount, String tableIdentifier)
+            throws NoSuchFieldException, IllegalAccessException {
         String[] fieldArray = tableIdentifier.split("\\.");
         // throw an exception if the executor is not enhanced
         JdbcExec executor = jdbcExecMap.get(tableIdentifier);
@@ -766,10 +747,11 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         }
         Field metricField = TableMetricStatementExecutor.class.getDeclaredField("metric");
         long[] metrics = (long[]) metricField.get(executor);
-        long cleanCount = metrics[0];
-        long cleanSize = metrics[1];
         long dirtyCount = metrics[2];
         long dirtySize = metrics[3];
+
+        long cleanCount = totalCount - dirtyCount;
+        long cleanSize = metrics[1];
 
         if (fieldArray.length == 3) {
             sinkMetricData.outputDirtyMetrics(fieldArray[0], fieldArray[1], fieldArray[2],
@@ -865,8 +847,8 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
      */
     public interface StatementExecutorFactory<T extends JdbcBatchStatementExecutor<?>>
             extends
-            Function<RuntimeContext, T>,
-            Serializable {
+                Function<RuntimeContext, T>,
+                Serializable {
 
     }
 
