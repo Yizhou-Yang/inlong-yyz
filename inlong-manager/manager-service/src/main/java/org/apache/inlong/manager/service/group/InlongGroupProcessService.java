@@ -337,7 +337,9 @@ public class InlongGroupProcessService {
 
     private void invokeDeleteProcess(String groupId, String operator) {
         // check can be deleted
-        InlongGroupInfo groupInfo = groupService.doDeleteCheck(groupId, operator);
+        // InlongGroupInfo groupInfo = groupService.doDeleteCheck(groupId, operator);
+        // not to check direct to delete group
+        InlongGroupInfo groupInfo = groupService.get(groupId);
         // start to delete group process
         GroupResourceProcessForm form = genGroupResourceProcessForm(groupInfo, GroupOperateType.DELETE);
         WorkflowResult result = workflowService.start(ProcessName.DELETE_GROUP_PROCESS, operator, form);
