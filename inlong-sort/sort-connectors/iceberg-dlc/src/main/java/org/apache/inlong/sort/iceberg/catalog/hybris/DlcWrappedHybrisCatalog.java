@@ -108,8 +108,7 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
             DLCUtils.GATEWAY_URL,
             DLCUtils.OWNER_UIN,
             DLCUtils.OPERATOR_UIN,
-            Constants.DLC_CREDENTIAL_PROVIDER_CLASS_CONF
-    ).collect(Collectors.toSet());
+            Constants.DLC_CREDENTIAL_PROVIDER_CLASS_CONF).collect(Collectors.toSet());
 
     private static final Logger LOG = LoggerFactory.getLogger(DlcWrappedHybrisCatalog.class);
 

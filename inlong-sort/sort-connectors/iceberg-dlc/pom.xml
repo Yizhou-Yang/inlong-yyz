@@ -47,8 +47,8 @@
             <artifactId>lakefs-cloud-plugin</artifactId>
             <exclusions>
                 <exclusion>
-                    <artifactId>tencentcloud-sdk-java</artifactId>
                     <groupId>com.tencentcloudapi</groupId>
+                    <artifactId>tencentcloud-sdk-java</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -61,16 +61,16 @@
                     <artifactId>tencentcloud-sdk-java</artifactId>
                 </exclusion>
                 <exclusion>
-                    <artifactId>tencentcloud-sdk-java-common</artifactId>
                     <groupId>com.tencentcloudapi</groupId>
+                    <artifactId>tencentcloud-sdk-java-common</artifactId>
                 </exclusion>
                 <exclusion>
                     <groupId>com.tencent.cloud.wedata</groupId>
                     <artifactId>wedata-credential-utils</artifactId>
                 </exclusion>
                 <exclusion>
-                    <artifactId>cos_api</artifactId>
                     <groupId>com.qcloud</groupId>
+                    <artifactId>cos_api</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -229,15 +229,11 @@
                                 <relocation>
                                     <pattern>com.amazonaws</pattern>
                                     <shadedPattern>org.apache.inlong.sort.iceberg.shaded.com.amazonaws</shadedPattern>
-                                    <shadedPattern>
-                                        org.apache.inlong.sort.iceberg.shaded.org.apache.inlong.sort.base
-                                    </shadedPattern>
+                                    <shadedPattern>org.apache.inlong.sort.iceberg.shaded.org.apache.inlong.sort.base</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.commons.codec.digest</pattern>
-                                    <shadedPattern>
-                                        org.apache.inlong.sort.iceberg.shaded.org.apache.commons.codec.digest
-                                    </shadedPattern>
+                                    <shadedPattern>org.apache.inlong.sort.iceberg.shaded.org.apache.commons.codec.digest</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
@@ -249,26 +245,41 @@
 
     <repositories>
         <repository>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
             <id>dlc-snapshot</id>
             <name>dlc_snapshot_mirror</name>
             <url>https://mirrors.tencent.com/repository/maven/dlc-snapshot</url>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
         </repository>
         <repository>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
             <id>dlc</id>
             <name>dlc_mirror</name>
             <url>https://mirrors.tencent.com/repository/maven/dlc</url>
+        </repository>
+        <repository>
+            <id>tencent_public</id>
+            <name>tencent_public</name>
+            <url>https://mirrors.tencent.com/repository/maven/tencent_public</url>
+        </repository>
+        <repository>
             <releases>
-                <enabled>true</enabled>
+                <enabled>false</enabled>
             </releases>
             <snapshots>
-                <enabled>false</enabled>
+                <enabled>true</enabled>
             </snapshots>
+            <id>tencent.snapshots</id>
+            <url>https://mirrors.tencent.com/repository/maven/tencent_public_snapshots/</url>
         </repository>
     </repositories>
 </project>

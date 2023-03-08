@@ -109,7 +109,6 @@ public class IcebergMultipleStreamWriter extends IcebergProcessFunction<RecordWi
     private transient ListState<MetricState> metricStateListState;
     private transient RuntimeContext runtimeContext;
 
-
     public IcebergMultipleStreamWriter(
             boolean appendMode,
             CatalogLoader catalogLoader,
@@ -277,7 +276,7 @@ public class IcebergMultipleStreamWriter extends IcebergProcessFunction<RecordWi
                                     .setLabels(dirtyLabel)
                                     .setLogTag(dirtyLogTag)
                                     .setIdentifier(dirtyIdentifier)
-                                    .setRowType( multipleWriters.get(tableId).getFlinkRowType())
+                                    .setRowType(multipleWriters.get(tableId).getFlinkRowType())
                                     .setDirtyMessage(e.getMessage());
                             dirtySink.invoke(builder.build());
                             if (sinkMetricData != null) {
@@ -324,7 +323,7 @@ public class IcebergMultipleStreamWriter extends IcebergProcessFunction<RecordWi
             this.metricStateListState = context.getOperatorStateStore().getUnionListState(
                     new ListStateDescriptor<>(
                             INLONG_METRIC_STATE_NAME, TypeInformation.of(new TypeHint<MetricState>() {
-                    })));
+                            })));
 
         }
         if (context.isRestored()) {

@@ -83,8 +83,8 @@ import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_OUT;
 
 public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWithSchema>
         implements
-        OneInputStreamOperator<RowData, RecordWithSchema>,
-        ProcessingTimeCallback {
+            OneInputStreamOperator<RowData, RecordWithSchema>,
+            ProcessingTimeCallback {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DynamicSchemaHandleOperator.class);
     private static final long HELPER_DEBUG_INTERVEL = 10 * 60 * 1000;
@@ -112,8 +112,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
     // metric
     private final String inlongMetric;
     private final String auditHostAndPorts;
-    private @Nullable
-    transient SinkTableMetricData metricData;
+    private @Nullable transient SinkTableMetricData metricData;
     private transient ListState<MetricState> metricStateListState;
     private transient MetricState metricState;
 
@@ -209,7 +208,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
     }
 
     private void handleDirtyDataOfLogWithIgnore(JsonNode jsonNode, Schema dataSchema,
-                                                TableIdentifier tableId, Exception e) {
+            TableIdentifier tableId, Exception e) {
         List<RowData> rowDataForDataSchemaList = Collections.emptyList();
         try {
             rowDataForDataSchemaList = dynamicSchemaFormat
@@ -280,7 +279,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             this.metricStateListState = context.getOperatorStateStore().getUnionListState(
                     new ListStateDescriptor<>(
                             String.format(INLONG_METRIC_STATE_NAME), TypeInformation.of(new TypeHint<MetricState>() {
-                    })));
+                            })));
         }
         if (context.isRestored()) {
             metricState = MetricStateUtils.restoreMetricState(metricStateListState,
@@ -379,7 +378,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
                 } else {
                     throw new NotSupportedException(
                             String.format("SchemaUpdatePolicy %s does not support schema dynamic update!",
-                            multipleSinkOption.getSchemaUpdatePolicy()));
+                                    multipleSinkOption.getSchemaUpdatePolicy()));
                 }
             }
         }
@@ -470,6 +469,5 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         }
         return null;
     }
-
 
 }
