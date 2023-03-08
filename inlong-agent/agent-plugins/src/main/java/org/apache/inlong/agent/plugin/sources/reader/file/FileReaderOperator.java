@@ -97,6 +97,7 @@ public class FileReaderOperator extends AbstractReader {
     public boolean inited = false;
     public volatile boolean finished = false;
     public String instanceId;
+    public String fileKey = null;
     private long timeout;
     private long waitTimeout;
     private long lastTime = 0;

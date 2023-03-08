@@ -32,6 +32,8 @@ import org.apache.inlong.sort.protocol.node.extract.PostgresExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.PulsarExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.RedisExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.SqlServerExtractNode;
+import org.apache.inlong.sort.protocol.node.extract.TdsqlKafkaExtractNode;
+import org.apache.inlong.sort.protocol.node.extract.TidbExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.TubeMQExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.DorisExtractNode;
 import org.apache.inlong.sort.protocol.node.load.ClickHouseLoadNode;
@@ -95,6 +97,8 @@ import java.util.TreeMap;
         @JsonSubTypes.Type(value = HudiLoadNode.class, name = "hudiLoad"),
         @JsonSubTypes.Type(value = DorisLoadNode.class, name = "dorisLoad"),
         @JsonSubTypes.Type(value = StarRocksLoadNode.class, name = "starRocksLoad"),
+        @JsonSubTypes.Type(value = TidbExtractNode.class, name = "tidbExtract"),
+        @JsonSubTypes.Type(value = TdsqlKafkaExtractNode.class, name = "tdsqlKafkaExtract")
 })
 public interface Node {
 

@@ -36,20 +36,43 @@
             <groupId>org.apache.inlong</groupId>
             <artifactId>sort-connector-iceberg</artifactId>
             <version>${project.version}</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>hive-exec</artifactId>
-                    <groupId>org.apache.hive</groupId>
-                </exclusion>
-            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.tencent.cloud.wedata</groupId>
+            <artifactId>wedata-credential-utils</artifactId>
+            <version>1.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.qcloud.cos</groupId>
             <artifactId>lakefs-cloud-plugin</artifactId>
+            <exclusions>
+                <exclusion>
+                    <artifactId>tencentcloud-sdk-java</artifactId>
+                    <groupId>com.tencentcloudapi</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
-            <groupId>com.qcloud</groupId>
+            <groupId>com.tencent.cloud.dlc</groupId>
             <artifactId>dlc-jdbc</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.tencentcloudapi</groupId>
+                    <artifactId>tencentcloud-sdk-java</artifactId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>tencentcloud-sdk-java-common</artifactId>
+                    <groupId>com.tencentcloudapi</groupId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.tencent.cloud.wedata</groupId>
+                    <artifactId>wedata-credential-utils</artifactId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>cos_api</artifactId>
+                    <groupId>com.qcloud</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -59,6 +82,7 @@
         <dependency>
             <groupId>com.qcloud</groupId>
             <artifactId>cos_api-bundle</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.qcloud</groupId>
@@ -140,6 +164,11 @@
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-flink-runtime-1.14</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.8</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -174,6 +203,7 @@
                                     <include>org.ini4j:ini4j</include>
                                     <include>com.google.code.gson:gson</include>
                                     <include>javax.xml.bind:jaxb-api</include>
+                                    <include>com.tencent.cloud.wedata:*</include>
                                     <include>com.amazonaws:*</include>
                                     <include>com.fasterxml.jackson.core:jackson-databind</include>
                                 </includes>
@@ -199,6 +229,15 @@
                                 <relocation>
                                     <pattern>com.amazonaws</pattern>
                                     <shadedPattern>org.apache.inlong.sort.iceberg.shaded.com.amazonaws</shadedPattern>
+                                    <shadedPattern>
+                                        org.apache.inlong.sort.iceberg.shaded.org.apache.inlong.sort.base
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.codec.digest</pattern>
+                                    <shadedPattern>
+                                        org.apache.inlong.sort.iceberg.shaded.org.apache.commons.codec.digest
+                                    </shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
@@ -210,26 +249,26 @@
 
     <repositories>
         <repository>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
             <id>dlc-snapshot</id>
             <name>dlc_snapshot_mirror</name>
             <url>https://mirrors.tencent.com/repository/maven/dlc-snapshot</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
         </repository>
         <repository>
+            <id>dlc</id>
+            <name>dlc_mirror</name>
+            <url>https://mirrors.tencent.com/repository/maven/dlc</url>
             <releases>
                 <enabled>true</enabled>
             </releases>
             <snapshots>
                 <enabled>false</enabled>
             </snapshots>
-            <id>dlc</id>
-            <name>dlc_mirror</name>
-            <url>https://mirrors.tencent.com/repository/maven/dlc</url>
         </repository>
     </repositories>
 </project>

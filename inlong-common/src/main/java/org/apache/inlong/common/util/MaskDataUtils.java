@@ -274,4 +274,8 @@ public class MaskDataUtils {
         return charPos;
     }
 
+    public static String removeMaskMsg(String sql) {
+        return sql.replaceFirst("'gateway.url'.*,", "'gateway.url' = '******',");
+    }
+
 }

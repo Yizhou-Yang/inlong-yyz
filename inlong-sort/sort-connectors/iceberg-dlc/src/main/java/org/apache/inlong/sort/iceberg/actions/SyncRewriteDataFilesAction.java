@@ -17,11 +17,13 @@
 
 package org.apache.inlong.sort.iceberg.actions;
 
+import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.actions.RewriteDataFiles;
 import org.apache.iceberg.expressions.Expression;
 import org.apache.inlong.sort.iceberg.thread.TaskRunService;
+import org.apache.inlong.sort.iceberg.utils.DLCUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,10 +153,18 @@ public class SyncRewriteDataFilesAction implements RewriteDataFiles {
         String url = options.url();
         try {
             Class.forName(DLC_JDBC_CLASS);
-            connection = DriverManager.getConnection(
+            boolean tmpTokenOpen = Boolean.valueOf(this.options.getTableProperties().getOrDefault("tmp.token.open", "false"));
+            if (tmpTokenOpen) {
+                Properties properties = new Properties();
+                Map<String, String> tmpTokenOptions = DLCUtils.getTmpTokenOptions(this.options.getTableProperties());
+                properties.putAll(tmpTokenOptions);
+                connection = DriverManager.getConnection(url, properties);
+            } else {
+                connection = DriverManager.getConnection(
                     url,
                     options.secretId(),
                     options.secretKey());
+            }
             // get meta data
             DatabaseMetaData metaData = connection.getMetaData();
             LOG.info("DLC product = {}, DLC jdbc version = {}, DLC jdbc = '{}'",

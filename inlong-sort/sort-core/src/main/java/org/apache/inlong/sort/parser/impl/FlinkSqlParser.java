@@ -20,6 +20,7 @@ package org.apache.inlong.sort.parser.impl;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.table.api.TableEnvironment;
+import org.apache.inlong.common.util.MaskDataUtils;
 import org.apache.inlong.sort.configuration.Constants;
 import org.apache.inlong.sort.formats.base.TableFormatUtils;
 import org.apache.inlong.sort.formats.common.ArrayFormatInfo;
@@ -262,7 +263,7 @@ public class FlinkSqlParser implements Parser {
         if (node instanceof ExtractNode) {
             log.info("start parse node, node id:{}", node.getId());
             String sql = genCreateSql(node);
-            log.info("node id:{}, create table sql:\n{}", node.getId(), sql);
+            log.info("node id:{}, create table sql:\n{}", node.getId(), MaskDataUtils.removeMaskMsg(sql));
             registerTableSql(node, sql);
             hasParsedSet.add(node.getId());
         } else {
@@ -277,11 +278,11 @@ public class FlinkSqlParser implements Parser {
             }
             if (node instanceof LoadNode) {
                 String createSql = genCreateSql(node);
-                log.info("node id:{}, create table sql:\n{}", node.getId(), createSql);
+                log.info("node id:{}, create table sql:\n{}", node.getId(), MaskDataUtils.removeMaskMsg(createSql));
                 registerTableSql(node, createSql);
                 LoadNode loadNode = (LoadNode) node;
                 String insertSql = genLoadNodeInsertSql(loadNode, relation, nodeMap);
-                log.info("node id:{}, insert sql:\n{}", node.getId(), insertSql);
+                log.info("node id:{}, insert sql:\n{}", node.getId(), MaskDataUtils.removeMaskMsg(insertSql));
                 insertSqls.add(insertSql);
                 hasParsedSet.add(node.getId());
             } else if (node instanceof TransformNode) {
@@ -291,9 +292,9 @@ public class FlinkSqlParser implements Parser {
                 Preconditions.checkState(!transformNode.getFieldRelations().isEmpty(),
                         "field relations is empty");
                 String createSql = genCreateSql(node);
-                log.info("node id:{}, create table sql:\n{}", node.getId(), createSql);
+                log.info("node id:{}, create table sql:\n{}", node.getId(), MaskDataUtils.removeMaskMsg(createSql));
                 String selectSql = genTransformSelectSql(transformNode, relation, nodeMap);
-                log.info("node id:{}, tansform sql:\n{}", node.getId(), selectSql);
+                log.info("node id:{}, tansform sql:\n{}", node.getId(), MaskDataUtils.removeMaskMsg(selectSql));
                 registerTableSql(node, createSql + " AS\n" + selectSql);
                 hasParsedSet.add(node.getId());
             }

@@ -173,4 +173,28 @@ public class SyncRewriteDataFilesActionOption implements Serializable {
         }
         return Integer.valueOf(writeCompactInterval);
     }
+
+    public Map<String, String> getProperties() {
+        return properties;
+    }
+
+    public Map<String, String> getTableProperties() {
+        return tableProperties;
+    }
+
+    public long getLatestSnapshotId() {
+        return latestSnapshotId;
+    }
+
+    public void setProperties(Map<String, String> properties) {
+        this.properties = properties;
+    }
+
+    public void setTableProperties(Map<String, String> tableProperties) {
+        this.tableProperties = tableProperties;
+    }
+
+    public void setLatestSnapshotId(long latestSnapshotId) {
+        this.latestSnapshotId = latestSnapshotId;
+    }
 }
