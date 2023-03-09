@@ -225,7 +225,7 @@ public class HeartbeatManager implements AbstractHeartbeatManager {
         clusterNode.setModifier(creator);
         clusterNode.setDescription(AUTO_REGISTERED);
         insertOrUpdateLabel(clusterNode, heartbeat);
-        return clusterNodeMapper.insertOnDuplicateKeyUpdate(clusterNode);
+        return clusterNodeMapper.insert(clusterNode);
     }
 
     private int updateClusterNode(InlongClusterNodeEntity clusterNode, HeartbeatMsg heartbeat) {
