@@ -295,7 +295,7 @@ public final class RowDataDebeziumDeserializeSchema
                     // 'org.apache.inlong.sort.cdc.oracle.shaded' added,
                     // so we need to use `schemaName.contains()` to determine the Schema type.
                     String schemaName = schema.name();
-                    if (schemaName.contains(MicroTimestamp.SCHEMA_NAME)) {
+                    if (schemaName.contains(MicroTime.SCHEMA_NAME)) {
                         return (int) ((long) dbzObj / 1000);
                     } else if (schemaName.contains(NanoTime.SCHEMA_NAME)) {
                         return (int) ((long) dbzObj / 1000_000);
