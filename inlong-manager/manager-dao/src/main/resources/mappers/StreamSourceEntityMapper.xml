@@ -82,6 +82,15 @@
         where template_id = #{templateId,jdbcType=INTEGER}
         and is_deleted = 0
     </select>
+    <select id="selectByTemplateIdAndIp" resultType="org.apache.inlong.manager.dao.entity.StreamSourceEntity">
+        select
+        <include refid="Base_Column_List"/>
+        from stream_source
+        where template_id = #{templateId,jdbcType=INTEGER}
+        and agent_ip = #{agentIp, jdbcType=VARCHAR}
+        and is_deleted = 0
+        limit 1
+    </select>
     <select id="selectByIdForUpdate" resultType="org.apache.inlong.manager.dao.entity.StreamSourceEntity">
         select
         <include refid="Base_Column_List"/>

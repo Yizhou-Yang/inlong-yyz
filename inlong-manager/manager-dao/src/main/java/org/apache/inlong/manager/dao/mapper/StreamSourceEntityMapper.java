@@ -104,6 +104,9 @@ public interface StreamSourceEntityMapper {
      */
     List<StreamSourceEntity> selectByTemplateId(@Param("templateId") Integer templateId);
 
+    List<StreamSourceEntity> selectByTemplateIdAndIp(@Param("templateId") Integer templateId,
+            @Param("agentIp") String agentIp);
+
     /**
      * Get the distinct source type from the given groupId and streamId
      */
