@@ -61,6 +61,8 @@ import org.apache.inlong.manager.pojo.cluster.ClusterRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagPageRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagResponse;
+import org.apache.inlong.manager.pojo.cluster.agent.AgentClusterNodeRequest;
+import org.apache.inlong.manager.pojo.cluster.agent.DeleteAgentClusterNodeRequest;
 import org.apache.inlong.manager.pojo.cluster.pulsar.PulsarClusterDTO;
 import org.apache.inlong.manager.pojo.common.PageResult;
 import org.apache.inlong.manager.pojo.common.UpdateResult;
@@ -1648,4 +1650,30 @@ public class InlongClusterServiceImpl implements InlongClusterService {
                 errMsg);
     }
 
+
+    @Override
+    public Boolean logicDeleteNodeByAgentGroup(AgentClusterNodeRequest agentClusterNodeRequest) {
+        ClusterPageRequest clusterPageRequest = new ClusterPageRequest();
+        clusterPageRequest.setName(agentClusterNodeRequest.getName());
+        clusterPageRequest.setType(agentClusterNodeRequest.getType());
+        clusterPageRequest.setClusterTag(agentClusterNodeRequest.getClusterTags());
+        List<InlongClusterEntity> inlongClusterEntities = clusterMapper.selectByCondition(clusterPageRequest);
+        if (CollectionUtils.isNotEmpty(inlongClusterEntities)) {
+            Integer clusterId = inlongClusterEntities.get(0).getId();
+            List<DeleteAgentClusterNodeRequest> deleteAgentClusterNodeRequests =
+                                                agentClusterNodeRequest.getDeleteAgentClusterNodeRequests();
+            for (DeleteAgentClusterNodeRequest clusterNodeRequest : deleteAgentClusterNodeRequests) {
+                clusterNodeRequest.setParentId(clusterId);
+                if (InlongConstants.AFFECTED_ONE_ROW !=
+                                clusterNodeMapper.logicDeleteNodeByAgentGroup(clusterNodeRequest)) {
+                    LOGGER.error(
+                            "agent cluster node has already updated with parentId={}, type={}, ip={}, extParams={}",
+                            clusterId, clusterNodeRequest.getType(),
+                            clusterNodeRequest.getIp(), clusterNodeRequest.getExtParams());
+                    throw new BusinessException(ErrorCodeEnum.CONFIG_EXPIRED);
+                }
+            }
+        }
+        return true;
+    }
 }

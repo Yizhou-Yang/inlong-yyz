@@ -28,6 +28,7 @@ import org.apache.inlong.manager.pojo.cluster.ClusterRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagPageRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagResponse;
+import org.apache.inlong.manager.pojo.cluster.agent.AgentClusterNodeRequest;
 import org.apache.inlong.manager.pojo.common.PageResult;
 import org.apache.inlong.manager.pojo.common.UpdateResult;
 import org.apache.inlong.manager.pojo.user.UserInfo;
@@ -426,5 +427,13 @@ public interface InlongClusterService {
      * @return true or false
      */
     Boolean testConnection(ClusterRequest request);
+
+    /**
+     * logic delete agent cluster node
+     *
+     * @param clusterNodeRequest
+     * @return
+     */
+    Boolean logicDeleteNodeByAgentGroup(AgentClusterNodeRequest clusterNodeRequest);
 
 }

@@ -32,6 +32,7 @@ import org.apache.inlong.manager.pojo.cluster.ClusterRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagPageRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagResponse;
+import org.apache.inlong.manager.pojo.cluster.agent.AgentClusterNodeRequest;
 import org.apache.inlong.manager.pojo.common.PageResult;
 import org.apache.inlong.manager.pojo.common.Response;
 import org.apache.inlong.manager.pojo.common.UpdateResult;
@@ -231,5 +232,12 @@ public class InlongClusterController {
     @ApiOperation(value = "Test connection for inlong cluster")
     public Response<Boolean> testConnection(@RequestBody ClusterRequest request) {
         return Response.success(clusterService.testConnection(request));
+    }
+
+    @RequestMapping(value = "/cluster/node/logicDeleteNodeByAgentGroup", method = RequestMethod.POST)
+    @ApiOperation(value = "logic delete cluster node")
+    @OperationLog(operation = OperationType.UPDATE)
+    public Response<Boolean> logicDeleteNodeByAgentGroup(@RequestBody AgentClusterNodeRequest request) {
+        return Response.success(clusterService.logicDeleteNodeByAgentGroup(request));
     }
 }
