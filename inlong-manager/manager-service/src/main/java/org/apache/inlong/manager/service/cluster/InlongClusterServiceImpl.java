@@ -1664,6 +1664,9 @@ public class InlongClusterServiceImpl implements InlongClusterService {
                                                 agentClusterNodeRequest.getDeleteAgentClusterNodeRequests();
             for (DeleteAgentClusterNodeRequest clusterNodeRequest : deleteAgentClusterNodeRequests) {
                 clusterNodeRequest.setParentId(clusterId);
+                clusterNodeRequest.setStatus(clusterNodeRequest.getStatus());
+                clusterNodeRequest.setType(clusterNodeRequest.getType());
+                clusterNodeRequest.setIp(clusterNodeRequest.getIp());
                 if (InlongConstants.AFFECTED_ONE_ROW !=
                                 clusterNodeMapper.logicDeleteNodeByAgentGroup(clusterNodeRequest)) {
                     LOGGER.error(
