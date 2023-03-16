@@ -390,7 +390,7 @@ public class AgentServiceImpl implements AgentService {
             if (!matchLabel(sourceEntity, clusterNodeEntity)
                     && !exceptedUnmatchedStatus.contains(SourceStatus.forCode(sourceEntity.getStatus()))) {
                 LOGGER.info("Transform task({}) from {} to {} because tag mismatch "
-                                + "for agent({}) in cluster({})", sourceEntity.getAgentIp(),
+                        + "for agent({}) in cluster({})", sourceEntity.getAgentIp(),
                         sourceEntity.getStatus(), SourceStatus.TO_BE_ISSUED_FROZEN.getCode(),
                         agentIp, agentClusterName);
                 sourceMapper.updateStatus(
@@ -400,23 +400,23 @@ public class AgentServiceImpl implements AgentService {
             // case: agent tag rebind and match source task again and stream is not in 'SUSPENDED' status
             InlongStreamEntity streamEntity = streamMapper.selectByIdentifier(
                     sourceEntity.getInlongGroupId(), sourceEntity.getInlongStreamId());
-                    Set<SourceStatus> exceptedMatchedSourceStatus = Sets.newHashSet(
-                            SourceStatus.SOURCE_NORMAL,
-                            SourceStatus.TO_BE_ISSUED_ADD,
-                            SourceStatus.TO_BE_ISSUED_ACTIVE);
-                    Set<StreamStatus> exceptedMatchedStreamStatus = Sets.newHashSet(
-                            StreamStatus.SUSPENDED, StreamStatus.SUSPENDED);
-                    if (matchLabel(sourceEntity, clusterNodeEntity)
-                            && !exceptedMatchedSourceStatus.contains(SourceStatus.forCode(sourceEntity.getStatus()))
-                            && !exceptedMatchedStreamStatus.contains(StreamStatus.forCode(streamEntity.getStatus()))) {
-                        LOGGER.info("Transform task({}) from {} to {} because tag rematch "
-                                + "for agent({}) in cluster({})", sourceEntity.getAgentIp(),
-                                sourceEntity.getStatus(), SourceStatus.TO_BE_ISSUED_ACTIVE.getCode(),
-                                agentIp, agentClusterName);
-                        sourceMapper.updateStatus(
-                                sourceEntity.getId(), SourceStatus.TO_BE_ISSUED_ACTIVE.getCode(), false);
-                    }
-                });
+            Set<SourceStatus> exceptedMatchedSourceStatus = Sets.newHashSet(
+                    SourceStatus.SOURCE_NORMAL,
+                    SourceStatus.TO_BE_ISSUED_ADD,
+                    SourceStatus.TO_BE_ISSUED_ACTIVE);
+            Set<StreamStatus> exceptedMatchedStreamStatus = Sets.newHashSet(
+                    StreamStatus.SUSPENDED, StreamStatus.SUSPENDED);
+            if (matchLabel(sourceEntity, clusterNodeEntity)
+                    && !exceptedMatchedSourceStatus.contains(SourceStatus.forCode(sourceEntity.getStatus()))
+                    && !exceptedMatchedStreamStatus.contains(StreamStatus.forCode(streamEntity.getStatus()))) {
+                LOGGER.info("Transform task({}) from {} to {} because tag rematch "
+                        + "for agent({}) in cluster({})", sourceEntity.getAgentIp(),
+                        sourceEntity.getStatus(), SourceStatus.TO_BE_ISSUED_ACTIVE.getCode(),
+                        agentIp, agentClusterName);
+                sourceMapper.updateStatus(
+                        sourceEntity.getId(), SourceStatus.TO_BE_ISSUED_ACTIVE.getCode(), false);
+            }
+        });
     }
 
     private InlongClusterNodeEntity selectByIpAndCluster(String clusterName, String ip) {
