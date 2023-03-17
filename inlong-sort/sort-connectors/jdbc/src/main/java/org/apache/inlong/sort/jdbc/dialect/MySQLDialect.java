@@ -75,7 +75,7 @@ public class MySQLDialect extends AbstractJdbcDialect {
 
     @Override
     public Optional<String> defaultDriverName() {
-        return Optional.of("com.mysql.jdbc.Driver");
+        return Optional.of("com.mysql.cj.jdbc.Driver");
     }
 
     @Override
