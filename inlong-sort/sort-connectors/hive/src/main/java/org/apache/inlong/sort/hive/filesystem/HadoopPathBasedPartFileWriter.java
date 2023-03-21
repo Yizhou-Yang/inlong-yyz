@@ -1,0 +1,752 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.inlong.sort.hive.filesystem;
+
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_DATABASE_PATTERN;
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
+import static org.apache.inlong.sort.hive.HiveOptions.HIVE_SCHEMA_SCAN_INTERVAL;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.ImmutableTriple;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
+import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.connectors.hive.FlinkHiveException;
+import org.apache.flink.core.io.SimpleVersionedSerializer;
+import org.apache.flink.formats.hadoop.bulk.HadoopFileCommitter;
+import org.apache.flink.formats.hadoop.bulk.HadoopFileCommitterFactory;
+import org.apache.flink.formats.hadoop.bulk.HadoopPathBasedBulkWriter;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
+import org.apache.flink.streaming.api.functions.sink.filesystem.AbstractPartFileWriter;
+import org.apache.flink.streaming.api.functions.sink.filesystem.BucketWriter;
+import org.apache.flink.streaming.api.functions.sink.filesystem.InProgressFileWriter;
+import org.apache.flink.streaming.api.functions.sink.filesystem.WriterProperties;
+
+import org.apache.flink.table.catalog.ObjectIdentifier;
+import org.apache.flink.table.catalog.hive.client.HiveShim;
+import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
+import org.apache.flink.table.data.GenericRowData;
+import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.util.ExceptionUtils;
+import org.apache.hadoop.conf.Configuration;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
+import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.inlong.sort.base.dirty.DirtyOptions;
+import org.apache.inlong.sort.base.dirty.DirtySinkHelper;
+import org.apache.inlong.sort.base.dirty.DirtyType;
+import org.apache.inlong.sort.base.dirty.sink.DirtySink;
+import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
+import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
+import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
+import org.apache.inlong.sort.base.sink.PartitionPolicy;
+import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
+import org.apache.inlong.sort.hive.HiveBulkWriterFactory;
+import org.apache.inlong.sort.hive.HiveTableMetaStoreFactory;
+import org.apache.inlong.sort.hive.HiveTableUtil;
+import org.apache.inlong.sort.hive.HiveWriterFactory;
+import org.apache.inlong.sort.hive.table.HiveTableInlongFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * The part-file writer that writes to the specified hadoop path.
+ */
+public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFileWriter<IN, BucketID> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(HadoopPathBasedPartFileWriter.class);
+
+    private InLongHadoopPathBasedBulkWriter writer;
+
+    private HadoopFileCommitter fileCommitter;
+
+    private BucketID bucketID;
+    private Path targetPath;
+    private Path inProgressPath;
+    private final HiveShim hiveShim;
+    private final boolean sinkMultipleEnable;
+    private final String sinkMultipleFormat;
+
+    private final String databasePattern;
+    private final String tablePattern;
+
+    private final SchemaUpdateExceptionPolicy schemaUpdatePolicy;
+
+    private final PartitionPolicy partitionPolicy;
+
+    private transient JsonDynamicSchemaFormat jsonFormat;
+
+    @Nullable
+    private transient SinkTableMetricData metricData;
+
+    private DirtyOptions dirtyOptions;
+
+    private @Nullable DirtySink<Object> dirtySink;
+
+    public HadoopPathBasedPartFileWriter(final BucketID bucketID,
+            Path targetPath,
+            Path inProgressPath,
+            InLongHadoopPathBasedBulkWriter writer,
+            HadoopFileCommitter fileCommitter,
+            long createTime,
+            HiveShim hiveShim,
+            boolean sinkMultipleEnable,
+            String sinkMultipleFormat,
+            String databasePattern,
+            String tablePattern,
+            @Nullable SinkTableMetricData metricData,
+            DirtyOptions dirtyOptions,
+            @Nullable DirtySink<Object> dirtySink,
+            SchemaUpdateExceptionPolicy schemaUpdatePolicy,
+            PartitionPolicy partitionPolicy) {
+        super(bucketID, createTime);
+
+        this.bucketID = bucketID;
+        this.targetPath = targetPath;
+        this.inProgressPath = inProgressPath;
+        this.writer = writer;
+        this.fileCommitter = fileCommitter;
+        this.hiveShim = hiveShim;
+        this.sinkMultipleEnable = sinkMultipleEnable;
+        this.sinkMultipleFormat = sinkMultipleFormat;
+        this.databasePattern = databasePattern;
+        this.tablePattern = tablePattern;
+        this.metricData = metricData;
+        this.schemaUpdatePolicy = schemaUpdatePolicy;
+        this.dirtyOptions = dirtyOptions;
+        this.dirtySink = dirtySink;
+        this.partitionPolicy = partitionPolicy;
+    }
+
+    @Override
+    public void write(IN element, long currentTime) {
+        String databaseName = null;
+        String tableName = null;
+        int recordNum = 1;
+        int recordSize = 0;
+        JsonNode rootNode = null;
+        ObjectIdentifier identifier = null;
+        HashMap<ObjectIdentifier, Long> ignoreWritingTableMap = HiveTableInlongFactory.getIgnoreWritingTableMap();
+        try {
+            if (sinkMultipleEnable) {
+                GenericRowData rowData = (GenericRowData) element;
+                if (jsonFormat == null) {
+                    jsonFormat = (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(sinkMultipleFormat);
+                }
+                byte[] rawData = (byte[]) rowData.getField(0);
+                recordSize = rawData.length;
+                rootNode = jsonFormat.deserialize(rawData);
+                boolean isDDL = jsonFormat.extractDDLFlag(rootNode);
+                if (isDDL) {
+                    // Ignore ddl change for now
+                    return;
+                }
+                databaseName = jsonFormat.parse(rootNode, databasePattern);
+                tableName = jsonFormat.parse(rootNode, tablePattern);
+
+                List<Map<String, Object>> physicalDataList = HiveTableUtil.jsonNode2Map(
+                        jsonFormat.getPhysicalData(rootNode));
+                recordNum = physicalDataList.size();
+
+                identifier = ObjectIdentifier.of("default_catalog", databaseName, tableName);
+
+                // ignore writing data into this table
+                if (ignoreWritingTableMap.containsKey(identifier)) {
+                    return;
+                }
+
+                List<String> pkListStr = jsonFormat.extractPrimaryKeyNames(rootNode);
+                RowType schema = jsonFormat.extractSchema(rootNode, pkListStr);
+                HiveWriterFactory writerFactory = getHiveWriterFactory(identifier, schema);
+
+                // collect metaStoreFactory of all tables for committing partitions
+                collectMetastoreFactory(identifier, writerFactory);
+
+                // parse the real location of hive table
+                Pair<Path, Path> pathPair = getHdfsPath(writerFactory);
+                Path targetPath = pathPair.getLeft();
+                Path inProgressFilePath = pathPair.getRight();
+
+                // reset paths of file committer
+                HadoopRenameFileCommitter committer = (HadoopRenameFileCommitter) fileCommitter;
+                committer.setTargetFilePath(targetPath);
+                committer.setTempFilePath(inProgressFilePath);
+
+                Pair<RecordWriter, Function<RowData, Writable>> pair = getRecordWriterAndRowConverter(writerFactory,
+                        inProgressFilePath);
+                // reset record writer and row converter
+                writer.setRecordWriter(pair.getLeft());
+                writer.setRowConverter(pair.getRight());
+                // reset target path
+                writer.setTargetPath(targetPath);
+
+                boolean replaceLineBreak = writerFactory.getStorageDescriptor().getInputFormat()
+                        .contains("TextInputFormat");
+
+                for (Map<String, Object> record : physicalDataList) {
+                    // check and alter hive table if schema has changed
+                    checkSchema(identifier, writerFactory, schema, inProgressFilePath);
+
+                    GenericRowData genericRowData = HiveTableUtil.getRowData(record, writerFactory.getAllColumns(),
+                            writerFactory.getAllTypes(), replaceLineBreak);
+                    writer.addElement(genericRowData);
+                }
+                if (metricData != null) {
+                    metricData.invoke(recordNum, recordSize);
+                }
+            } else {
+                writer.addElement((RowData) element);
+            }
+        } catch (Exception e) {
+            if (schemaUpdatePolicy == null || SchemaUpdateExceptionPolicy.THROW_WITH_STOP == schemaUpdatePolicy) {
+                throw new FlinkHiveException("Failed to write data", e);
+            } else if (SchemaUpdateExceptionPolicy.STOP_PARTIAL == schemaUpdatePolicy) {
+                if (identifier != null) {
+                    ignoreWritingTableMap.put(identifier, 1L);
+                }
+            } else if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE == schemaUpdatePolicy) {
+                handleDirtyData(databaseName, tableName, recordNum, recordSize, rootNode, jsonFormat, e);
+            }
+            LOG.error("Failed to write data", e);
+        }
+        markWrite(currentTime);
+    }
+
+    /**
+     * upload dirty data metrics and write dirty data
+     *
+     * @param databaseName database name
+     * @param tableName table name
+     * @param recordNum record num
+     * @param recordSize record byte size
+     * @param data raw data
+     * @param jsonFormat json formatter for formatting raw data
+     * @param e exception
+     */
+    private void handleDirtyData(String databaseName,
+            String tableName,
+            int recordNum,
+            int recordSize,
+            JsonNode data,
+            JsonDynamicSchemaFormat jsonFormat,
+            Exception e) {
+        // upload metrics for dirty data
+        if (null != metricData) {
+            if (sinkMultipleEnable) {
+                metricData.outputDirtyMetrics(databaseName, tableName, recordNum, recordSize);
+            } else {
+                metricData.invokeDirty(recordNum, recordSize);
+            }
+        }
+
+        if (!dirtyOptions.ignoreDirty()) {
+            return;
+        }
+        if (data == null || jsonFormat == null) {
+            return;
+        }
+        Triple<String, String, String> triple = getDirtyLabelTagAndIdentity(data, jsonFormat);
+        String label = triple.getLeft();
+        String tag = triple.getMiddle();
+        String identify = triple.getRight();
+        if (label == null || tag == null || identify == null) {
+            LOG.warn("dirty label or tag or identify is null, ignore dirty data writing");
+            return;
+        }
+        // archive dirty data
+        DirtySinkHelper<Object> dirtySinkHelper = new DirtySinkHelper<>(dirtyOptions, dirtySink);
+        dirtySinkHelper.invoke(data, DirtyType.BATCH_LOAD_ERROR, label, tag, identify, e);
+    }
+
+    /**
+     * parse dirty label , tag and identify
+     *
+     * @param data raw data
+     * @param jsonFormat json formatter
+     * @return dirty label, tag and identify
+     */
+    private Triple<String, String, String> getDirtyLabelTagAndIdentity(JsonNode data,
+            JsonDynamicSchemaFormat jsonFormat) {
+        String dirtyLabel = null;
+        String dirtyLogTag = null;
+        String dirtyIdentify = null;
+        try {
+            if (dirtyOptions.ignoreDirty()) {
+                if (dirtyOptions.getLabels() != null) {
+                    dirtyLabel = jsonFormat.parse(data,
+                            DirtySinkHelper.regexReplace(dirtyOptions.getLabels(), DirtyType.BATCH_LOAD_ERROR, null));
+                }
+                if (dirtyOptions.getLogTag() != null) {
+                    dirtyLogTag = jsonFormat.parse(data,
+                            DirtySinkHelper.regexReplace(dirtyOptions.getLogTag(), DirtyType.BATCH_LOAD_ERROR, null));
+                }
+                if (dirtyOptions.getIdentifier() != null) {
+                    dirtyIdentify = jsonFormat.parse(data,
+                            DirtySinkHelper.regexReplace(dirtyOptions.getIdentifier(), DirtyType.BATCH_LOAD_ERROR,
+                                    null));
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn("Parse dirty options failed. {}", ExceptionUtils.stringifyException(e));
+        }
+        return new ImmutableTriple<>(dirtyLabel, dirtyLogTag, dirtyIdentify);
+    }
+
+    /**
+     * get hive writer factory, create table if not exists automatically
+     *
+     * @param identifier hive database and table name
+     * @param schema hive field with flink type
+     * @return hive writer factory
+     */
+    private HiveWriterFactory getHiveWriterFactory(ObjectIdentifier identifier, RowType schema) {
+        HiveWriterFactory writerFactory = HiveTableUtil.getWriterFactory(hiveShim, identifier);
+        if (writerFactory == null) {
+            // hive table may not exist, auto create
+            HiveTableUtil.createTable(identifier.getDatabaseName(), identifier.getObjectName(), schema,
+                    partitionPolicy);
+            writerFactory = HiveTableUtil.getWriterFactory(hiveShim, identifier);
+        }
+        return writerFactory;
+    }
+
+    /**
+     * collect metastore factory for committing partitions
+     *
+     * @param identifier hive database and table name
+     * @param writerFactory hive writer factory
+     */
+    private void collectMetastoreFactory(ObjectIdentifier identifier, HiveWriterFactory writerFactory) {
+        if (!HiveTableInlongFactory.getTableMetaStoreMap().containsKey(identifier)) {
+            assert writerFactory != null;
+            String hiveVersion = writerFactory.getJobConf().get(HiveCatalogFactoryOptions.HIVE_VERSION.key());
+            HiveTableMetaStoreFactory metaStoreFactory = new HiveTableMetaStoreFactory(writerFactory.getJobConf(),
+                    hiveVersion, identifier.getDatabaseName(), identifier.getObjectName());
+            HiveTableInlongFactory.getTableMetaStoreMap().put(identifier, metaStoreFactory);
+        }
+    }
+
+    /**
+     * get target hdfs path and temp hdfs path for data writing
+     *
+     * @param writerFactory hive writer factory
+     * @return pair of target path and temp path
+     */
+    private Pair<Path, Path> getHdfsPath(HiveWriterFactory writerFactory) throws IOException, ClassNotFoundException {
+        String location = writerFactory.getStorageDescriptor().getLocation();
+        String path = targetPath.toUri().getPath();
+        path = path.substring(path.indexOf("/tmp/") + 5);
+        Path targetPath = new Path(location + "/" + path);
+        Path inProgressFilePath = new Path(targetPath.getParent() + "/" + inProgressPath.getName());
+        return new ImmutablePair<>(targetPath, inProgressFilePath);
+    }
+
+    /**
+     * get hive record writer and row converter
+     *
+     * @param writerFactory hive writer factory
+     * @param inProgressFilePath temp hdfs file path for writing data
+     * @return pair of hive record writer and row converter objects
+     */
+    private Pair<RecordWriter, Function<RowData, Writable>> getRecordWriterAndRowConverter(
+            HiveWriterFactory writerFactory, Path inProgressFilePath) {
+        FileSinkOperator.RecordWriter recordWriter;
+        Function<RowData, Writable> rowConverter;
+        if (!HiveTableInlongFactory.getRecordWriterHashMap().containsKey(targetPath)) {
+            recordWriter = writerFactory.createRecordWriter(inProgressFilePath);
+            rowConverter = writerFactory.createRowDataConverter();
+            HiveTableInlongFactory.getRecordWriterHashMap().put(targetPath, recordWriter);
+            HiveTableInlongFactory.getRowConverterHashMap().put(targetPath, rowConverter);
+        } else {
+            recordWriter = HiveTableInlongFactory.getRecordWriterHashMap().get(targetPath);
+            rowConverter = HiveTableInlongFactory.getRowConverterHashMap().get(targetPath);
+        }
+        return new ImmutablePair<>(recordWriter, rowConverter);
+    }
+
+    /**
+     * check if source table schema changes
+     *
+     * @param identifier hive database name and table name
+     * @param writerFactory hive writer factory
+     * @param schema hive field with flink types
+     * @param inProgressFilePath temp hdfs file path for writing data
+     */
+    private void checkSchema(ObjectIdentifier identifier, HiveWriterFactory writerFactory, RowType schema,
+            Path inProgressFilePath) {
+        HashMap<ObjectIdentifier, Long> schemaCheckTimeMap = HiveTableInlongFactory.getSchemaCheckTimeMap();
+        if (!schemaCheckTimeMap.containsKey(identifier)) {
+            schemaCheckTimeMap.put(identifier, System.currentTimeMillis());
+        }
+        long lastUpdate = schemaCheckTimeMap.get(identifier);
+        // handle the schema every `HIVE_SCHEMA_SCAN_INTERVAL` milliseconds
+        int scanSchemaInterval = Integer.parseInt(writerFactory.getJobConf()
+                .get(HIVE_SCHEMA_SCAN_INTERVAL.key(), HIVE_SCHEMA_SCAN_INTERVAL.defaultValue() + ""));
+        if (System.currentTimeMillis() - lastUpdate >= scanSchemaInterval) {
+            boolean changed = HiveTableUtil.changeSchema(schema, writerFactory.getAllColumns(),
+                    writerFactory.getAllTypes(), identifier.getDatabaseName(), identifier.getObjectName());
+            if (changed) {
+                // remove cache and reload hive writer factory
+                HiveTableInlongFactory.getFactoryMap().remove(identifier);
+                writerFactory = HiveTableUtil.getWriterFactory(hiveShim, identifier);
+                assert writerFactory != null;
+                FileSinkOperator.RecordWriter recordWriter = writerFactory.createRecordWriter(inProgressFilePath);
+                Function<RowData, Writable> rowConverter = writerFactory.createRowDataConverter();
+                writer.setRecordWriter(recordWriter);
+                writer.setRowConverter(rowConverter);
+                HiveTableInlongFactory.getRecordWriterHashMap().put(targetPath, recordWriter);
+                HiveTableInlongFactory.getRowConverterHashMap().put(targetPath, rowConverter);
+            }
+            schemaCheckTimeMap.put(identifier, System.currentTimeMillis());
+        }
+    }
+
+    @Override
+    public InProgressFileRecoverable persist() {
+        throw new UnsupportedOperationException("The path based writers do not support persisting");
+    }
+
+    @Override
+    public PendingFileRecoverable closeForCommit() throws IOException {
+        writer.flush();
+        writer.finish();
+        fileCommitter.preCommit();
+        return new HadoopPathBasedPendingFile(fileCommitter, getSize()).getRecoverable();
+    }
+
+    @Override
+    public void dispose() {
+        writer.dispose();
+    }
+
+    @Override
+    public long getSize() throws IOException {
+        return writer.getSize();
+    }
+
+    static class HadoopPathBasedPendingFile implements BucketWriter.PendingFile {
+
+        private final HadoopFileCommitter fileCommitter;
+
+        private final long fileSize;
+
+        public HadoopPathBasedPendingFile(HadoopFileCommitter fileCommitter, long fileSize) {
+            this.fileCommitter = fileCommitter;
+            this.fileSize = fileSize;
+        }
+
+        @Override
+        public void commit() throws IOException {
+            fileCommitter.commit();
+        }
+
+        @Override
+        public void commitAfterRecovery() throws IOException {
+            fileCommitter.commitAfterRecovery();
+        }
+
+        public PendingFileRecoverable getRecoverable() {
+            return new HadoopPathBasedPendingFileRecoverable(fileCommitter.getTargetFilePath(),
+                    fileCommitter.getTempFilePath(), fileSize);
+        }
+    }
+
+    @VisibleForTesting
+    static class HadoopPathBasedPendingFileRecoverable implements PendingFileRecoverable {
+
+        private final Path targetFilePath;
+
+        private final Path tempFilePath;
+
+        private final long fileSize;
+
+        @Deprecated
+        // Remained for compatibility
+        public HadoopPathBasedPendingFileRecoverable(Path targetFilePath, Path tempFilePath) {
+            this.targetFilePath = targetFilePath;
+            this.tempFilePath = tempFilePath;
+            this.fileSize = -1L;
+        }
+
+        public HadoopPathBasedPendingFileRecoverable(Path targetFilePath, Path tempFilePath, long fileSize) {
+            this.targetFilePath = targetFilePath;
+            this.tempFilePath = tempFilePath;
+            this.fileSize = fileSize;
+        }
+
+        public Path getTargetFilePath() {
+            return targetFilePath;
+        }
+
+        public Path getTempFilePath() {
+            return tempFilePath;
+        }
+
+        public org.apache.flink.core.fs.Path getPath() {
+            return new org.apache.flink.core.fs.Path(targetFilePath.toString());
+        }
+
+        public long getSize() {
+            return fileSize;
+        }
+    }
+
+    @VisibleForTesting
+    static class HadoopPathBasedPendingFileRecoverableSerializer
+            implements
+                SimpleVersionedSerializer<PendingFileRecoverable> {
+
+        static final HadoopPathBasedPendingFileRecoverableSerializer INSTANCE =
+                new HadoopPathBasedPendingFileRecoverableSerializer();
+
+        private static final Charset CHARSET = StandardCharsets.UTF_8;
+
+        private static final int MAGIC_NUMBER = 0x2c853c90;
+
+        @Override
+        public int getVersion() {
+            return 2;
+        }
+
+        @Override
+        public byte[] serialize(PendingFileRecoverable pendingFileRecoverable) {
+            if (!(pendingFileRecoverable instanceof HadoopPathBasedPartFileWriter.HadoopPathBasedPendingFileRecoverable)) {
+                throw new UnsupportedOperationException("Only HadoopPathBasedPendingFileRecoverable is supported.");
+            }
+
+            HadoopPathBasedPendingFileRecoverable hadoopRecoverable =
+                    (HadoopPathBasedPendingFileRecoverable) pendingFileRecoverable;
+            Path path = hadoopRecoverable.getTargetFilePath();
+            Path inProgressPath = hadoopRecoverable.getTempFilePath();
+
+            byte[] pathBytes = path.toUri().toString().getBytes(CHARSET);
+            byte[] inProgressBytes = inProgressPath.toUri().toString().getBytes(CHARSET);
+
+            byte[] targetBytes = new byte[12 + pathBytes.length + inProgressBytes.length + Long.BYTES];
+            ByteBuffer bb = ByteBuffer.wrap(targetBytes).order(ByteOrder.LITTLE_ENDIAN);
+            bb.putInt(MAGIC_NUMBER);
+            bb.putInt(pathBytes.length);
+            bb.put(pathBytes);
+            bb.putInt(inProgressBytes.length);
+            bb.put(inProgressBytes);
+            bb.putLong(hadoopRecoverable.getSize());
+
+            return targetBytes;
+        }
+
+        @Override
+        public HadoopPathBasedPendingFileRecoverable deserialize(int version, byte[] serialized) throws IOException {
+            switch (version) {
+                case 1:
+                    return deserializeV1(serialized);
+                case 2:
+                    return deserializeV2(serialized);
+                default:
+                    throw new IOException("Unrecognized version or corrupt state: " + version);
+            }
+        }
+
+        private HadoopPathBasedPendingFileRecoverable deserializeV1(byte[] serialized) throws IOException {
+            final ByteBuffer bb = ByteBuffer.wrap(serialized).order(ByteOrder.LITTLE_ENDIAN);
+
+            if (bb.getInt() != MAGIC_NUMBER) {
+                throw new IOException("Corrupt data: Unexpected magic number.");
+            }
+
+            byte[] targetFilePathBytes = new byte[bb.getInt()];
+            bb.get(targetFilePathBytes);
+            String targetFilePath = new String(targetFilePathBytes, CHARSET);
+
+            byte[] tempFilePathBytes = new byte[bb.getInt()];
+            bb.get(tempFilePathBytes);
+            String tempFilePath = new String(tempFilePathBytes, CHARSET);
+
+            return new HadoopPathBasedPendingFileRecoverable(new Path(targetFilePath), new Path(tempFilePath));
+        }
+
+        private HadoopPathBasedPendingFileRecoverable deserializeV2(byte[] serialized) throws IOException {
+            final ByteBuffer bb = ByteBuffer.wrap(serialized).order(ByteOrder.LITTLE_ENDIAN);
+
+            if (bb.getInt() != MAGIC_NUMBER) {
+                throw new IOException("Corrupt data: Unexpected magic number.");
+            }
+
+            byte[] targetFilePathBytes = new byte[bb.getInt()];
+            bb.get(targetFilePathBytes);
+            String targetFilePath = new String(targetFilePathBytes, CHARSET);
+
+            byte[] tempFilePathBytes = new byte[bb.getInt()];
+            bb.get(tempFilePathBytes);
+            String tempFilePath = new String(tempFilePathBytes, CHARSET);
+
+            long fileSize = bb.getLong();
+
+            return new HadoopPathBasedPendingFileRecoverable(new Path(targetFilePath), new Path(tempFilePath),
+                    fileSize);
+        }
+    }
+
+    private static class UnsupportedInProgressFileRecoverableSerializable
+            implements
+                SimpleVersionedSerializer<InProgressFileRecoverable> {
+
+        static final UnsupportedInProgressFileRecoverableSerializable INSTANCE =
+                new UnsupportedInProgressFileRecoverableSerializable();
+
+        @Override
+        public int getVersion() {
+            throw new UnsupportedOperationException("Persists the path-based part file write is not supported");
+        }
+
+        @Override
+        public byte[] serialize(InProgressFileRecoverable obj) {
+            throw new UnsupportedOperationException("Persists the path-based part file write is not supported");
+        }
+
+        @Override
+        public InProgressFileRecoverable deserialize(int version, byte[] serialized) {
+            throw new UnsupportedOperationException("Persists the path-based part file write is not supported");
+        }
+    }
+
+    /**
+     * Factory to create {@link HadoopPathBasedPartFileWriter}. This writer does not support
+     * snapshotting the in-progress files. For pending files, it stores the target path and the
+     * staging file path into the state.
+     */
+    public static class HadoopPathBasedBucketWriter<IN, BucketID> implements BucketWriter<IN, BucketID> {
+
+        private final Configuration configuration;
+
+        private final HadoopPathBasedBulkWriter.Factory<IN> bulkWriterFactory;
+
+        private final HadoopFileCommitterFactory fileCommitterFactory;
+
+        private final HiveWriterFactory hiveWriterFactory;
+
+        @Nullable
+        private transient SinkTableMetricData metricData;
+
+        private DirtyOptions dirtyOptions;
+
+        private @Nullable DirtySink<Object> dirtySink;
+
+        private SchemaUpdateExceptionPolicy schemaUpdatePolicy;
+
+        private PartitionPolicy partitionPolicy;
+
+        public HadoopPathBasedBucketWriter(Configuration configuration,
+                HadoopPathBasedBulkWriter.Factory<IN> bulkWriterFactory,
+                HadoopFileCommitterFactory fileCommitterFactory, @Nullable SinkTableMetricData metricData,
+                DirtyOptions dirtyOptions, @Nullable DirtySink<Object> dirtySink,
+                SchemaUpdateExceptionPolicy schemaUpdatePolicy,
+                PartitionPolicy partitionPolicy) {
+
+            this.configuration = configuration;
+            this.bulkWriterFactory = bulkWriterFactory;
+            this.hiveWriterFactory = ((HiveBulkWriterFactory) this.bulkWriterFactory).getFactory();
+            this.fileCommitterFactory = fileCommitterFactory;
+            this.metricData = metricData;
+            this.dirtyOptions = dirtyOptions;
+            this.dirtySink = dirtySink;
+            this.schemaUpdatePolicy = schemaUpdatePolicy;
+            this.partitionPolicy = partitionPolicy;
+        }
+
+        @Override
+        public HadoopPathBasedPartFileWriter<IN, BucketID> openNewInProgressFile(BucketID bucketID,
+                org.apache.flink.core.fs.Path flinkPath, long creationTime) throws IOException {
+
+            Path path = new Path(flinkPath.toUri());
+            HadoopFileCommitter fileCommitter = fileCommitterFactory.create(configuration, path);
+            Path inProgressFilePath = fileCommitter.getTempFilePath();
+
+            InLongHadoopPathBasedBulkWriter writer = (InLongHadoopPathBasedBulkWriter) bulkWriterFactory.create(path,
+                    inProgressFilePath);
+            JobConf jobConf = hiveWriterFactory.getJobConf();
+            boolean sinkMultipleEnable = Boolean.parseBoolean(jobConf.get(SINK_MULTIPLE_ENABLE.key(), "false"));
+            String sinkMultipleFormat = jobConf.get(SINK_MULTIPLE_FORMAT.key());
+            String databasePattern = jobConf.get(SINK_MULTIPLE_DATABASE_PATTERN.key());
+            String tablePattern = jobConf.get(SINK_MULTIPLE_TABLE_PATTERN.key());
+            return new HadoopPathBasedPartFileWriter<>(bucketID,
+                    path,
+                    inProgressFilePath,
+                    writer,
+                    fileCommitter,
+                    creationTime,
+                    hiveWriterFactory.getHiveShim(),
+                    sinkMultipleEnable,
+                    sinkMultipleFormat,
+                    databasePattern,
+                    tablePattern,
+                    metricData,
+                    dirtyOptions,
+                    dirtySink,
+                    schemaUpdatePolicy,
+                    partitionPolicy);
+        }
+
+        @Override
+        public PendingFile recoverPendingFile(PendingFileRecoverable pendingFileRecoverable) throws IOException {
+            if (!(pendingFileRecoverable instanceof HadoopPathBasedPartFileWriter.HadoopPathBasedPendingFileRecoverable)) {
+                throw new UnsupportedOperationException("Only HadoopPathBasedPendingFileRecoverable is supported.");
+            }
+
+            HadoopPathBasedPendingFileRecoverable hadoopRecoverable =
+                    (HadoopPathBasedPendingFileRecoverable) pendingFileRecoverable;
+            return new HadoopPathBasedPendingFile(
+                    fileCommitterFactory.recoverForCommit(configuration, hadoopRecoverable.getTargetFilePath(),
+                            hadoopRecoverable.getTempFilePath()),
+                    hadoopRecoverable.getSize());
+        }
+
+        @Override
+        public WriterProperties getProperties() {
+            return new WriterProperties(UnsupportedInProgressFileRecoverableSerializable.INSTANCE,
+                    HadoopPathBasedPendingFileRecoverableSerializer.INSTANCE, false);
+        }
+
+        @Override
+        public InProgressFileWriter<IN, BucketID> resumeInProgressFileFrom(BucketID bucketID,
+                InProgressFileRecoverable inProgressFileSnapshot, long creationTime) {
+
+            throw new UnsupportedOperationException("Resume is not supported");
+        }
+
+        @Override
+        public boolean cleanupInProgressFileRecoverable(InProgressFileRecoverable inProgressFileRecoverable) {
+            return false;
+        }
+    }
+}

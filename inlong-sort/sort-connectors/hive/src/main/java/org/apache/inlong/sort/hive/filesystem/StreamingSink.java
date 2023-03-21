@@ -32,7 +32,6 @@ import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.filesystem.FileSystemFactory;
 import org.apache.flink.table.filesystem.TableMetaStoreFactory;
 import org.apache.flink.table.filesystem.stream.PartitionCommitInfo;
-import org.apache.flink.table.filesystem.stream.PartitionCommitter;
 import org.apache.flink.table.filesystem.stream.compact.CompactBucketWriter;
 import org.apache.flink.table.filesystem.stream.compact.CompactCoordinator;
 import org.apache.flink.table.filesystem.stream.compact.CompactMessages.CoordinatorInput;
@@ -150,7 +149,7 @@ public class StreamingSink {
             FileSystemFactory fsFactory,
             Configuration options) {
         DataStream<?> stream = writer;
-        if (partitionKeys.size() > 0 && options.contains(SINK_PARTITION_COMMIT_POLICY_KIND)) {
+        if (options.contains(SINK_PARTITION_COMMIT_POLICY_KIND)) {
             PartitionCommitter committer =
                     new PartitionCommitter(
                             locationPath, identifier, partitionKeys, msFactory, fsFactory, options);
