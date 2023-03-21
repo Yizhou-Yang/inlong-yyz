@@ -275,8 +275,8 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                     rows,
                     snapshotSplit.splitId(),
                     Strings.duration(clock.currentTimeInMillis() - exportStart));
-        } catch (SQLException e) {
-            throw new ConnectException("Snapshotting of table " + table.id() + " failed", e);
+        } catch (Throwable e) {
+            throw new RuntimeException("Snapshotting of table " + table.id() + " failed", e);
         }
     }
 
