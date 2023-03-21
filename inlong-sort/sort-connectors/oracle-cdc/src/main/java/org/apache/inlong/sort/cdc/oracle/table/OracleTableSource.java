@@ -78,6 +78,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
     private final String chunkKeyColumn;
+    private final boolean isAppend;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -112,7 +113,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             int connectionPoolSize,
             double distributionFactorUpper,
             double distributionFactorLower,
-            @Nullable String chunkKeyColumn) {
+            @Nullable String chunkKeyColumn,
+            boolean isAppend) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -138,16 +140,19 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.chunkKeyColumn = chunkKeyColumn;
+        this.isAppend = isAppend;
     }
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return ChangelogMode.newBuilder()
-                .addContainedKind(RowKind.INSERT)
-                .addContainedKind(RowKind.UPDATE_BEFORE)
-                .addContainedKind(RowKind.UPDATE_AFTER)
-                .addContainedKind(RowKind.DELETE)
-                .build();
+        final ChangelogMode.Builder builder =
+                ChangelogMode.newBuilder().addContainedKind(RowKind.INSERT);
+        if (!isAppend) {
+            builder.addContainedKind(RowKind.UPDATE_BEFORE)
+                    .addContainedKind(RowKind.UPDATE_AFTER)
+                    .addContainedKind(RowKind.DELETE);
+        }
+        return builder.build();
     }
 
     @Override
@@ -255,7 +260,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         connectionPoolSize,
                         distributionFactorUpper,
                         distributionFactorLower,
-                        chunkKeyColumn);
+                        chunkKeyColumn,
+                        isAppend);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -293,7 +299,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(connectionPoolSize, that.connectionPoolSize)
                 && Objects.equals(distributionFactorUpper, that.distributionFactorUpper)
                 && Objects.equals(distributionFactorLower, that.distributionFactorLower)
-                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn);
+                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
+                && Objects.equals(isAppend, that.isAppend);
     }
 
     @Override
@@ -322,7 +329,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 connectionPoolSize,
                 distributionFactorUpper,
                 distributionFactorLower,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                isAppend);
     }
 
     @Override
