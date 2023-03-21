@@ -135,6 +135,12 @@ public final class Constants {
 
     public static final String AUTO_DESERIALIZE_FALSE = "autoDeserialize=false";
 
+    public static final ConfigOption<String> AUDIT_KEYS =
+            ConfigOptions.key("metrics.audit.key")
+                    .stringType()
+                    .defaultValue("")
+                    .withDescription("Audit keys for metrics collecting");
+
     public static final ConfigOption<String> INLONG_METRIC =
             ConfigOptions.key("inlong.metric.labels")
                     .stringType()
