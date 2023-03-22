@@ -45,7 +45,6 @@ import org.apache.inlong.sort.cdc.mysql.debezium.reader.SnapshotSplitReader;
 import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffset;
 import org.apache.inlong.sort.cdc.mysql.source.split.MySqlSnapshotSplit;
 import org.apache.inlong.sort.cdc.mysql.source.utils.StatementUtils;
-import org.apache.kafka.connect.errors.ConnectException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
