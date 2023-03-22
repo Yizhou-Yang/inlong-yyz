@@ -1,19 +1,18 @@
 /*
- *   Licensed to the Apache Software Foundation (ASF) under one
- *   or more contributor license agreements.  See the NOTICE file
- *   distributed with this work for additional information
- *   regarding copyright ownership.  The ASF licenses this file
- *   to you under the Apache License, Version 2.0 (the
- *   "License"); you may not use this file except in compliance
- *   with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *   Unless required by applicable law or agreed to in writing, software
- *   distributed under the License is distributed on an "AS IS" BASIS,
- *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *   See the License for the specific language governing permissions and
- *   limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.inlong.sort.base;
@@ -86,6 +85,10 @@ public final class Constants {
      */
     public static final String TABLE_NAME = "table";
     /**
+     * Collection Name used in inlong metric
+     */
+    public static final String COLLECTION_NAME = "collection";
+    /**
      * Read Phase used in inlong metric
      */
     public static final String READ_PHASE = "readPhase";
@@ -131,6 +134,12 @@ public final class Constants {
     public static final String AUTO_DESERIALIZE_TRUE = "autoDeserialize=true";
 
     public static final String AUTO_DESERIALIZE_FALSE = "autoDeserialize=false";
+
+    public static final ConfigOption<String> AUDIT_KEYS =
+            ConfigOptions.key("metrics.audit.key")
+                    .stringType()
+                    .defaultValue("")
+                    .withDescription("Audit keys for metrics collecting");
 
     public static final ConfigOption<String> INLONG_METRIC =
             ConfigOptions.key("inlong.metric.labels")
@@ -198,7 +207,7 @@ public final class Constants {
             ConfigOptions.key("sink.multiple.ignore-single-table-errors")
                     .booleanType()
                     .defaultValue(true)
-                    .withDescription("Whether ignore the single table erros when multiple sink writing scenario.");
+                    .withDescription("Whether ignore the single table errors when multiple sink writing scenario.");
 
     public static final ConfigOption<Boolean> SINK_MULTIPLE_PK_AUTO_GENERATED =
             ConfigOptions.key("sink.multiple.pk-auto-generated")
@@ -227,11 +236,11 @@ public final class Constants {
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "The identifier of dirty data, "
-                                    + "it will be used for filename generation of file dirty sink, "
+                            "The identifier of dirty data, it will be used for filename generation of file dirty sink, "
                                     + "topic generation of mq dirty sink, tablename generation of database, etc."
                                     + "and it supports variable replace like '${variable}'."
-                                    + "There are two system variables[SYSTEM_TIME|DIRTY_TYPE] are currently supported,"
+                                    + "There are several system variables[SYSTEM_TIME|DIRTY_TYPE|DIRTY_MESSAGE] "
+                                    + "are currently supported, "
                                     + "and the support of other variables is determined by the connector.");
     public static final ConfigOption<Boolean> DIRTY_SIDE_OUTPUT_ENABLE =
             ConfigOptions.key("dirty.side-output.enable")
@@ -248,8 +257,7 @@ public final class Constants {
                     .stringType()
                     .defaultValue("csv")
                     .withDescription(
-                            "The format of dirty side-output, only support [csv|json] for now "
-                                    + "and default value is 'csv'");
+                            "The format of dirty side-output, only support [csv|json] for now and default value is 'csv'");
     public static final ConfigOption<Boolean> DIRTY_SIDE_OUTPUT_IGNORE_ERRORS =
             ConfigOptions.key("dirty.side-output.ignore-errors")
                     .booleanType()
@@ -267,7 +275,8 @@ public final class Constants {
                     .withDescription(
                             "The labels of dirty side-output, format is 'key1=value1&key2=value2', "
                                     + "it supports variable replace like '${variable}',"
-                                    + "There are two system variables[SYSTEM_TIME|DIRTY_TYPE] are currently supported,"
+                                    + "There are two system variables[SYSTEM_TIME|DIRTY_TYPE|DIRTY_MESSAGE] "
+                                    + "are currently supported,"
                                     + " and the support of other variables is determined by the connector.");
     public static final ConfigOption<String> DIRTY_SIDE_OUTPUT_LOG_TAG =
             ConfigOptions.key("dirty.side-output.log-tag")
@@ -275,7 +284,7 @@ public final class Constants {
                     .defaultValue("DirtyData")
                     .withDescription(
                             "The log tag of dirty side-output, it supports variable replace like '${variable}'."
-                                    + "There are two system variables[SYSTEM_TIME|DIRTY_TYPE] are currently supported,"
+                                    + "There are two system variables[SYSTEM_TIME|DIRTY_TYPE|DIRTY_MESSAGE] are currently supported,"
                                     + " and the support of other variables is determined by the connector.");
     public static final ConfigOption<String> DIRTY_SIDE_OUTPUT_FIELD_DELIMITER =
             ConfigOptions.key("dirty.side-output.field-delimiter")

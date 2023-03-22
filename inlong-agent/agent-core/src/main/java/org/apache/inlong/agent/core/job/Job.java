@@ -25,12 +25,12 @@ import org.apache.inlong.agent.constant.JobConstants;
  */
 public class Job {
 
-    private final JobProfile jobConf;
+    protected final JobProfile jobConf;
     // job name
     private String name;
     // job description
     private String description;
-    private String jobInstanceId;
+    protected String jobInstanceId;
 
     public Job(JobProfile jobConf) {
         this.jobConf = jobConf;

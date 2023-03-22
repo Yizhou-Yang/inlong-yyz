@@ -1,10 +1,10 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -28,8 +28,6 @@ import org.apache.inlong.sdk.sort.api.QueryConsumeConfig;
 import org.apache.inlong.sdk.sort.api.SortClient;
 import org.apache.inlong.sdk.sort.api.SortClientConfig;
 import org.apache.inlong.sdk.sort.api.SortClientFactory;
-import org.apache.inlong.sdk.sort.impl.ManagerReportHandlerImpl;
-import org.apache.inlong.sdk.sort.impl.MetricReporterImpl;
 import org.apache.inlong.sort.standalone.admin.ConsumerServiceMBean;
 import org.apache.inlong.sort.standalone.config.holder.CommonPropertiesHolder;
 import org.apache.inlong.sort.standalone.config.holder.ManagerUrlHandler;
@@ -70,7 +68,11 @@ import java.util.concurrent.TimeUnit;
  * </p>
  */
 public final class SortSdkSource extends AbstractSource
-        implements Configurable, Runnable, EventDrivenSource, ConsumerServiceMBean {
+        implements
+            Configurable,
+            Runnable,
+            EventDrivenSource,
+            ConsumerServiceMBean {
 
     // Log of {@link SortSdkSource}.
     private static final Logger LOG = LoggerFactory.getLogger(SortSdkSource.class);
@@ -192,10 +194,7 @@ public final class SortSdkSource extends AbstractSource
             if (SortClusterConfigType.FILE.name().equalsIgnoreCase(configType)) {
                 LOG.info("Create sort sdk client in file way:{}", configType);
                 ClassResourceQueryConsumeConfig queryConfig = new ClassResourceQueryConsumeConfig();
-                client = SortClientFactory.createSortClient(clientConfig,
-                        queryConfig,
-                        new MetricReporterImpl(clientConfig),
-                        new ManagerReportHandlerImpl());
+                client = SortClientFactory.createSortClient(clientConfig, queryConfig);
             } else if (SortClusterConfigType.MANAGER.name().equalsIgnoreCase(configType)) {
                 LOG.info("Create sort sdk client in manager way:{}", configType);
                 clientConfig.setManagerApiUrl(ManagerUrlHandler.getSortSourceConfigUrl());
@@ -214,10 +213,7 @@ public final class SortSdkSource extends AbstractSource
                     return null;
                 }
                 // if it specifies the type of QueryConsumeConfig.
-                client = SortClientFactory.createSortClient(clientConfig,
-                        (QueryConsumeConfig) loaderObject,
-                        new MetricReporterImpl(clientConfig),
-                        new ManagerReportHandlerImpl());
+                client = SortClientFactory.createSortClient(clientConfig, (QueryConsumeConfig) loaderObject);
             }
 
             // init
@@ -238,8 +234,9 @@ public final class SortSdkSource extends AbstractSource
      * @return Map
      */
     private Map<String, String> getSortClientConfigParameters() {
+        Map<String, String> sortSdkParams = new HashMap<>();
         Map<String, String> commonParams = CommonPropertiesHolder.getContext().getSubProperties(SORT_SDK_PREFIX);
-        Map<String, String> sortSdkParams = new HashMap<>(commonParams);
+        sortSdkParams.putAll(commonParams);
         SortTaskConfig taskConfig = SortClusterConfigHolder.getTaskConfig(taskName);
         if (taskConfig != null) {
             Map<String, String> sinkParams = taskConfig.getSinkParams();

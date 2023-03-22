@@ -1,19 +1,18 @@
 /*
- *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements. See the NOTICE file distributed with
- *  this work for additional information regarding copyright ownership.
- *  The ASF licenses this file to You under the Apache License, Version 2.0
- *  (the "License"); you may not use this file except in compliance with
- *  the License. You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.inlong.sort.iceberg.actions;
@@ -118,7 +117,7 @@ public class SyncRewriteDataFilesAction implements RewriteDataFiles {
             LOG.info("Do compact: {}", rewriteTableSql);
             boolean firstIsResultSet = statement.execute(rewriteTableSql);
 
-            if (false) {  // todo:It can be configured as synchronous or asynchronous. Obtaining ResultSet is
+            if (false) { // todo:It can be configured as synchronous or asynchronous. Obtaining ResultSet is
                 // synchronous, and not obtaining it is only asynchronous
                 ResultSet rs = statement.getResultSet();
                 ResultSetMetaData rsmd = rs.getMetaData();
@@ -154,7 +153,8 @@ public class SyncRewriteDataFilesAction implements RewriteDataFiles {
         String url = options.url();
         try {
             Class.forName(DLC_JDBC_CLASS);
-            boolean tmpTokenOpen = Boolean.valueOf(this.options.getTableProperties().getOrDefault("tmp.token.open", "false"));
+            boolean tmpTokenOpen =
+                    Boolean.valueOf(this.options.getTableProperties().getOrDefault("tmp.token.open", "false"));
             if (tmpTokenOpen) {
                 Properties properties = new Properties();
                 Map<String, String> tmpTokenOptions = DLCUtils.getTmpTokenOptions(this.options.getTableProperties());
@@ -162,9 +162,9 @@ public class SyncRewriteDataFilesAction implements RewriteDataFiles {
                 connection = DriverManager.getConnection(url, properties);
             } else {
                 connection = DriverManager.getConnection(
-                    url,
-                    options.secretId(),
-                    options.secretKey());
+                        url,
+                        options.secretId(),
+                        options.secretKey());
             }
             // get meta data
             DatabaseMetaData metaData = connection.getMetaData();

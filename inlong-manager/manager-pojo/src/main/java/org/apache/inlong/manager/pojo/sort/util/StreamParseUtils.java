@@ -91,7 +91,7 @@ public class StreamParseUtils {
     }
 
     public static LookUpJoinerDefinition parseLookupJoinerDefinition(String transformDefinition,
-                                                                     JsonObject joinerJson) {
+            JsonObject joinerJson) {
         LookUpJoinerDefinition joinerDefinition = GSON.fromJson(transformDefinition, LookUpJoinerDefinition.class);
         StreamNode leftStreamNode = parseNode(joinerJson.getAsJsonObject(LEFT_NODE));
         joinerDefinition.setLeftNode(leftStreamNode);
@@ -101,7 +101,7 @@ public class StreamParseUtils {
     }
 
     public static TemporalJoinerDefinition parseTemporalJoinerDefinition(String transformDefinition,
-                                                                         JsonObject joinerJson) {
+            JsonObject joinerJson) {
         TemporalJoinerDefinition joinerDefinition = GSON.fromJson(transformDefinition, TemporalJoinerDefinition.class);
         StreamNode leftStreamNode = parseNode(joinerJson.getAsJsonObject(LEFT_NODE));
         joinerDefinition.setLeftNode(leftStreamNode);
@@ -111,7 +111,7 @@ public class StreamParseUtils {
     }
 
     public static IntervalJoinerDefinition parseIntervalJoinerDefinition(String transformDefinition,
-                                                                         JsonObject joinerJson) {
+            JsonObject joinerJson) {
         IntervalJoinerDefinition joinerDefinition = GSON.fromJson(transformDefinition, IntervalJoinerDefinition.class);
         StreamNode leftStreamNode = parseNode(joinerJson.getAsJsonObject(LEFT_NODE));
         joinerDefinition.setLeftNode(leftStreamNode);
@@ -124,6 +124,7 @@ public class StreamParseUtils {
         if (jsonObject.has(SOURCE_TYPE)) {
             String sourceName = jsonObject.get(SOURCE_NAME).getAsString();
             StreamSource source = new StreamSource() {
+
                 @Override
                 public SourceRequest genSourceRequest() {
                     return null;
@@ -140,6 +141,7 @@ public class StreamParseUtils {
         } else {
             String transformName = jsonObject.get(TRANSFORM_NAME).getAsString();
             StreamTransform transform = new StreamTransform() {
+
                 @Override
                 public String getTransformName() {
                     return super.getTransformName();

@@ -61,6 +61,7 @@ public class ConfigConstants {
     public static final String STAT_INTERVAL_SEC = "stat-interval-sec";
 
     public static final String MAX_MONITOR_CNT = "max-monitor-cnt";
+    public static final int DEF_MONITOR_STAT_CNT = 300000;
 
     public static final String HEART_INTERVAL_SEC = "heart-interval-sec";
 
@@ -98,6 +99,7 @@ public class ConfigConstants {
     public static final String PROXY_CLUSTER_NAME = "proxy.cluster.name";
     public static final String DEFAULT_PROXY_CLUSTER_NAME = "DataProxy";
     public static final String PROXY_CLUSTER_TAG = "proxy.cluster.tag";
+    public static final String PROXY_CLUSTER_EXT_TAG = "proxy.cluster.extTag";
     public static final String PROXY_CLUSTER_INCHARGES = "proxy.cluster.inCharges";
     public static final String CONFIG_CHECK_INTERVAL = "configCheckInterval";
     public static final String SOURCE_NO_TOPIC_ACCEPT = "source.topic.notfound.accept";
@@ -137,12 +139,13 @@ public class ConfigConstants {
 
     public static final String MANAGER_AUTH_SECRET_ID = "manager.auth.secretId";
     public static final String MANAGER_AUTH_SECRET_KEY = "manager.auth.secretKey";
-    //Pulsar config
+    // Pulsar config
     public static final String KEY_TENANT = "tenant";
     public static final String KEY_NAMESPACE = "namespace";
 
     public static final String KEY_SERVICE_URL = "serviceUrl";
     public static final String KEY_AUTHENTICATION = "authentication";
+    public static final String KEY_STATS_INTERVAL_SECONDS = "statsIntervalSeconds";
 
     public static final String KEY_ENABLEBATCHING = "enableBatching";
     public static final String KEY_BATCHINGMAXBYTES = "batchingMaxBytes";

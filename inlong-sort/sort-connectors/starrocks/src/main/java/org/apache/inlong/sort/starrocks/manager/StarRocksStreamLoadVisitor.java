@@ -95,9 +95,8 @@ public class StarRocksStreamLoadVisitor implements Serializable {
                             + "2.Wrong column_separator or row_delimiter. "
                             + "3.Column count exceeded the limitation.");
         }
-        if (LOG.isDebugEnabled()) {
-            LOG.debug(String.format("Stream Load response: \n%s\n", JSON.toJSONString(loadResult)));
-        }
+        LOG.info(String.format("Stream Load response: \n%s\n", JSON.toJSONString(loadResult)));
+
         if (RESULT_FAILED.equals(loadResult.get(keyStatus))) {
             Map<String, String> logMap = new HashMap<>();
             if (loadResult.containsKey("ErrorURL")) {
@@ -105,7 +104,8 @@ public class StarRocksStreamLoadVisitor implements Serializable {
             }
             throw new StarRocksStreamLoadFailedException(
                     String.format("Failed to flush data to StarRocks, Error " + "response: \n%s\n%s\n",
-                            JSON.toJSONString(loadResult), JSON.toJSONString(logMap)), loadResult);
+                            JSON.toJSONString(loadResult), JSON.toJSONString(logMap)),
+                    loadResult);
         } else if (RESULT_LABEL_EXISTED.equals(loadResult.get(keyStatus))) {
             LOG.error(String.format("Stream Load response: \n%s\n", JSON.toJSONString(loadResult)));
             // has to block-checking the state to get the final result
@@ -136,14 +136,16 @@ public class StarRocksStreamLoadVisitor implements Serializable {
                     if (respEntity == null) {
                         throw new StarRocksStreamLoadFailedException(String.format(
                                 "Failed to flush data to StarRocks, Error "
-                                        + "could not get the final state of label[%s].\n", label), null);
+                                        + "could not get the final state of label[%s].\n",
+                                label), null);
                     }
                     Map<String, Object> result = (Map<String, Object>) JSON.parse(EntityUtils.toString(respEntity));
                     String labelState = (String) result.get("state");
                     if (null == labelState) {
                         throw new StarRocksStreamLoadFailedException(String.format(
                                 "Failed to flush data to StarRocks, Error "
-                                        + "could not get the final state of label[%s]. response[%s]\n", label,
+                                        + "could not get the final state of label[%s]. response[%s]\n",
+                                label,
                                 EntityUtils.toString(respEntity)), null);
                     }
                     LOG.info(String.format("Checking label[%s] state[%s]\n", label, labelState));
@@ -156,12 +158,14 @@ public class StarRocksStreamLoadVisitor implements Serializable {
                         case RESULT_LABEL_ABORTED:
                             throw new StarRocksStreamLoadFailedException(
                                     String.format("Failed to flush data to StarRocks, Error " + "label[%s] state[%s]\n",
-                                            label, labelState), null, true);
+                                            label, labelState),
+                                    null, true);
                         case RESULT_LABEL_UNKNOWN:
                         default:
                             throw new StarRocksStreamLoadFailedException(
                                     String.format("Failed to flush data to StarRocks, Error " + "label[%s] state[%s]\n",
-                                            label, labelState), null);
+                                            label, labelState),
+                                    null);
                     }
                 }
             }
@@ -220,7 +224,7 @@ public class StarRocksStreamLoadVisitor implements Serializable {
     private byte[] joinRows(List<byte[]> rows, int totalBytes) throws IOException {
         if (StarRocksSinkOptions.StreamLoadFormat.CSV.equals(sinkOptions.getStreamLoadFormat())) {
             byte[] lineDelimiter = StarRocksDelimiterParser.parse(
-                            sinkOptions.getSinkStreamLoadProperties().get("row_delimiter"), "\n")
+                    sinkOptions.getSinkStreamLoadProperties().get("row_delimiter"), "\n")
                     .getBytes(StandardCharsets.UTF_8);
             ByteBuffer bos = ByteBuffer.allocate(totalBytes + rows.size() * lineDelimiter.length);
             for (byte[] row : rows) {
@@ -254,6 +258,7 @@ public class StarRocksStreamLoadVisitor implements Serializable {
                 Thread.currentThread().getId()));
         final HttpClientBuilder httpClientBuilder = HttpClients.custom()
                 .setRedirectStrategy(new DefaultRedirectStrategy() {
+
                     @Override
                     protected boolean isRedirectable(String method) {
                         return true;

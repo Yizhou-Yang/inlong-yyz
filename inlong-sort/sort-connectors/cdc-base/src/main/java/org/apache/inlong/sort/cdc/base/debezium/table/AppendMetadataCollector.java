@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,14 +46,14 @@ public final class AppendMetadataCollector implements Collector<RowData>, Serial
     }
 
     public void collect(RowData physicalRow, TableChange tableSchema) {
-        GenericRowData metaRow = new GenericRowData(metadataConverters.length);
+        GenericRowData metaRow = new GenericRowData(physicalRow.getRowKind(), metadataConverters.length);
         for (int i = 0; i < metadataConverters.length; i++) {
             Object meta = metadataConverters[i].read(inputRecord, tableSchema, physicalRow);
             metaRow.setField(i, meta);
         }
         if (migrateAll) {
             // all data are put into meta row, set physicalRow to empty
-            physicalRow = new GenericRowData(0);
+            physicalRow = new GenericRowData(physicalRow.getRowKind(), 0);
         }
         RowData outRow = new JoinedRowData(physicalRow.getRowKind(), physicalRow, metaRow);
         outputCollector.collect(outRow);

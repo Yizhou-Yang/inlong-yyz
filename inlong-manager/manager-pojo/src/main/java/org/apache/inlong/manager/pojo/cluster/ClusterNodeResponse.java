@@ -55,8 +55,8 @@ public class ClusterNodeResponse {
     @ApiModelProperty(value = "Cluster protocol type")
     private String protocolType;
 
-    @ApiModelProperty(value = "Cluster node tag, separated by commas")
-    private String nodeTags;
+    @ApiModelProperty(value = "Load value of the node")
+    private Integer nodeLoad;
 
     @ApiModelProperty(value = "Extended params")
     private String extParams;

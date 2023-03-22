@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,11 +17,22 @@
 
 package org.apache.inlong.sort.cdc.mysql.source.metrics;
 
+import static org.apache.inlong.sort.base.Constants.NUM_BYTES_IN;
+import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_IN;
+
+import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
+import org.apache.inlong.sort.base.Constants;
+import org.apache.inlong.sort.base.enums.ReadPhase;
 import org.apache.inlong.sort.base.metric.MetricOption;
-import org.apache.inlong.sort.base.metric.SourceMetricData;
+import org.apache.inlong.sort.base.metric.MetricState;
+import org.apache.inlong.sort.base.metric.sub.SourceTableMetricData;
 import org.apache.inlong.sort.cdc.mysql.source.reader.MySqlSourceReader;
+import org.apache.inlong.sort.cdc.mysql.source.split.MySqlMetricSplit.MySqlTableMetric;
 
 /**
  * A collection class for handling metrics in {@link MySqlSourceReader}.
@@ -50,7 +60,7 @@ public class MySqlSourceReaderMetrics {
      */
     private volatile long emitDelay = 0L;
 
-    private SourceMetricData sourceMetricData;
+    private SourceTableMetricData sourceTableMetricData;
 
     public MySqlSourceReaderMetrics(MetricGroup metricGroup) {
         this.metricGroup = metricGroup;
@@ -58,7 +68,8 @@ public class MySqlSourceReaderMetrics {
 
     public void registerMetrics(MetricOption metricOption) {
         if (metricOption != null) {
-            sourceMetricData = new SourceMetricData(metricOption, metricGroup);
+            sourceTableMetricData = new SourceTableMetricData(metricOption, metricGroup,
+                    Arrays.asList(Constants.DATABASE_NAME, Constants.TABLE_NAME));
         }
         metricGroup.gauge("currentFetchEventTimeLag", (Gauge<Long>) this::getFetchDelay);
         metricGroup.gauge("currentEmitEventTimeLag", (Gauge<Long>) this::getEmitDelay);
@@ -93,20 +104,47 @@ public class MySqlSourceReaderMetrics {
         this.emitDelay = emitDelay;
     }
 
-    public void outputMetrics(long rowCountSize, long rowDataSize) {
-        if (sourceMetricData != null) {
-            sourceMetricData.outputMetrics(rowCountSize, rowDataSize);
+    public void outputMetrics(String database, String table, boolean isSnapshotRecord, Object data) {
+        if (sourceTableMetricData != null) {
+            sourceTableMetricData.outputMetricsWithEstimate(database, table, isSnapshotRecord, data);
         }
     }
 
-    public void initMetrics(long rowCountSize, long rowDataSize) {
-        if (sourceMetricData != null) {
-            sourceMetricData.getNumBytesIn().inc(rowDataSize);
-            sourceMetricData.getNumRecordsIn().inc(rowCountSize);
+    public void initMetrics(long rowCountSize, long rowDataSize, Map<String, Long> readPhaseMetricMap,
+            Map<String, MySqlTableMetric> tableMetricMap) {
+        if (sourceTableMetricData != null) {
+            // node level metric data
+            sourceTableMetricData.getNumBytesIn().inc(rowDataSize);
+            sourceTableMetricData.getNumRecordsIn().inc(rowCountSize);
+
+            // register read phase metric data and table level metric data
+            if (readPhaseMetricMap != null && tableMetricMap != null) {
+                MetricState metricState = new MetricState();
+                metricState.setMetrics(readPhaseMetricMap);
+                Map<String, MetricState> subMetricStateMap = new HashMap<>();
+                tableMetricMap.entrySet().stream().filter(v -> v.getValue() != null).forEach(entry -> {
+                    MetricState subMetricState = new MetricState();
+                    subMetricState.setMetrics(ImmutableMap
+                            .of(NUM_RECORDS_IN, entry.getValue().getNumRecordsIn(), NUM_BYTES_IN,
+                                    entry.getValue().getNumBytesIn()));
+                    subMetricStateMap.put(entry.getKey(), subMetricState);
+                });
+                metricState.setSubMetricStateMap(subMetricStateMap);
+                sourceTableMetricData.registerSubMetricsGroup(metricState);
+            }
         }
     }
 
-    public SourceMetricData getSourceMetricData() {
-        return sourceMetricData;
+    public SourceTableMetricData getSourceMetricData() {
+        return sourceTableMetricData;
+    }
+
+    /**
+     * output read phase metric
+     *
+     * @param readPhase the readPhase of record
+     */
+    public void outputReadPhaseMetrics(ReadPhase readPhase) {
+        sourceTableMetricData.outputReadPhaseMetrics(readPhase);
     }
 }

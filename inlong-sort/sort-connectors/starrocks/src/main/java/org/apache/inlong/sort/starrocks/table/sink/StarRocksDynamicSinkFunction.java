@@ -17,6 +17,8 @@
 
 package org.apache.inlong.sort.starrocks.table.sink;
 
+import static org.apache.inlong.sort.base.Constants.DIRTY_BYTES_OUT;
+import static org.apache.inlong.sort.base.Constants.DIRTY_RECORDS_OUT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC_STATE_NAME;
 import static org.apache.inlong.sort.base.Constants.NUM_BYTES_OUT;
 import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_OUT;
@@ -56,12 +58,16 @@ import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.binary.NestedRowData;
 import org.apache.flink.types.RowKind;
+import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.InstantiationUtil;
+import org.apache.inlong.sort.base.dirty.DirtyOptions;
+import org.apache.inlong.sort.base.dirty.DirtySinkHelper;
+import org.apache.inlong.sort.base.dirty.DirtyType;
 import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
 import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
 import org.apache.inlong.sort.base.metric.MetricOption;
 import org.apache.inlong.sort.base.metric.MetricState;
-import org.apache.inlong.sort.base.metric.SinkMetricData;
+import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.base.util.MetricStateUtils;
 import org.apache.inlong.sort.starrocks.manager.SinkBufferEntity;
@@ -95,12 +101,14 @@ public class StarRocksDynamicSinkFunction<T> extends RichSinkFunction<T> impleme
     private final String tablePattern;
 
     private final String inlongMetric;
-    private transient SinkMetricData metricData;
+    private transient SinkTableMetricData metricData;
     private transient ListState<MetricState> metricStateListState;
     private transient MetricState metricState;
     private final String auditHostAndPorts;
 
     private transient JsonDynamicSchemaFormat jsonDynamicSchemaFormat;
+
+    private DirtySinkHelper<Object> dirtySinkHelper;
 
     public StarRocksDynamicSinkFunction(StarRocksSinkOptions sinkOptions,
             TableSchema schema,
@@ -111,14 +119,15 @@ public class StarRocksDynamicSinkFunction<T> extends RichSinkFunction<T> impleme
             String tablePattern,
             String inlongMetric,
             String auditHostAndPorts,
-            SchemaUpdateExceptionPolicy schemaUpdatePolicy) {
+            SchemaUpdateExceptionPolicy schemaUpdatePolicy,
+            DirtySinkHelper<Object> dirtySinkHelper) {
         StarRocksJdbcConnectionOptions jdbcOptions = new StarRocksJdbcConnectionOptions(sinkOptions.getJdbcUrl(),
                 sinkOptions.getUsername(), sinkOptions.getPassword());
         StarRocksJdbcConnectionProvider jdbcConnProvider = new StarRocksJdbcConnectionProvider(jdbcOptions);
         StarRocksQueryVisitor starrocksQueryVisitor = new StarRocksQueryVisitor(jdbcConnProvider,
                 sinkOptions.getDatabaseName(), sinkOptions.getTableName());
         this.sinkManager = new StarRocksSinkManager(sinkOptions, schema, jdbcConnProvider, starrocksQueryVisitor,
-                multipleSink, schemaUpdatePolicy);
+                multipleSink, schemaUpdatePolicy, dirtySinkHelper, sinkMultipleFormat);
 
         rowTransformer.setStarRocksColumns(starrocksQueryVisitor.getFieldMapping());
         rowTransformer.setTableSchema(schema);
@@ -132,6 +141,8 @@ public class StarRocksDynamicSinkFunction<T> extends RichSinkFunction<T> impleme
         this.tablePattern = tablePattern;
         this.inlongMetric = inlongMetric;
         this.auditHostAndPorts = auditHostAndPorts;
+
+        this.dirtySinkHelper = dirtySinkHelper;
     }
 
     @Override
@@ -150,11 +161,19 @@ public class StarRocksDynamicSinkFunction<T> extends RichSinkFunction<T> impleme
                 .withInlongAudit(auditHostAndPorts)
                 .withInitRecords(metricState != null ? metricState.getMetricValue(NUM_RECORDS_OUT) : 0L)
                 .withInitBytes(metricState != null ? metricState.getMetricValue(NUM_BYTES_OUT) : 0L)
+                .withInitDirtyRecords(metricState != null ? metricState.getMetricValue(DIRTY_RECORDS_OUT) : 0L)
+                .withInitDirtyBytes(metricState != null ? metricState.getMetricValue(DIRTY_BYTES_OUT) : 0L)
                 .withRegisterMetric(MetricOption.RegisteredMetric.ALL).build();
         if (metricOption != null) {
-            metricData = new SinkMetricData(metricOption, getRuntimeContext().getMetricGroup());
+            metricData = new SinkTableMetricData(metricOption, getRuntimeContext().getMetricGroup());
+            if (multipleSink) {
+                // register sub sink metric data from metric state
+                metricData.registerSubMetricsGroup(metricState);
+            }
             sinkManager.setSinkMetricData(metricData);
         }
+
+        dirtySinkHelper.open(parameters);
     }
 
     @Override
@@ -207,7 +226,7 @@ public class StarRocksDynamicSinkFunction<T> extends RichSinkFunction<T> impleme
             }
         }
         if (value instanceof RowData) {
-            if (RowKind.UPDATE_BEFORE.equals(((RowData) value).getRowKind())) {
+            if (!multipleSink && RowKind.UPDATE_BEFORE.equals(((RowData) value).getRowKind())) {
                 // do not need update_before, cauz an update action happened on the primary keys will be separated into
                 // `delete` and `create`
                 return;
@@ -232,6 +251,33 @@ public class StarRocksDynamicSinkFunction<T> extends RichSinkFunction<T> impleme
             }
             String databaseName = jsonDynamicSchemaFormat.parse(rootNode, databasePattern);
             String tableName = jsonDynamicSchemaFormat.parse(rootNode, tablePattern);
+
+            DirtyOptions dirtyOptions = dirtySinkHelper.getDirtyOptions();
+
+            String dirtyLabel = null;
+            String dirtyLogTag = null;
+            String dirtyIdentify = null;
+            try {
+                if (dirtyOptions.ignoreDirty()) {
+                    if (dirtyOptions.getLabels() != null) {
+                        dirtyLabel = jsonDynamicSchemaFormat.parse(rootNode,
+                                DirtySinkHelper.regexReplace(dirtyOptions.getLabels(), DirtyType.BATCH_LOAD_ERROR,
+                                        null));
+                    }
+                    if (dirtyOptions.getLogTag() != null) {
+                        dirtyLogTag = jsonDynamicSchemaFormat.parse(rootNode,
+                                DirtySinkHelper.regexReplace(dirtyOptions.getLogTag(), DirtyType.BATCH_LOAD_ERROR,
+                                        null));
+                    }
+                    if (dirtyOptions.getIdentifier() != null) {
+                        dirtyIdentify = jsonDynamicSchemaFormat.parse(rootNode,
+                                DirtySinkHelper.regexReplace(dirtyOptions.getIdentifier(), DirtyType.BATCH_LOAD_ERROR,
+                                        null));
+                    }
+                }
+            } catch (Exception e) {
+                LOG.warn("Parse dirty options failed. {}", ExceptionUtils.stringifyException(e));
+            }
 
             List<RowKind> rowKinds = jsonDynamicSchemaFormat.opType2RowKind(
                     jsonDynamicSchemaFormat.getOpType(rootNode));
@@ -265,10 +311,12 @@ public class StarRocksDynamicSinkFunction<T> extends RichSinkFunction<T> impleme
                         default:
                             throw new RuntimeException("Unrecognized row kind:" + rowKind);
                     }
-                    records.add(record);
+                    if (record != null) {
+                        records.add(record);
+                    }
                 }
             }
-            sinkManager.writeRecords(databaseName, tableName, records);
+            sinkManager.writeRecords(databaseName, tableName, records, dirtyLogTag, dirtyIdentify, dirtyLabel);
         } else {
             String record = serializer.serialize(rowTransformer.transform(value, sinkOptions.supportUpsertDelete()));
             sinkManager.writeRecords(sinkOptions.getDatabaseName(), sinkOptions.getTableName(), record);
@@ -315,9 +363,9 @@ public class StarRocksDynamicSinkFunction<T> extends RichSinkFunction<T> impleme
         sinkManager.flush(null, true);
     }
 
-    //@Override
+    // @Override
     public synchronized void finish() throws Exception {
-        //super.finish();
+        // super.finish();
         LOG.info("StarRocks sink is draining the remaining data.");
         if (StarRocksSinkSemantic.EXACTLY_ONCE.equals(sinkOptions.getSemantic())) {
             flushPreviousState();

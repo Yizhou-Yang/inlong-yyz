@@ -1,19 +1,18 @@
 /*
- *   Licensed to the Apache Software Foundation (ASF) under one
- *   or more contributor license agreements.  See the NOTICE file
- *   distributed with this work for additional information
- *   regarding copyright ownership.  The ASF licenses this file
- *   to you under the Apache License, Version 2.0 (the
- *   "License"); you may not use this file except in compliance
- *   with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *   Unless required by applicable law or agreed to in writing, software
- *   distributed under the License is distributed on an "AS IS" BASIS,
- *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *   See the License for the specific language governing permissions and
- *   limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.inlong.sort.protocol.node.extract;
@@ -74,14 +73,20 @@ public class PostgresExtractNode extends ExtractNode implements Metadata, Inlong
     private String scanStartupMode;
 
     @JsonCreator
-    public PostgresExtractNode(@JsonProperty("id") String id, @JsonProperty("name") String name,
+    public PostgresExtractNode(@JsonProperty("id") String id,
+            @JsonProperty("name") String name,
             @JsonProperty("fields") List<FieldInfo> fields,
             @JsonProperty("watermark_field") WatermarkField watermarkField,
-            @JsonProperty("properties") Map<String, String> properties, @JsonProperty("primaryKey") String primaryKey,
-            @JsonProperty("tableNames") List<String> tableNames, @JsonProperty("hostname") String hostname,
-            @JsonProperty("username") String username, @JsonProperty("password") String password,
-            @JsonProperty("database") String database, @JsonProperty("schema") String schema,
-            @JsonProperty("port") Integer port, @JsonProperty("decodingPluginName") String decodingPluginName,
+            @JsonProperty("properties") Map<String, String> properties,
+            @JsonProperty("primaryKey") String primaryKey,
+            @JsonProperty("tableNames") List<String> tableNames,
+            @JsonProperty("hostname") String hostname,
+            @JsonProperty("username") String username,
+            @JsonProperty("password") String password,
+            @JsonProperty("database") String database,
+            @JsonProperty("schema") String schema,
+            @JsonProperty("port") Integer port,
+            @JsonProperty("decodingPluginName") String decodingPluginName,
             @JsonProperty("serverTimeZone") String serverTimeZone,
             @JsonProperty("scanStartupMode") String scanStartupMode) {
         super(id, name, fields, watermarkField, properties);
@@ -103,11 +108,14 @@ public class PostgresExtractNode extends ExtractNode implements Metadata, Inlong
      *
      * @return options
      * @see <a href="https://ververica.github.io/flink-cdc-connectors/master/content/connectors/postgres-cdc.html">postgres
-     *         cdc</a>
+     * cdc</a>
      */
     @Override
     public Map<String, String> tableOptions() {
         Map<String, String> options = super.tableOptions();
+        if (getProperties() != null && !getProperties().isEmpty()) {
+            options.putAll(getProperties());
+        }
         options.put(PostgresConstant.CONNECTOR, PostgresConstant.POSTGRES_CDC);
         options.put(PostgresConstant.HOSTNAME, hostname);
         options.put(PostgresConstant.USERNAME, username);

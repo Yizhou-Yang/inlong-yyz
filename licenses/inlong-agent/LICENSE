@@ -442,7 +442,7 @@ The text of each license is the standard Apache 2.0 license.
   org.apache.velocity:velocity-engine-core:2.3 - Apache Velocity - Engine (https://github.com/apache/velocity-engine/tree/2.3/velocity-engine-core), (Apache License, Version 2.0)
   org.apache.zookeeper:zookeeper:3.6.3 - Apache ZooKeeper - Server (https://github.com/apache/zookeeper/tree/release-3.6.3/zookeeper-server), (Apache License, Version 2.0)
   org.apache.zookeeper:zookeeper-jute:3.6.3 - Apache ZooKeeper - Jute (https://github.com/apache/zookeeper/tree/release-3.6.3/zookeeper-jute), (Apache License, Version 2.0)
-
+  org.apache.shiro:shiro-core:1.10.1 - Apache Shiro Cache (https://shiro.apache.org/), (Apache License, Version 2.0)
 
 ========================================================================
 Apache 2.0 licenses
@@ -528,7 +528,7 @@ The text of each license is also included at licenses/LICENSE-[project].txt.G
   com.google.code.findbugs:jsr305:3.0.2 - FindBugs-jsr305 (http://findbugs.sourceforge.net/), (New BSD License)
   com.thoughtworks.paranamer:paranamer:2.8 - ParaNamer Core (https://github.com/paul-hammant/paranamer/tree/paranamer-parent-2.8), (BSD)
   org.postgresql:postgresql:42.4.1 - PostgreSQL JDBC Driver (https://jdbc.postgresql.org), (BSD-2-Clause)
-  com.google.protobuf:protobuf-java:3.19.4 - Protocol Buffers [Core] (https://github.com/protocolbuffers/protobuf/tree/v3.19.4), (3-Clause BSD License)
+  com.google.protobuf:protobuf-java:3.19.6 - Protocol Buffers [Core] (https://github.com/protocolbuffers/protobuf/tree/v3.19.6), (3-Clause BSD License)
   org.scala-lang.modules:scala-java8-compat_2.11:0.9.0 - scala-java8-compat (https://github.com/scala/scala-java8-compat/tree/v0.9.0), (BSD 3-clause)
   org.scala-lang:scala-library:2.11.12 - Scala Library (https://github.com/scala/scala/tree/v2.11.12), (BSD 3-clause)
   org.scala-lang.modules:scala-parser-combinators_2.11:1.1.1 - scala-parser-combinators (http://www.scala-lang.org/), (BSD 3-clause)

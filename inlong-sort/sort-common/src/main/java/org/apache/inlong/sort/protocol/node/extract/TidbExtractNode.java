@@ -110,8 +110,7 @@ public class TidbExtractNode extends ExtractNode implements Metadata, InlongMetr
             @Nonnull @JsonProperty("topic") String topic,
             @Nonnull @JsonProperty("codec") String codec,
             @JsonProperty("groupId") String groupId,
-            @JsonProperty("autoOffsetReset") String autoOffsetReset
-    ) {
+            @JsonProperty("autoOffsetReset") String autoOffsetReset) {
         super(id, name, fields, watermarkField, properties);
         this.url = Preconditions.checkNotNull(url, "url is null");
         this.tableName = Preconditions.checkNotNull(tableName, "tableName is null");

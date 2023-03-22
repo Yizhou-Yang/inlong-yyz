@@ -35,6 +35,10 @@ public enum TaskTypeEnum {
     TUBEMQ(10),
     REDIS(11),
     MQTT(12),
+    HUDI(13),
+
+    // only used for unit test
+    MOCK(201),
     CKAFKA(212),
     MYSQL(213),
     TDSQL_KAFKA(101),
@@ -84,6 +88,10 @@ public enum TaskTypeEnum {
                 return TDSQL_KAFKA;
             case 102:
                 return TIDB;
+            case 13:
+                return HUDI;
+            case 201:
+                return MOCK;
             default:
                 throw new RuntimeException("Unsupported task type " + taskType);
         }

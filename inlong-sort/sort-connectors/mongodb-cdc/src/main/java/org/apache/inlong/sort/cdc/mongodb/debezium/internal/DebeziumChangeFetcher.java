@@ -150,9 +150,9 @@ public class DebeziumChangeFetcher<T> {
                 synchronized (checkpointLock) {
                     LOG.info(
                             "Database snapshot phase can't perform checkpoint, acquired Checkpoint lock.");
-                    handleBatch(events);
+                    handleBatch(events, false);
                     while (isRunning && isInDbSnapshotPhase) {
-                        handleBatch(handover.pollNext());
+                        handleBatch(handover.pollNext(), false);
                     }
                 }
                 LOG.info("Received record from streaming binlog phase, released checkpoint lock.");
@@ -162,7 +162,7 @@ public class DebeziumChangeFetcher<T> {
             while (isRunning) {
                 // If the handover is closed or has errors, exit.
                 // If there is no streaming phase, the handover will be closed by the engine.
-                handleBatch(handover.pollNext());
+                handleBatch(handover.pollNext(), true);
             }
         } catch (Handover.ClosedException e) {
             // ignore
@@ -206,7 +206,7 @@ public class DebeziumChangeFetcher<T> {
     // Helper
     // ---------------------------------------------------------------------------------------
 
-    private void handleBatch(List<ChangeEvent<SourceRecord, SourceRecord>> changeEvents)
+    private void handleBatch(List<ChangeEvent<SourceRecord, SourceRecord>> changeEvents, boolean isStreamingPhase)
             throws Exception {
         if (CollectionUtils.isEmpty(changeEvents)) {
             return;
@@ -224,11 +224,13 @@ public class DebeziumChangeFetcher<T> {
                     debeziumOffset.setSourcePartition(record.sourcePartition());
                     debeziumOffset.setSourceOffset(record.sourceOffset());
                 }
+            }
+            deserialization.deserialize(record, debeziumCollector, isStreamingPhase);
+
+            if (isHeartbeatEvent(record)) {
                 // drop heartbeat events
                 continue;
             }
-            deserialization.deserialize(record, debeziumCollector);
-
             if (!isSnapshotRecord(record)) {
                 LOG.debug("Snapshot phase finishes.");
                 isInDbSnapshotPhase = false;

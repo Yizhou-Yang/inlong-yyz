@@ -37,9 +37,9 @@ import java.util.List;
 public class LookUpJoinerDefinition extends TransformDefinition {
 
     public LookUpJoinerDefinition(StreamNode leftNode,
-                                  StreamNode rightNode,
-                                  List<StreamField> leftJoinFields,
-                                  List<StreamField> rightJoinFields) {
+            StreamNode rightNode,
+            List<StreamField> leftJoinFields,
+            List<StreamField> rightJoinFields) {
         this.transformType = TransformType.LOOKUP_JOINER;
         this.leftNode = leftNode;
         this.rightNode = rightNode;

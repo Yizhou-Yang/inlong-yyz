@@ -23,6 +23,7 @@ import java.util.Locale;
  * Enum of data type.
  */
 public enum DataTypeEnum {
+
     CSV("csv"),
     AVRO("avro"),
     JSON("json"),

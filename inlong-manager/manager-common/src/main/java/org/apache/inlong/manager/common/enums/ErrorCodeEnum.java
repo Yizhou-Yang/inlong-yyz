@@ -34,22 +34,26 @@ public enum ErrorCodeEnum {
     REQUEST_IS_EMPTY(104, "Request is empty"),
     REQUEST_COMPONENT_EMPTY(105, "Component is empty"),
     REQUEST_INSTANCE_EMPTY(106, "Instance is empty"),
+    LOGIN_USER_EMPTY(107, "Login user is empty"),
+    RECORD_DUPLICATE(108, "The record already exists"),
+    RECORD_NOT_FOUND(109, "The record does not exist"),
     USER_IS_NOT_MANAGER(110, "%s is not the manager, please contact %s"),
+    RECORD_IN_USED(111, "The record is in use"),
 
     GROUP_NOT_FOUND(1001, "Inlong group does not exist/no operation authority"),
     GROUP_DUPLICATE(1002, "Inlong group already exists"),
     GROUP_INFO_INCORRECT(1003, "Group info was incorrect"),
-    GROUP_SAVE_FAILED(1003, "Failed to save/update inlong group"),
-    GROUP_PERMISSION_DENIED(1004, "No permission to access this inlong group"),
-    GROUP_HAS_STREAM(1005, "There are some valid inlong stream for this inlong group"),
+    GROUP_SAVE_FAILED(1004, "Failed to save/update inlong group"),
+    GROUP_PERMISSION_DENIED(1005, "No permission to access this inlong group"),
     GROUP_UPDATE_NOT_ALLOWED(1006, "The current inlong group status does not support modification"),
     GROUP_DELETE_NOT_ALLOWED(1007, "The current inlong group status does not support deletion"),
-    GROUP_ID_UPDATE_NOT_ALLOWED(1008, "The current inlong group status does not support modifying the group id"),
-    GROUP_MIDDLEWARE_UPDATE_NOT_ALLOWED(1011,
-            "The current inlong group status does not support modifying the MQ type"),
+    GROUP_DELETE_HAS_STREAM(1008, "The inlong group contains inlong streams and is not allowed to be deleted"),
+
+    GROUP_ID_UPDATE_NOT_ALLOWED(1010, "The current status does not support modifying the inlong group id"),
+    GROUP_MIDDLEWARE_UPDATE_NOT_ALLOWED(1011, "The current status does not support modifying the MQ type"),
     GROUP_NAME_UPDATE_NOT_ALLOWED(1012, "The current inlong group status does not support modifying the name"),
     GROUP_INFO_INCONSISTENT(1013, "The inlong group info is inconsistent, please contact the administrator"),
-    GROUP_MODE_UNSUPPORTED(1014, "The current inlong group mode only support lightweight, standard"),
+    GROUP_MODE_UNSUPPORTED(1014, "The current inlong group mode only support lightweight or standard"),
 
     OPT_NOT_ALLOWED_BY_STATUS(1021, "InlongGroup status %s was not allowed to add/update/delete related info"),
 
@@ -59,9 +63,11 @@ public enum ErrorCodeEnum {
     CLUSTER_NOT_FOUND(1101, "Cluster information does not exist"),
     CLUSTER_TYPE_NOT_SUPPORTED(1102, "Cluster type '%s' not supported"),
     CLUSTER_INFO_INCORRECT(1103, "Cluster info was incorrect"),
+    CLUSTER_TAG_NOT_FOUND(1104, "Cluster tag information does not exist"),
 
     DATA_NODE_NOT_FOUND(1150, "Data node information does not exist"),
     DATA_NODE_TYPE_NOT_SUPPORTED(1151, "Data node type '%s' not supported"),
+    DATA_NODE_ID_CHANGED(1152, "Data node information's id not equals"),
 
     STREAM_NOT_FOUND(1201, "Inlong stream does not exist/no operation permission"),
     STREAM_ID_DUPLICATE(1202, "The current inlong group has a inlong stream with the same ID"),
@@ -74,7 +80,7 @@ public enum ErrorCodeEnum {
     STREAM_EXT_SAVE_FAILED(1207, "Failed to save/update inlong stream extension information"),
     STREAM_FIELD_SAVE_FAILED(1208, "Failed to save/update inlong stream field"),
     STREAM_DELETE_HAS_SOURCE(1209, "The inlong stream contains source info and is not allowed to be deleted"),
-    STREAM_DELETE_HAS_SINK(1210, "The inlong stream contains data sink info and is not allowed to be deleted"),
+    STREAM_DELETE_HAS_SINK(1210, "The inlong stream contains sink info and is not allowed to be deleted"),
 
     SOURCE_TYPE_IS_NULL(1300, "Source type is null"),
     SOURCE_TYPE_NOT_SUPPORT(1301, "Source type '%s' not support"),
@@ -115,6 +121,7 @@ public enum ErrorCodeEnum {
 
     WORKFLOW_EXE_FAILED(4000, "Workflow execution exception"),
     WORKFLOW_APPROVER_NOT_FOUND(4001, "Workflow approver does not exist/no operation authority"),
+    WORKFLOW_DELETE_RECORD_FAILED(4002, "Workflow delete record failure"),
 
     CONSUMER_GROUP_DUPLICATED(2600, "The consumer group already exists"),
     CONSUMER_GROUP_CREATE_FAILED(2601, "Failed to create TubeMQ consumer group"),

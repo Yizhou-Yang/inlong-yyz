@@ -42,10 +42,13 @@ public class SourceType {
     public static final String ORACLE = "ORACLE";
     public static final String SQLSERVER = "SQLSERVER";
     public static final String MONGODB = "MONGODB";
+    public static final String MQTT = "MQTT";
+    public static final String HUDI = "HUDI";
     public static final String TDSQL_KAFKA = "TDSQL_KAFKA";
     public static final String TIDB = "TIDB";
 
     public static final Map<String, TaskTypeEnum> SOURCE_TASK_MAP = new HashMap<String, TaskTypeEnum>() {
+
         {
             put(AUTO_PUSH, null);
             put(TUBEMQ, TaskTypeEnum.TUBEMQ);
@@ -62,6 +65,9 @@ public class SourceType {
             put(ORACLE, TaskTypeEnum.ORACLE);
             put(SQLSERVER, TaskTypeEnum.SQLSERVER);
             put(MONGODB, TaskTypeEnum.MONGODB);
+            put(MQTT, TaskTypeEnum.MQTT);
+            put(HUDI, TaskTypeEnum.HUDI);
+
             put(TIDB, TaskTypeEnum.TIDB);
         }
     };

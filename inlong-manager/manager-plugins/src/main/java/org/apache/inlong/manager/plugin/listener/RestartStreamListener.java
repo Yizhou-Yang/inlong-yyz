@@ -19,6 +19,7 @@ package org.apache.inlong.manager.plugin.listener;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.manager.common.consts.InlongConstants;
 import org.apache.inlong.manager.common.enums.GroupOperateType;
@@ -89,9 +90,12 @@ public class RestartStreamListener implements SortOperateListener {
 
         Map<String, String> kvConf = new HashMap<>();
         groupExtList.forEach(groupExtInfo -> kvConf.put(groupExtInfo.getKeyName(), groupExtInfo.getKeyValue()));
-        streamExtList.forEach(extInfo -> {
-            kvConf.put(extInfo.getKeyName(), extInfo.getKeyValue());
-        });
+        // There is a possibility that the extList value is null
+        if (CollectionUtils.isNotEmpty(streamExtList)) {
+            streamExtList.forEach(extInfo -> {
+                kvConf.put(extInfo.getKeyName(), extInfo.getKeyValue());
+            });
+        }
         final String groupId = streamInfo.getInlongGroupId();
         final String streamId = streamInfo.getInlongStreamId();
         String sortExt = kvConf.get(InlongConstants.SORT_PROPERTIES);
@@ -121,7 +125,7 @@ public class RestartStreamListener implements SortOperateListener {
 
         FlinkInfo flinkInfo = new FlinkInfo();
         flinkInfo.setJobId(jobId);
-        String jobName = Constants.INLONG + context.getProcessForm().getInlongGroupId();
+        String jobName = Constants.SORT_JOB_NAME_GENERATOR.apply(processForm);
         flinkInfo.setJobName(jobName);
         String sortUrl = kvConf.get(InlongConstants.SORT_URL);
         flinkInfo.setEndpoint(sortUrl);

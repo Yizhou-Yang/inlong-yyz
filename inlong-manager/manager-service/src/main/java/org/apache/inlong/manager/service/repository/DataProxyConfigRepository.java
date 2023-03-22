@@ -21,7 +21,6 @@ import com.google.common.base.Splitter;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -61,6 +60,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.PostConstruct;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -72,8 +72,6 @@ import java.util.Optional;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
-
-import javax.annotation.PostConstruct;
 
 /**
  * DataProxyConfigRepository
@@ -89,14 +87,14 @@ public class DataProxyConfigRepository implements IRepository {
     public static final String KEY_BACKUP_TOPIC = "backup_topic";
     public static final String KEY_SORT_TASK_NAME = "defaultSortTaskName";
     public static final String KEY_DATA_NODE_NAME = "defaultDataNodeName";
-    public static final String KEY_SORT_CONSUEMER_GROUP = "defaultSortConsumerGroup";
+    public static final String KEY_SORT_CONSUMER_GROUP = "defaultSortConsumerGroup";
     public static final String KEY_SINK_NAME = "defaultSinkName";
 
     public static final Splitter.MapSplitter MAP_SPLITTER = Splitter.on(SEPARATOR).trimResults()
             .withKeyValueSeparator(KEY_VALUE_SEPARATOR);
     public static final String CACHE_CLUSTER_PRODUCER_TAG = "producer";
     public static final String CACHE_CLUSTER_CONSUMER_TAG = "consumer";
-    private static final Gson gson = new Gson();
+    private static final Gson GSON = new Gson();
 
     // key: proxyClusterName, value: jsonString
     private Map<String, String> proxyConfigJson = new ConcurrentHashMap<>();
@@ -213,7 +211,7 @@ public class DataProxyConfigRepository implements IRepository {
         if (proxyClusterMap.size() == 0) {
             return;
         }
-        // reoload cache cluster
+        // reload cache cluster
         this.reloadCacheCluster(proxyClusterMap);
         // reload inlong group id and inlong stream id
         this.reloadInlongId(proxyClusterMap);
@@ -264,6 +262,9 @@ public class DataProxyConfigRepository implements IRepository {
             // cache
             String clusterTag = proxyObj.getSetName();
             String extTag = proxyObj.getZone();
+            if (StringUtils.isEmpty(extTag)) {
+                continue;
+            }
             Map<String, List<CacheCluster>> cacheClusterZoneMap = cacheClusterMap.get(clusterTag);
             if (cacheClusterZoneMap != null) {
                 Map<String, String> subTagMap = tagCache.computeIfAbsent(extTag, k -> MAP_SPLITTER.split(extTag));
@@ -283,7 +284,7 @@ public class DataProxyConfigRepository implements IRepository {
                             CacheClusterObject obj = new CacheClusterObject();
                             obj.setName(cacheCluster.getClusterName());
                             obj.setZone(cacheCluster.getExtTag());
-                            obj.setParams(fromJson(cacheCluster.getExtParams()));
+                            obj.setParams(fromJsonToMap(cacheCluster.getExtParams()));
                             cacheClusters.add(obj);
                         }
                     }
@@ -293,12 +294,15 @@ public class DataProxyConfigRepository implements IRepository {
     }
 
     /**
-     * fromJson
+     * Parse Json string to Java Map
      */
-    private Map<String, String> fromJson(String jsonString) {
+    private Map<String, String> fromJsonToMap(String jsonString) {
         Map<String, String> mapObj = new HashMap<>();
+        if (StringUtils.isBlank(jsonString)) {
+            return mapObj;
+        }
         try {
-            JsonObject obj = gson.fromJson(jsonString, JsonObject.class);
+            JsonObject obj = GSON.fromJson(jsonString, JsonObject.class);
             for (String key : obj.keySet()) {
                 JsonElement child = obj.get(key);
                 if (child.isJsonPrimitive()) {
@@ -308,9 +312,24 @@ public class DataProxyConfigRepository implements IRepository {
                 }
             }
         } catch (Exception e) {
-            LOGGER.error(e.getMessage(), e);
+            LOGGER.error("parse json string to map error", e);
         }
         return mapObj;
+    }
+
+    /**
+     * Parse Json string to JsonObject
+     */
+    private JsonObject fromJsonToJson(String jsonString) {
+        if (StringUtils.isBlank(jsonString)) {
+            return new JsonObject();
+        }
+        try {
+            return GSON.fromJson(jsonString, JsonObject.class);
+        } catch (Exception e) {
+            LOGGER.error("parse json string to json object error", e);
+            return new JsonObject();
+        }
     }
 
     /**
@@ -322,7 +341,7 @@ public class DataProxyConfigRepository implements IRepository {
         clusterSetMapper.selectInlongGroupId().forEach(value -> groupIdMap.put(value.getInlongGroupId(), value));
         // reload inlong group ext params
         Map<String, Map<String, String>> groupParams = new HashMap<>();
-        groupIdMap.forEach((k, v) -> groupParams.put(k, fromJson(v.getExtParams())));
+        groupIdMap.forEach((k, v) -> groupParams.put(k, fromJsonToMap(v.getExtParams())));
         // reload inlong group ext
         List<InlongGroupExtEntity> groupExtCursor = sortConfigLoader
                 .loadGroupBackupInfo(ClusterSwitch.BACKUP_CLUSTER_TAG);
@@ -334,7 +353,7 @@ public class DataProxyConfigRepository implements IRepository {
                 .forEach(v -> streamIdMap.put(getInlongId(v.getInlongGroupId(), v.getInlongStreamId()), v));
         // reload inlong stream ext params
         Map<String, Map<String, String>> streamParams = new HashMap<>();
-        streamIdMap.forEach((k, v) -> streamParams.put(k, fromJson(v.getExtParams())));
+        streamIdMap.forEach((k, v) -> streamParams.put(k, fromJsonToMap(v.getExtParams())));
         // reload inlong stream ext
         List<InlongStreamExtEntity> streamExtCursor = sortConfigLoader
                 .loadStreamBackupInfo(ClusterSwitch.BACKUP_MQ_RESOURCE);
@@ -366,7 +385,8 @@ public class DataProxyConfigRepository implements IRepository {
             InlongStreamId streamIdObj = entry.getValue();
             String groupId = streamIdObj.getInlongGroupId();
             InlongGroupId groupIdObj = groupIdMap.get(groupId);
-            if (groupId == null) {
+            if (groupId == null || groupIdObj == null) {
+                LOGGER.debug("groupId {} or groupIdObj {} is null, ignored", groupId, groupIdObj);
                 continue;
             }
             // master
@@ -394,12 +414,12 @@ public class DataProxyConfigRepository implements IRepository {
 
                 Map<String, String> streamParam = streamParams.get(inlongId);
                 if (streamParam != null && !StringUtils.isBlank(streamParam.get(ClusterSwitch.BACKUP_MQ_RESOURCE))) {
-                    obj.setTopic(streamParam.get(ClusterSwitch.BACKUP_MQ_RESOURCE));
+                    backupObj.setTopic(streamParam.get(ClusterSwitch.BACKUP_MQ_RESOURCE));
                     backupObj.getParams().put(KEY_NAMESPACE, groupMqResource);
                 } else {
-                    obj.setTopic(groupMqResource);
+                    backupObj.setTopic(groupMqResource);
                 }
-                inlongIdMap.computeIfAbsent(clusterTag, k -> new ArrayList<>()).add(obj);
+                inlongIdMap.computeIfAbsent(clusterTag, k -> new ArrayList<>()).add(backupObj);
             }
         }
         return inlongIdMap;
@@ -430,14 +450,14 @@ public class DataProxyConfigRepository implements IRepository {
         for (Entry<String, DataProxyCluster> entry : proxyClusterMap.entrySet()) {
             DataProxyCluster proxyObj = entry.getValue();
             // json
-            String jsonDataProxyCluster = gson.toJson(proxyObj);
+            String jsonDataProxyCluster = GSON.toJson(proxyObj);
             String md5 = DigestUtils.md5Hex(jsonDataProxyCluster);
             DataProxyConfigResponse response = new DataProxyConfigResponse();
             response.setResult(true);
             response.setErrCode(DataProxyConfigResponse.SUCC);
             response.setMd5(md5);
             response.setData(proxyObj);
-            String jsonResponse = gson.toJson(response);
+            String jsonResponse = GSON.toJson(response);
             newProxyConfigJson.put(entry.getKey(), jsonResponse);
             newProxyMd5Map.put(entry.getKey(), md5);
         }
@@ -546,14 +566,13 @@ public class DataProxyConfigRepository implements IRepository {
             if (StringUtils.equals(clusterType, v.getType())
                     && StringUtils.equals(clusterTag, v.getClusterTags())) {
                 String newExtParams = v.getExtParams();
-                Gson gson = new Gson();
-                JsonObject extParams = gson.fromJson(newExtParams, JsonObject.class);
+                JsonObject extParams = fromJsonToJson(newExtParams);
                 if (extParams.has(KEY_SINK_NAME) && extParams.has(KEY_SORT_TASK_NAME)
-                        && extParams.has(KEY_DATA_NODE_NAME) && extParams.has(KEY_SORT_CONSUEMER_GROUP)) {
+                        && extParams.has(KEY_DATA_NODE_NAME) && extParams.has(KEY_SORT_CONSUMER_GROUP)) {
                     final String sinkName = extParams.get(KEY_SINK_NAME).getAsString();
                     final String sortTaskName = extParams.get(KEY_SORT_TASK_NAME).getAsString();
                     final String dataNodeName = extParams.get(KEY_DATA_NODE_NAME).getAsString();
-                    final String sortConsumerGroup = extParams.get(KEY_SORT_CONSUEMER_GROUP).getAsString();
+                    final String sortConsumerGroup = extParams.get(KEY_SORT_CONSUMER_GROUP).getAsString();
                     StreamSinkEntity newStreamSink = copyStreamSink(srcStreamSink);
                     newStreamSink.setInlongClusterName(v.getName());
                     newStreamSink.setSinkName(sinkName);
@@ -590,8 +609,7 @@ public class DataProxyConfigRepository implements IRepository {
             extParams = "{}";
         }
         // parse json
-        Gson gson = new Gson();
-        JsonObject extParamsObj = gson.fromJson(extParams, JsonObject.class);
+        JsonObject extParamsObj = fromJsonToJson(extParams);
         // change cluster tag
         extParamsObj.addProperty(KEY_BACKUP_CLUSTER_TAG, oldGroup.getInlongClusterTag());
         extParamsObj.addProperty(KEY_BACKUP_TOPIC, oldGroup.getMqResource());
@@ -622,8 +640,7 @@ public class DataProxyConfigRepository implements IRepository {
             return inlongGroupId;
         }
         // parse json
-        Gson gson = new Gson();
-        JsonObject extParamsObj = gson.fromJson(extParams, JsonObject.class);
+        JsonObject extParamsObj = fromJsonToJson(extParams);
         if (!extParamsObj.has(KEY_BACKUP_CLUSTER_TAG)) {
             return inlongGroupId;
         }

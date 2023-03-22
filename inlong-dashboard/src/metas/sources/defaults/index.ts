@@ -37,7 +37,7 @@ export const allDefaultSources: MetaExportWithBackendList<SourceMetaType> = [
     LoadEntity: () => import('./File'),
   },
   {
-    label: 'MySQL-BinLog',
+    label: 'MySQL',
     value: 'MYSQL_BINLOG',
     LoadEntity: () => import('./MySQLBinlog'),
   },
@@ -45,6 +45,11 @@ export const allDefaultSources: MetaExportWithBackendList<SourceMetaType> = [
     label: 'Mongodb',
     value: 'MONGODB',
     LoadEntity: () => import('./Mongodb'),
+  },
+  {
+    label: 'MQTT',
+    value: 'MQTT',
+    LoadEntity: () => import('./MQTT'),
   },
   {
     label: 'Oracle',
@@ -55,6 +60,11 @@ export const allDefaultSources: MetaExportWithBackendList<SourceMetaType> = [
     label: 'PostgreSQL',
     value: 'POSTGRESQL',
     LoadEntity: () => import('./PostgreSQL'),
+  },
+  {
+    label: 'Redis',
+    value: 'REDIS',
+    LoadEntity: () => import('./Redis'),
   },
   {
     label: 'SQLServer',

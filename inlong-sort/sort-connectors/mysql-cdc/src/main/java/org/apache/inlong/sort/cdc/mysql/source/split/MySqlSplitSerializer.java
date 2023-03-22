@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,6 +29,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeParser;
 import org.apache.inlong.sort.cdc.base.debezium.history.FlinkJsonTableChangeSerializer;
 import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffset;
+import org.apache.inlong.sort.cdc.mysql.source.split.MySqlMetricSplit.MySqlTableMetric;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -135,6 +135,50 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
         return finishedSplitsInfo;
     }
 
+    private static void writeReadPhaseMetric(Map<String, Long> readPhaseMetrics, DataOutputSerializer out)
+            throws IOException {
+        final int size = readPhaseMetrics.size();
+        out.writeInt(size);
+        for (Map.Entry<String, Long> entry : readPhaseMetrics.entrySet()) {
+            out.writeUTF(entry.getKey());
+            out.writeLong(entry.getValue());
+        }
+    }
+
+    private static Map<String, Long> readReadPhaseMetric(DataInputDeserializer in) throws IOException {
+        Map<String, Long> readPhaseMetrics = new HashMap<>();
+        if (in.available() > 0) {
+            final int size = in.readInt();
+            for (int i = 0; i < size; i++) {
+                readPhaseMetrics.put(in.readUTF(), in.readLong());
+            }
+        }
+        return readPhaseMetrics;
+    }
+
+    private static void writeTableMetrics(Map<String, MySqlTableMetric> tableMetrics, DataOutputSerializer out)
+            throws IOException {
+        final int size = tableMetrics.size();
+        out.writeInt(size);
+        for (Map.Entry<String, MySqlTableMetric> entry : tableMetrics.entrySet()) {
+            out.writeUTF(entry.getKey());
+            out.writeLong(entry.getValue().getNumRecordsIn());
+            out.writeLong(entry.getValue().getNumBytesIn());
+        }
+    }
+
+    private static Map<String, MySqlTableMetric> readTableMetrics(DataInputDeserializer in) throws IOException {
+        Map<String, MySqlTableMetric> tableMetrics = new HashMap<>();
+        if (in.available() > 0) {
+            final int size = in.readInt();
+            for (int i = 0; i < size; i++) {
+                String tableIdentify = in.readUTF();
+                tableMetrics.put(tableIdentify, new MySqlTableMetric(in.readLong(), in.readLong()));
+            }
+        }
+        return tableMetrics;
+    }
+
     @Override
     public int getVersion() {
         return VERSION;
@@ -196,6 +240,8 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             out.writeInt(METRIC_SPLIT_FLAG);
             out.writeLong(mysqlMetricSplit.getNumBytesIn());
             out.writeLong(mysqlMetricSplit.getNumRecordsIn());
+            writeReadPhaseMetric(mysqlMetricSplit.getReadPhaseMetricMap(), out);
+            writeTableMetrics(mysqlMetricSplit.getTableMetricMap(), out);
             final byte[] result = out.getCopyOfBuffer();
             out.clear();
             return result;
@@ -266,9 +312,16 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
                     totalFinishedSplitSize,
                     isSuspended);
         } else if (splitKind == METRIC_SPLIT_FLAG) {
-            long numBytesIn = in.readLong();
-            long numRecordsIn = in.readLong();
-            return new MySqlMetricSplit(numBytesIn, numRecordsIn);
+            long numBytesIn = 0L;
+            long numRecordsIn = 0L;
+            if (in.available() > 0) {
+                numBytesIn = in.readLong();
+                numRecordsIn = in.readLong();
+            }
+            Map<String, Long> readPhaseMetricMap = readReadPhaseMetric(in);
+            Map<String, MySqlTableMetric> tableMetricMap = readTableMetrics(in);
+
+            return new MySqlMetricSplit(numBytesIn, numRecordsIn, readPhaseMetricMap, tableMetricMap);
         } else {
             throw new IOException("Unknown split kind: " + splitKind);
         }

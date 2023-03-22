@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,6 +21,7 @@ import com.google.common.base.Splitter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.common.enums.DataProxyErrCode;
 import org.apache.inlong.common.msg.AttributeConstants;
+import org.apache.inlong.common.msg.MsgType;
 import org.apache.inlong.sdk.dataproxy.SendResult;
 import org.apache.inlong.sdk.dataproxy.config.EncryptConfigEntry;
 
@@ -67,11 +67,7 @@ public class EncodeObject {
     private String errMsg;
     private String dpIp;
 
-    /* Used by de_serialization. msgtype=8*/
-    public EncodeObject() {
-    }
-
-    /* Used by de_serialization. msgtype=7*/
+    /* Used by de_serialization. msgtype=7/8 */
     public EncodeObject(String attributes) {
         handleAttr(attributes);
     }
@@ -89,6 +85,7 @@ public class EncodeObject {
         this.bodyBytes = bodyBytes;
         this.messageId = messageId;
         this.attributes = attributes + "&messageId=" + messageId;
+        addRTMS(MsgType.MSG_COMMON_SERVICE.getValue());
     }
 
     // used for bytes initializtion,msgtype=3/5
@@ -100,6 +97,7 @@ public class EncodeObject {
         this.msgtype = msgtype;
         this.groupId = groupId;
         this.isCompress = isCompress;
+        addRTMS(msgtype);
     }
 
     // used for bodylist initializtion,msgtype=3/5
@@ -111,6 +109,7 @@ public class EncodeObject {
         this.msgtype = msgtype;
         this.groupId = groupId;
         this.isCompress = isCompress;
+        addRTMS(msgtype);
     }
 
     // used for bytes initializtion,msgtype=7/8
@@ -127,6 +126,7 @@ public class EncodeObject {
         this.messageId = String.valueOf(seqId);
         this.groupId = groupId;
         this.streamId = streamId;
+        addRTMS(msgtype);
     }
 
     // used for bodylist initializtion,msgtype=7/8
@@ -143,6 +143,7 @@ public class EncodeObject {
         this.messageId = String.valueOf(seqId);
         this.groupId = groupId;
         this.streamId = streamId;
+        addRTMS(msgtype);
     }
 
     // file agent, used for bytes initializtion,msgtype=7/8
@@ -162,6 +163,7 @@ public class EncodeObject {
         this.streamId = streamId;
         this.messageKey = messageKey;
         this.proxyIp = proxyIp;
+        addRTMS(msgtype);
     }
 
     // file agent, used for bodylist initializtion,msgtype=7/8
@@ -181,6 +183,7 @@ public class EncodeObject {
         this.streamId = streamId;
         this.messageKey = messageKey;
         this.proxyIp = proxyIp;
+        addRTMS(msgtype);
     }
 
     private void handleAttr(String attributes) {
@@ -203,8 +206,24 @@ public class EncodeObject {
             if (StringUtils.isBlank(errMsg)) {
                 this.errMsg = DataProxyErrCode.valueOf(Integer.parseInt(errCode)).getErrMsg();
             }
-            //sendResult
+            // sendResult
             this.sendResult = convertToSendResult(Integer.parseInt(errCode));
+        }
+    }
+
+    private void addRTMS(int msgtype) {
+        if (msgtype == MsgType.MSG_BIN_MULTI_BODY.getValue() || msgtype == MsgType.MSG_BIN_HEARTBEAT.getValue()) {
+            if (StringUtils.isBlank(commonattr)) {
+                this.commonattr = AttributeConstants.MSG_RPT_TIME + "=" + System.currentTimeMillis();
+            } else {
+                this.commonattr += "&" + AttributeConstants.MSG_RPT_TIME + "=" + System.currentTimeMillis();
+            }
+        } else {
+            if (StringUtils.isBlank(attributes)) {
+                this.attributes = AttributeConstants.MSG_RPT_TIME + "=" + System.currentTimeMillis();
+            } else {
+                this.attributes += "&" + AttributeConstants.MSG_RPT_TIME + "=" + System.currentTimeMillis();
+            }
         }
     }
 

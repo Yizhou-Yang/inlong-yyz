@@ -168,7 +168,8 @@ public abstract class AbstractSinkOperator implements StreamSinkOperator {
         LOGGER.info("success to update sink field");
     }
 
-    protected void saveFieldOpt(SinkRequest request) {
+    @Override
+    public void saveFieldOpt(SinkRequest request) {
         List<SinkField> fieldList = request.getSinkFieldList();
         LOGGER.info("begin to save sink fields={}", fieldList);
         if (CollectionUtils.isEmpty(fieldList)) {
@@ -226,9 +227,9 @@ public abstract class AbstractSinkOperator implements StreamSinkOperator {
             return param;
         } catch (Exception e) {
             LOGGER.error(String.format(
-                            "cannot parse properties for groupId=%s, streamId=%s, sinkName=%s, the row properties: %s",
-                            streamSink.getInlongGroupId(), streamSink.getInlongStreamId(),
-                            streamSink.getSinkName(), streamSink.getExtParams()),
+                    "cannot parse properties for groupId=%s, streamId=%s, sinkName=%s, the row properties: %s",
+                    streamSink.getInlongGroupId(), streamSink.getInlongStreamId(),
+                    streamSink.getSinkName(), streamSink.getExtParams()),
                     e);
 
             return null;

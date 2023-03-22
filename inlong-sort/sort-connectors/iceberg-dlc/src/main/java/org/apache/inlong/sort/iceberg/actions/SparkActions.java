@@ -17,15 +17,14 @@
 
 package org.apache.inlong.sort.iceberg.actions;
 
-import lombok.extern.slf4j.Slf4j;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.actions.RewriteDataFiles;
 import org.apache.inlong.sort.iceberg.FlinkActions;
 
 import java.util.Map;
 
-@Slf4j
 public class SparkActions implements FlinkActions {
+
     private static final long serialVersionUID = 1L;
 
     private Map<String, String> actionProperties;

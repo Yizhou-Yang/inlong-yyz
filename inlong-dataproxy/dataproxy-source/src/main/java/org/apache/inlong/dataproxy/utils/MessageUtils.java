@@ -1,16 +1,18 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one or more contributor license
- * agreements.  See the NOTICE file distributed with this work for additional information regarding
- * copyright ownership. The ASF licenses this file to You under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.  You may obtain a
- * copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.inlong.dataproxy.utils;
@@ -33,11 +35,12 @@ import org.apache.inlong.common.msg.AttributeConstants;
 import org.apache.inlong.common.util.NetworkUtils;
 import org.apache.inlong.dataproxy.base.SinkRspEvent;
 import org.apache.inlong.dataproxy.consts.ConfigConstants;
-import org.apache.inlong.dataproxy.source.MsgType;
+import org.apache.inlong.common.msg.MsgType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class MessageUtils {
+
     // log print count
     private static final LogCounter logCounter =
             new LogCounter(10, 100000, 30 * 1000);
@@ -93,9 +96,9 @@ public class MessageUtils {
      * @param msgType       the message type
      */
     public static void sourceReturnRspPackage(Map<String, String> commonAttrMap,
-                                              Map<String, Object> resultMap,
-                                              Channel remoteChannel,
-                                              MsgType msgType) throws Exception {
+            Map<String, Object> resultMap,
+            Channel remoteChannel,
+            MsgType msgType) throws Exception {
         ByteBuf binBuffer;
         String origAttrs = null;
         final StringBuilder strBuff = new StringBuilder(512);
@@ -155,7 +158,7 @@ public class MessageUtils {
                         commonAttrMap.get(AttributeConstants.UNIQ_ID));
             } else if (MsgType.MSG_BIN_HEARTBEAT.equals(msgType)) {
                 binBuffer = buildHBRspPackage(destAttrs,
-                        (Byte)resultMap.get(ConfigConstants.VERSION_TYPE), 0);
+                        (Byte) resultMap.get(ConfigConstants.VERSION_TYPE), 0);
             } else {
                 // MsgType.MSG_ACK_SERVICE.equals(msgType)
                 // MsgType.MSG_ORIGINAL_RETURN.equals(msgType)
@@ -187,8 +190,8 @@ public class MessageUtils {
      * @param errMsg   error message
      */
     public static void sinkReturnRspPackage(SinkRspEvent event,
-                                            DataProxyErrCode errCode,
-                                            String errMsg) {
+            DataProxyErrCode errCode,
+            String errMsg) {
         ByteBuf binBuffer;
         final StringBuilder strBuff = new StringBuilder(512);
         // get and check channel context

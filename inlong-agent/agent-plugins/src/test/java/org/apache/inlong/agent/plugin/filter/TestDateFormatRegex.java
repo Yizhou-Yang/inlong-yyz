@@ -68,7 +68,7 @@ public class TestDateFormatRegex {
         dateFormatRegex.match(file);
         dateFormatRegex.getFormattedTime();
         Assert.assertEquals(helper.getParentPath().toString() + "/\\w{3}"
-                        + AgentUtils.formatCurrentTime("yyyyMMdd_HH") + ".log",
+                + AgentUtils.formatCurrentTime("yyyyMMdd_HH") + ".log",
                 dateFormatRegex.getFormattedRegex());
     }
 

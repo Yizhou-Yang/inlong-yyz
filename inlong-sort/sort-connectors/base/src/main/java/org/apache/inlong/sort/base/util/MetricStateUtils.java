@@ -1,25 +1,22 @@
 /*
- *   Licensed to the Apache Software Foundation (ASF) under one
- *   or more contributor license agreements.  See the NOTICE file
- *   distributed with this work for additional information
- *   regarding copyright ownership.  The ASF licenses this file
- *   to you under the Apache License, Version 2.0 (the
- *   "License"); you may not use this file except in compliance
- *   with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *   Unless required by applicable law or agreed to in writing, software
- *   distributed under the License is distributed on an "AS IS" BASIS,
- *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *   See the License for the specific language governing permissions and
- *   limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.inlong.sort.base.util;
 
-import java.util.Map.Entry;
-import java.util.Set;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.metrics.Counter;
 import org.apache.inlong.sort.base.enums.ReadPhase;
@@ -27,6 +24,7 @@ import org.apache.inlong.sort.base.metric.MetricState;
 import org.apache.inlong.sort.base.metric.SinkMetricData;
 import org.apache.inlong.sort.base.metric.SourceMetricData;
 import org.apache.inlong.sort.base.metric.phase.ReadPhaseMetricData;
+import org.apache.inlong.sort.base.metric.sub.SinkSubMetricData;
 import org.apache.inlong.sort.base.metric.sub.SourceSubMetricData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +33,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import static org.apache.inlong.sort.base.Constants.DIRTY_BYTES_OUT;
 import static org.apache.inlong.sort.base.Constants.DIRTY_RECORDS_OUT;
@@ -222,10 +222,46 @@ public class MetricStateUtils {
         Map<String, Long> metricDataMap = new HashMap<>();
         metricDataMap.put(NUM_RECORDS_OUT, sinkMetricData.getNumRecordsOut().getCount());
         metricDataMap.put(NUM_BYTES_OUT, sinkMetricData.getNumBytesOut().getCount());
-        metricDataMap.put(DIRTY_RECORDS_OUT, sinkMetricData.getDirtyRecordsOut().getCount());
-        metricDataMap.put(DIRTY_BYTES_OUT, sinkMetricData.getDirtyBytesOut().getCount());
+        if (sinkMetricData.getDirtyRecordsOut() != null) {
+            metricDataMap.put(DIRTY_RECORDS_OUT, sinkMetricData.getDirtyRecordsOut().getCount());
+        }
+        if (sinkMetricData.getDirtyBytesOut() != null) {
+            metricDataMap.put(DIRTY_BYTES_OUT, sinkMetricData.getDirtyBytesOut().getCount());
+        }
         MetricState metricState = new MetricState(subtaskIndex, metricDataMap);
+
+        // snapshot sub metric data state
+        snapshotMetricStateForSinkSubMetricData(sinkMetricData, subtaskIndex, metricState);
         metricStateListState.add(metricState);
+    }
+
+    /**
+     * Snapshot sub metric state data for {@link SinkSubMetricData}
+     * @param sinkMetricData {@link SinkMetricData} A collection class for handling metrics
+     * @param subtaskIndex subtask index
+     * @param metricState state of source metric data
+     */
+    private static void snapshotMetricStateForSinkSubMetricData(SinkMetricData sinkMetricData,
+            Integer subtaskIndex, MetricState metricState) {
+        if (!(sinkMetricData instanceof SinkSubMetricData)) {
+            return;
+        }
+        SinkSubMetricData sinkSubMetricData = (SinkSubMetricData) sinkMetricData;
+
+        Map<String, SinkMetricData> subSinkMetricMap = sinkSubMetricData.getSubSinkMetricMap();
+        if (subSinkMetricMap != null && !subSinkMetricMap.isEmpty()) {
+            Map<String, MetricState> subMetricStateMap = new HashMap<>();
+            Set<Entry<String, SinkMetricData>> entries = subSinkMetricMap.entrySet();
+            for (Entry<String, SinkMetricData> entry : entries) {
+                Map<String, Long> subMetricDataMap = new HashMap<>();
+                subMetricDataMap.put(NUM_RECORDS_OUT, entry.getValue().getNumRecordsOut().getCount());
+                subMetricDataMap.put(NUM_BYTES_OUT, entry.getValue().getNumBytesOut().getCount());
+                subMetricDataMap.put(DIRTY_RECORDS_OUT, entry.getValue().getDirtyRecordsOut().getCount());
+                subMetricDataMap.put(DIRTY_BYTES_OUT, entry.getValue().getDirtyBytesOut().getCount());
+                subMetricStateMap.put(entry.getKey(), new MetricState(subtaskIndex, subMetricDataMap));
+            }
+            metricState.setSubMetricStateMap(subMetricStateMap);
+        }
     }
 
 }

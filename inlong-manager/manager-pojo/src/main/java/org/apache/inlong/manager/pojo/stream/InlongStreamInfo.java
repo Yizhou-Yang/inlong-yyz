@@ -42,6 +42,8 @@ import java.util.List;
 @ApiModel("Inlong stream info")
 public class InlongStreamInfo extends BaseInlongStream {
 
+    public static final int ENABLE_WRAP_WITH_INLONG_MSG = 1;
+
     @ApiModelProperty(value = "Primary key")
     private Integer id;
 
@@ -57,8 +59,7 @@ public class InlongStreamInfo extends BaseInlongStream {
     @ApiModelProperty(value = "Inlong stream description")
     private String description;
 
-    @ApiModelProperty(value = "MQ resource for inlong stream. Default: ${inlongStreamId}",
-            notes = "in inlong stream, TubeMQ corresponds to filter consumption ID, Pulsar corresponds to Topic")
+    @ApiModelProperty(value = "MQ resource for inlong stream. Default: ${inlongStreamId}", notes = "in inlong stream, TubeMQ corresponds to filter consumption ID, Pulsar corresponds to Topic")
     private String mqResource;
 
     @ApiModelProperty(value = "Data type, including: TEXT, KV, etc.")
@@ -73,9 +74,8 @@ public class InlongStreamInfo extends BaseInlongStream {
     @ApiModelProperty(value = "Data field escape symbol")
     private String dataEscapeChar;
 
-    @ApiModelProperty(value = "Whether to send synchronously, 0: no, 1: yes",
-            notes = "Each task under this stream sends data synchronously, "
-                    + "which will affect the throughput of data collection, please choose carefully")
+    @ApiModelProperty(value = "Whether to send synchronously, 0: no, 1: yes", notes = "Each task under this stream sends data synchronously, "
+            + "which will affect the throughput of data collection, please choose carefully")
     private Integer syncSend;
 
     @ApiModelProperty(value = "Number of access items per day, unit: 10,000 items per day")
@@ -128,6 +128,12 @@ public class InlongStreamInfo extends BaseInlongStream {
 
     @ApiModelProperty(value = "Version number")
     private Integer version;
+
+    @ApiModelProperty(value = "Whether the message body wrapped with InlongMsg")
+    private Boolean wrapWithInlongMsg = true;
+
+    @ApiModelProperty(value = "Whether to ignore the parse errors of field value")
+    private Boolean ignoreParseError = true;
 
     public InlongStreamRequest genRequest() {
         return CommonBeanUtils.copyProperties(this, InlongStreamRequest::new);

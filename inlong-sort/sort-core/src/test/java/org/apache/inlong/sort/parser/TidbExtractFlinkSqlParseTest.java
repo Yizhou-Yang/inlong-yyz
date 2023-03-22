@@ -1,19 +1,18 @@
 /*
- *   Licensed to the Apache Software Foundation (ASF) under one
- *   or more contributor license agreements.  See the NOTICE file
- *   distributed with this work for additional information
- *   regarding copyright ownership.  The ASF licenses this file
- *   to you under the Apache License, Version 2.0 (the
- *   "License"); you may not use this file except in compliance
- *   with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *   Unless required by applicable law or agreed to in writing, software
- *   distributed under the License is distributed on an "AS IS" BASIS,
- *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *   See the License for the specific language governing permissions and
- *   limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.inlong.sort.parser;
@@ -62,8 +61,7 @@ public class TidbExtractFlinkSqlParseTest extends AbstractTestBase {
                 new FieldInfo("age", new IntFormatInfo()),
                 new MetaFieldInfo("database_name", MetaField.DATABASE_NAME),
                 new MetaFieldInfo("table_name", MetaField.TABLE_NAME),
-                new MetaFieldInfo("op_ts", MetaField.OP_TS)
-        );
+                new MetaFieldInfo("op_ts", MetaField.OP_TS));
         return new TidbExtractNode("1", "postgres_input", fields, null, null, null, "jdbc:mysql://localhost:2379",
                 "mytable", "database", "username", "pwd", "localhost:9002", "topic", "json", "consumer_group",
                 "earliest");
@@ -81,8 +79,7 @@ public class TidbExtractFlinkSqlParseTest extends AbstractTestBase {
                         new FieldInfo("cf:name", new StringFormatInfo()),
                         new FieldInfo("cf:database_name", new StringFormatInfo()),
                         new FieldInfo("cf:table_name", new StringFormatInfo()),
-                        new FieldInfo("cf:op_ts", new TimestampFormatInfo())
-                ),
+                        new FieldInfo("cf:op_ts", new TimestampFormatInfo())),
                 Arrays.asList(
                         new FieldRelation(new FieldInfo("age", new LongFormatInfo()),
                                 new FieldInfo("cf:age", new LongFormatInfo())),
@@ -93,8 +90,7 @@ public class TidbExtractFlinkSqlParseTest extends AbstractTestBase {
                         new FieldRelation(new FieldInfo("table_name", new StringFormatInfo()),
                                 new FieldInfo("cf:table_name", new StringFormatInfo())),
                         new FieldRelation(new FieldInfo("op_ts", new TimestampFormatInfo()),
-                                new FieldInfo("cf:op_ts", new TimestampFormatInfo()))
-                ),
+                                new FieldInfo("cf:op_ts", new TimestampFormatInfo()))),
                 null, null, 1, null, "user",
                 "default",
                 "localhost:2181", "MD5(`name`)", null, "/hbase", null, null);

@@ -18,6 +18,7 @@
 package org.apache.inlong.agent.plugin.sinks;
 
 import org.apache.inlong.agent.conf.JobProfile;
+import org.apache.inlong.agent.message.BatchProxyMessage;
 import org.apache.inlong.agent.plugin.Message;
 import org.apache.inlong.agent.plugin.MessageFilter;
 import org.apache.inlong.agent.utils.AgentUtils;
@@ -51,6 +52,8 @@ public class MockSink extends AbstractSink {
         if (message != null) {
             messages.add(message);
             number.incrementAndGet();
+            BatchProxyMessage msg = new BatchProxyMessage();
+            msg.setJobId(jobInstanceId);
             // increment the count of successful sinks
             sinkMetric.sinkSuccessCount.incrementAndGet();
         } else {
@@ -75,6 +78,7 @@ public class MockSink extends AbstractSink {
         jobInstanceId = jobConf.get(JOB_INSTANCE_ID);
         dataTime = AgentUtils.timeStrConvertToMillSec(jobConf.get(JOB_DATA_TIME, ""),
                 jobConf.get(JOB_CYCLE_UNIT, ""));
+        sourceFileName = "test";
         LOGGER.info("get dataTime is : {}", dataTime);
     }
 

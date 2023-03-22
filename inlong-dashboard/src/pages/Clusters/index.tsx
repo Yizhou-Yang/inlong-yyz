@@ -111,12 +111,12 @@ const Comp: React.FC = () => {
         name: 'keyword',
       },
       {
-        type: 'radiobutton',
+        type: 'select',
         name: 'type',
         label: i18n.t('pages.Clusters.Type'),
         initialValue: defaultValues.type,
         props: {
-          buttonStyle: 'solid',
+          dropdownMatchSelectWidth: false,
           options: clusters,
         },
       },
@@ -190,6 +190,7 @@ const Comp: React.FC = () => {
 
       <CreateModal
         {...createModal}
+        defaultType={options.type}
         visible={createModal.visible as boolean}
         onOk={async () => {
           await getList();

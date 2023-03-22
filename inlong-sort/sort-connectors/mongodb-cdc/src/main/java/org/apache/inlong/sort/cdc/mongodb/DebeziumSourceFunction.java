@@ -17,8 +17,12 @@
 
 package org.apache.inlong.sort.cdc.mongodb;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope;
+import com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils;
 import com.ververica.cdc.debezium.Validator;
+import io.debezium.connector.AbstractSourceInfo;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.debezium.data.Envelope;
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.embedded.Connect;
@@ -47,10 +51,13 @@ import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.inlong.sort.base.Constants;
+import org.apache.inlong.sort.base.enums.ReadPhase;
 import org.apache.inlong.sort.base.metric.MetricOption;
 import org.apache.inlong.sort.base.metric.MetricOption.RegisteredMetric;
 import org.apache.inlong.sort.base.metric.MetricState;
 import org.apache.inlong.sort.base.metric.SourceMetricData;
+import org.apache.inlong.sort.base.metric.sub.SourceTableMetricData;
 import org.apache.inlong.sort.base.util.MetricStateUtils;
 import org.apache.inlong.sort.cdc.mongodb.debezium.DebeziumDeserializationSchema;
 import org.apache.inlong.sort.cdc.mongodb.debezium.internal.DebeziumChangeConsumer;
@@ -63,6 +70,8 @@ import org.apache.inlong.sort.cdc.mongodb.debezium.internal.FlinkOffsetBackingSt
 import org.apache.inlong.sort.cdc.mongodb.debezium.internal.Handover;
 import org.apache.inlong.sort.cdc.mongodb.debezium.internal.SchemaRecord;
 import org.apache.inlong.sort.cdc.mongodb.debezium.utils.DatabaseHistoryUtil;
+import org.apache.inlong.sort.cdc.mongodb.debezium.utils.RecordUtils;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +80,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
 import java.util.UUID;
@@ -231,7 +241,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     private String inlongAudit;
 
-    private SourceMetricData sourceMetricData;
+    private SourceTableMetricData sourceMetricData;
 
     private boolean migrateAll;
 
@@ -449,7 +459,12 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 .withRegisterMetric(RegisteredMetric.ALL)
                 .build();
         if (metricOption != null) {
-            sourceMetricData = new SourceMetricData(metricOption, metricGroup);
+            sourceMetricData = new SourceTableMetricData(metricOption, metricGroup,
+                    Arrays.asList(Constants.DATABASE_NAME, Constants.COLLECTION_NAME));
+            if (migrateAll) {
+                // register sub source metric data from metric state
+                sourceMetricData.registerSubMetricsGroup(metricState);
+            }
         }
         properties.setProperty("name", "engine");
         properties.setProperty("offset.storage", FlinkOffsetBackingStore.class.getCanonicalName());
@@ -486,9 +501,43 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 new DebeziumChangeFetcher<>(
                         sourceContext,
                         new DebeziumDeserializationSchema<T>() {
+
+                            /**
+                             * Deserialize the Debezium record, it is represented in Kafka {@link SourceRecord}.
+                             *
+                             * @param record
+                             * @param out
+                             */
                             @Override
                             public void deserialize(SourceRecord record, Collector<T> out) throws Exception {
-                                if (sourceMetricData != null) {
+                                // do nothing
+                            }
+
+                            @Override
+                            public void deserialize(SourceRecord record, Collector<T> out, Boolean isStreamingPhase)
+                                    throws Exception {
+                                if (record != null && MongoRecordUtils.isHeartbeatEvent(record)) {
+                                    if (sourceMetricData != null && isStreamingPhase) {
+                                        sourceMetricData.outputReadPhaseMetrics(ReadPhase.INCREASE_PHASE);
+                                    }
+                                    return;
+                                }
+                                if (sourceMetricData != null && record != null && migrateAll) {
+                                    Struct value = (Struct) record.value();
+                                    Struct ns = value.getStruct(MongoDBEnvelope.NAMESPACE_FIELD);
+                                    if (null == ns) {
+                                        ns = value.getStruct(RecordUtils.DOCUMENT_TO_FIELD);
+                                    }
+                                    String dbName = ns.getString(MongoDBEnvelope.NAMESPACE_DATABASE_FIELD);
+                                    String collectionName =
+                                            ns.getString(MongoDBEnvelope.NAMESPACE_COLLECTION_FIELD);
+                                    Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+                                    String snapshotRecord = source.getString(AbstractSourceInfo.SNAPSHOT_KEY);
+                                    boolean isSnapshotRecord = Boolean.parseBoolean(snapshotRecord);
+                                    sourceMetricData
+                                            .outputMetricsWithEstimate(new String[]{dbName, collectionName},
+                                                    isSnapshotRecord, value);
+                                } else if (sourceMetricData != null && record != null) {
                                     sourceMetricData.outputMetricsWithEstimate(record.value());
                                 }
                                 deserializer.deserialize(record, out);

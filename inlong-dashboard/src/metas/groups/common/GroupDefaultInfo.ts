@@ -39,12 +39,12 @@ export class GroupDefaultInfo implements DataWithBackend, RenderRow, RenderList 
   @FieldDecorator({
     type: 'input',
     props: {
-      maxLength: 32,
+      maxLength: 100,
     },
     rules: [
       { required: true },
       {
-        pattern: /^[a-z_\-\d]+$/,
+        pattern: /^[a-z_0-9]+$/,
         message: i18n.t('meta.Group.InlongGroupIdRules'),
       },
     ],
@@ -86,6 +86,30 @@ export class GroupDefaultInfo implements DataWithBackend, RenderRow, RenderList 
   description: string;
 
   @FieldDecorator({
+    type: 'select',
+    initialValue: 0,
+    rules: [{ required: true }],
+    props: {
+      options: [
+        {
+          label: i18n.t('meta.Group.DataReportType.DataProxyWithSource'),
+          value: 0,
+        },
+        {
+          label: i18n.t('meta.Group.DataReportType.DataProxyWithSink'),
+          value: 1,
+        },
+        {
+          label: i18n.t('meta.Group.DataReportType.MQ'),
+          value: 2,
+        },
+      ],
+    },
+  })
+  @I18n('meta.Group.DataReportType')
+  dataReportType: string;
+
+  @FieldDecorator({
     type: 'radio',
     initialValue: defaultValue,
     rules: [{ required: true }],
@@ -93,7 +117,9 @@ export class GroupDefaultInfo implements DataWithBackend, RenderRow, RenderList 
       options: groups.filter(item => Boolean(item.value)),
     },
   })
-  @ColumnDecorator()
+  @ColumnDecorator({
+    render: type => groups.find(c => c.value === type)?.label || type,
+  })
   @I18n('meta.Group.MQType')
   mqType: string;
 

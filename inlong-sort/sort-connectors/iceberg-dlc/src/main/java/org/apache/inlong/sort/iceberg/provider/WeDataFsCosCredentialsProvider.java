@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.inlong.sort.iceberg.provider;
 
 import com.qcloud.cos.auth.COSCredentials;
@@ -21,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class WeDataFsCosCredentialsProvider extends AbstractCOSCredentialProvider {
+
     private static final Logger LOG = LoggerFactory.getLogger(WeDataFsCosCredentialsProvider.class);
 
     public static final String END_POINT = "service.endpoint";
@@ -31,7 +49,7 @@ public class WeDataFsCosCredentialsProvider extends AbstractCOSCredentialProvide
     public static final String TOKEN_AVAILABLE_PERIOD = "token.available.period";
     public static final String REQUEST_IDENTITY_TOKEN = "request.identity.token";
 
-    private static final long DEFAULT_REFRESH_INTERVAL_MILLISECONDS = 30 * 1000;    // millisecond
+    private static final long DEFAULT_REFRESH_INTERVAL_MILLISECONDS = 30 * 1000; // millisecond
     private static final int DEFAULT_MAX_FETCH_RETRY_TIMES = 3;
 
     public static DlcServiceClient serviceClient;
@@ -126,7 +144,8 @@ public class WeDataFsCosCredentialsProvider extends AbstractCOSCredentialProvide
                         token.getExpiredTime());
             } catch (TencentCloudSDKException e) {
                 this.lastFailedRefreshTimeInMilliseconds = System.currentTimeMillis();
-                String errorMsg = String.format("Service fetch service access token failed, retry: %d/%d", i, retryTimes);
+                String errorMsg =
+                        String.format("Service fetch service access token failed, retry: %d/%d", i, retryTimes);
                 LOG.error(errorMsg, e);
             } catch (UnsupportedEncodingException e) {
                 this.lastFailedRefreshTimeInMilliseconds = System.currentTimeMillis();
@@ -142,12 +161,14 @@ public class WeDataFsCosCredentialsProvider extends AbstractCOSCredentialProvide
         if (null == this.credentials) {
             return true;
         } else {
-            return System.currentTimeMillis() - this.lastFailedRefreshTimeInMilliseconds > DEFAULT_REFRESH_INTERVAL_MILLISECONDS;
+            return System.currentTimeMillis()
+                    - this.lastFailedRefreshTimeInMilliseconds > DEFAULT_REFRESH_INTERVAL_MILLISECONDS;
         }
     }
 
     public boolean checkHostingBucket(String bucket) {
-        // e: 40000006da0c3eb6390e2729ca9a2a283abee25ed153804d75c1306dcd1ebdd6b1eb4167@dlcf5e2-100017516939-1636514832-100017307912-1304028854
+        // e:
+        // 40000006da0c3eb6390e2729ca9a2a283abee25ed153804d75c1306dcd1ebdd6b1eb4167@dlcf5e2-100017516939-1636514832-100017307912-1304028854
         String pattern = ".*?[@dlc].*?-*-\\d{10}-\\d{12}-\\d{10}";
         return Pattern.matches(pattern, bucket);
     }

@@ -81,6 +81,11 @@ public class HeartbeatMsg {
     private String nodeGroup;
 
     /**
+     * Ext tag of cluster, key=value pairs seperated by &
+     */
+    private String extTag;
+
+    /**
      * Name of responsible person, separated by commas(,)
      */
     private String inCharges = "admin";
@@ -101,7 +106,7 @@ public class HeartbeatMsg {
     private Integer load = 0xffff;
 
     public ComponentHeartbeat componentHeartbeat() {
-        return new ComponentHeartbeat(nodeSrvStatus, clusterTag, clusterName,
+        return new ComponentHeartbeat(nodeSrvStatus, clusterTag, extTag, clusterName,
                 componentType, ip, port, inCharges, protocolType, load);
     }
 }

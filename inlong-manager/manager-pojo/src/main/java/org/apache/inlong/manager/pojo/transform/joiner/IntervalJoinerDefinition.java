@@ -38,15 +38,15 @@ import java.util.List;
 public class IntervalJoinerDefinition extends TransformDefinition {
 
     public IntervalJoinerDefinition(StreamNode leftNode,
-                                    StreamNode rightNode,
-                                    List<StreamField> leftJoinFields,
-                                    List<StreamField> rightJoinFields,
-                                    String leftTimeColumn,
-                                    String rightTimeColumn,
-                                    String forwardInterval,
-                                    String backwardInterval,
-                                    TimeUnit forwardIntervalUnit,
-                                    TimeUnit backwardIntervalUnit) {
+            StreamNode rightNode,
+            List<StreamField> leftJoinFields,
+            List<StreamField> rightJoinFields,
+            String leftTimeColumn,
+            String rightTimeColumn,
+            String forwardInterval,
+            String backwardInterval,
+            TimeUnit forwardIntervalUnit,
+            TimeUnit backwardIntervalUnit) {
         this.transformType = TransformType.INTERVAL_JOINER;
         this.leftNode = leftNode;
         this.rightNode = rightNode;

@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,20 +23,33 @@ import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.jdbc.JdbcExecutionOptions;
 import org.apache.flink.connector.jdbc.JdbcStatementBuilder;
 import org.apache.flink.connector.jdbc.internal.connection.JdbcConnectionProvider;
 import org.apache.flink.connector.jdbc.internal.connection.SimpleJdbcConnectionProvider;
+import org.apache.flink.connector.jdbc.internal.converter.JdbcRowConverter;
 import org.apache.flink.connector.jdbc.internal.executor.JdbcBatchStatementExecutor;
+import org.apache.flink.connector.jdbc.internal.executor.TableBufferReducedStatementExecutor;
+import org.apache.flink.connector.jdbc.internal.executor.TableBufferedStatementExecutor;
+import org.apache.flink.connector.jdbc.internal.executor.TableSimpleStatementExecutor;
 import org.apache.flink.connector.jdbc.internal.options.JdbcDmlOptions;
 import org.apache.flink.connector.jdbc.internal.options.JdbcOptions;
 import org.apache.flink.connector.jdbc.statement.FieldNamedPreparedStatementImpl;
+import org.apache.flink.connector.jdbc.statement.StatementFactory;
 import org.apache.flink.connector.jdbc.utils.JdbcUtils;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.runtime.util.ExecutorThreadFactory;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.Row;
+import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Preconditions;
+import org.apache.inlong.sort.base.dirty.DirtyData;
+import org.apache.inlong.sort.base.dirty.DirtyOptions;
+import org.apache.inlong.sort.base.dirty.DirtySinkHelper;
+import org.apache.inlong.sort.base.dirty.DirtyType;
+import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.apache.inlong.sort.base.metric.MetricOption;
 import org.apache.inlong.sort.base.metric.MetricOption.RegisteredMetric;
 import org.apache.inlong.sort.base.metric.MetricState;
@@ -47,8 +59,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -60,6 +74,8 @@ import java.util.function.Function;
 
 import static org.apache.flink.connector.jdbc.utils.JdbcUtils.setRecordToStatement;
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.inlong.sort.base.Constants.DIRTY_BYTES_OUT;
+import static org.apache.inlong.sort.base.Constants.DIRTY_RECORDS_OUT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC_STATE_NAME;
 import static org.apache.inlong.sort.base.Constants.NUM_BYTES_OUT;
 import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_OUT;
@@ -68,9 +84,9 @@ import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_OUT;
  * A JDBC outputFormat that supports batching records before writing records to database.
  * Add an option `inlong.metric` to support metrics.
  */
-public class JdbcBatchingOutputFormat<
-        In, JdbcIn, JdbcExec extends JdbcBatchStatementExecutor<JdbcIn>>
-        extends AbstractJdbcOutputFormat<In> {
+public class JdbcBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatchStatementExecutor<JdbcIn>>
+        extends
+            AbstractJdbcOutputFormat<In> {
 
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(JdbcBatchingOutputFormat.class);
@@ -93,19 +109,26 @@ public class JdbcBatchingOutputFormat<
     private Long dataSize = 0L;
     private Long rowSize = 0L;
 
+    private final DirtyOptions dirtyOptions;
+    private @Nullable final DirtySink<Object> dirtySink;
+
     public JdbcBatchingOutputFormat(
             @Nonnull JdbcConnectionProvider connectionProvider,
             @Nonnull JdbcExecutionOptions executionOptions,
             @Nonnull StatementExecutorFactory<JdbcExec> statementExecutorFactory,
             @Nonnull RecordExtractor<In, JdbcIn> recordExtractor,
             String inlongMetric,
-            String auditHostAndPorts) {
+            String auditHostAndPorts,
+            DirtyOptions dirtyOptions,
+            @Nullable DirtySink<Object> dirtySink) {
         super(connectionProvider);
         this.executionOptions = checkNotNull(executionOptions);
         this.statementExecutorFactory = checkNotNull(statementExecutorFactory);
         this.jdbcRecordExtractor = checkNotNull(recordExtractor);
         this.inlongMetric = inlongMetric;
         this.auditHostAndPorts = auditHostAndPorts;
+        this.dirtyOptions = dirtyOptions;
+        this.dirtySink = dirtySink;
     }
 
     public static Builder builder() {
@@ -142,10 +165,19 @@ public class JdbcBatchingOutputFormat<
                 .withInlongAudit(auditHostAndPorts)
                 .withInitRecords(metricState != null ? metricState.getMetricValue(NUM_RECORDS_OUT) : 0L)
                 .withInitBytes(metricState != null ? metricState.getMetricValue(NUM_BYTES_OUT) : 0L)
+                .withInitDirtyRecords(metricState != null ? metricState.getMetricValue(DIRTY_RECORDS_OUT) : 0L)
+                .withInitDirtyBytes(metricState != null ? metricState.getMetricValue(DIRTY_BYTES_OUT) : 0L)
                 .withRegisterMetric(RegisteredMetric.ALL)
                 .build();
         if (metricOption != null) {
             sinkMetricData = new SinkMetricData(metricOption, runtimeContext.getMetricGroup());
+        }
+        if (dirtySink != null) {
+            try {
+                dirtySink.open(new Configuration());
+            } catch (Exception e) {
+                throw new IOException("failed to open dirty sink");
+            }
         }
         jdbcStatementExecutor = createAndOpenStatementExecutor(statementExecutorFactory);
         if (executionOptions.getBatchIntervalMs() != 0 && executionOptions.getBatchSize() != 1) {
@@ -159,14 +191,11 @@ public class JdbcBatchingOutputFormat<
                                     if (!closed) {
                                         try {
                                             flush();
-                                            if (sinkMetricData != null) {
+                                            if (sinkMetricData != null && dirtySink == null) {
                                                 sinkMetricData.invoke(rowSize, dataSize);
                                             }
                                             resetStateAfterFlush();
                                         } catch (Exception e) {
-                                            if (sinkMetricData != null) {
-                                                sinkMetricData.invokeDirty(rowSize, dataSize);
-                                            }
                                             resetStateAfterFlush();
                                             flushException = e;
                                         }
@@ -182,6 +211,16 @@ public class JdbcBatchingOutputFormat<
     private JdbcExec createAndOpenStatementExecutor(
             StatementExecutorFactory<JdbcExec> statementExecutorFactory) throws IOException {
         JdbcExec exec = statementExecutorFactory.apply(getRuntimeContext());
+        if (dirtySink != null) {
+            try {
+                JdbcExec newExecutor = enhanceExecutor(exec);
+                if (newExecutor != null) {
+                    exec = newExecutor;
+                }
+            } catch (Exception e) {
+                LOG.error("class enhance failed", e);
+            }
+        }
         try {
             exec.prepareStatements(connectionProvider.getConnection());
         } catch (SQLException e) {
@@ -196,30 +235,80 @@ public class JdbcBatchingOutputFormat<
         }
     }
 
+    /**
+     * update before is used for metric computing only
+     * @param record
+     * @return
+     */
+    private boolean isValidRowKind(In record) {
+        RowData rowData = (RowData) record;
+        return RowKind.UPDATE_BEFORE != rowData.getRowKind();
+    }
+
+    void handleDirtyData(Object dirtyData, DirtyType dirtyType, Exception e) {
+        if (!dirtyOptions.ignoreDirty()) {
+            RuntimeException ex;
+            if (e instanceof RuntimeException) {
+                ex = (RuntimeException) e;
+            } else {
+                ex = new RuntimeException(e);
+            }
+            throw ex;
+        }
+        if (sinkMetricData != null) {
+            sinkMetricData.invokeDirty(rowSize, dataSize);
+        }
+        if (dirtySink != null) {
+            DirtyData.Builder<Object> builder = DirtyData.builder();
+            try {
+                builder.setData(dirtyData)
+                        .setDirtyType(dirtyType)
+                        .setLabels(dirtyOptions.getLabels())
+                        .setLogTag(dirtyOptions.getLogTag())
+                        .setDirtyMessage(e.getMessage())
+                        .setIdentifier(dirtyOptions.getIdentifier());
+                dirtySink.invoke(builder.build());
+            } catch (Exception ex) {
+                if (!dirtyOptions.ignoreSideOutputErrors()) {
+                    throw new RuntimeException(ex);
+                }
+                LOG.warn("Dirty sink failed", ex);
+            }
+        }
+    }
+
     @Override
-    public final synchronized void writeRecord(In record) throws IOException {
+    public final synchronized void writeRecord(In record) {
+
+        updateMetric(record);
+
+        if (!isValidRowKind(record)) {
+            return;
+        }
+
         checkFlushException();
 
-        rowSize++;
-        dataSize = dataSize + record.toString().getBytes(StandardCharsets.UTF_8).length;
         try {
             addToBatch(record, jdbcRecordExtractor.apply(record));
             batchCount++;
             if (executionOptions.getBatchSize() > 0
                     && batchCount >= executionOptions.getBatchSize()) {
                 flush();
-                if (sinkMetricData != null) {
+                if (sinkMetricData != null && dirtySink == null) {
                     sinkMetricData.invoke(rowSize, dataSize);
                 }
                 resetStateAfterFlush();
             }
         } catch (Exception e) {
-            if (sinkMetricData != null) {
-                sinkMetricData.invokeDirty(rowSize, dataSize);
-            }
+            LOG.error(String.format("jdbc batch write record error, raw data: %s", record), e);
+            handleDirtyData(record, DirtyType.EXTRACT_ROWDATA_ERROR, e);
             resetStateAfterFlush();
-            throw new IOException("Writing records to JDBC failed.", e);
         }
+    }
+
+    private void updateMetric(In record) {
+        rowSize++;
+        dataSize += record.toString().getBytes(StandardCharsets.UTF_8).length;
     }
 
     private void resetStateAfterFlush() {
@@ -227,8 +316,13 @@ public class JdbcBatchingOutputFormat<
         rowSize = 0L;
     }
 
-    protected void addToBatch(In original, JdbcIn extracted) throws SQLException {
-        jdbcStatementExecutor.addToBatch(extracted);
+    protected void addToBatch(In original, JdbcIn extracted) {
+        try {
+            jdbcStatementExecutor.addToBatch(extracted);
+        } catch (Exception e) {
+            LOG.error(String.format("DataTypeMappingError, data: %s", extracted), e);
+            handleDirtyData(extracted, DirtyType.DATA_TYPE_MAPPING_ERROR, e);
+        }
     }
 
     @Override
@@ -245,8 +339,7 @@ public class JdbcBatchingOutputFormat<
             this.metricStateListState = context.getOperatorStateStore().getUnionListState(
                     new ListStateDescriptor<>(
                             INLONG_METRIC_STATE_NAME, TypeInformation.of(new TypeHint<MetricState>() {
-                    })));
-
+                            })));
         }
         if (context.isRestored()) {
             metricState = MetricStateUtils.restoreMetricState(metricStateListState,
@@ -287,6 +380,41 @@ public class JdbcBatchingOutputFormat<
                 }
             }
         }
+    }
+
+    private JdbcExec enhanceExecutor(JdbcExec exec) throws NoSuchFieldException, IllegalAccessException {
+        if (dirtySink == null) {
+            return null;
+        }
+        final DirtySinkHelper dirtySinkHelper = new DirtySinkHelper<>(dirtyOptions, dirtySink);
+        // enhance the actual executor to tablemetricstatementexecutor
+        Field ExecutorType;
+        if (exec instanceof TableBufferReducedStatementExecutor) {
+            ExecutorType = TableBufferReducedStatementExecutor.class.getDeclaredField("upsertExecutor");
+        } else if (exec instanceof TableBufferedStatementExecutor) {
+            ExecutorType = TableBufferedStatementExecutor.class.getDeclaredField("statementExecutor");
+        } else {
+            throw new RuntimeException("table enhance failed, can't enhance " + exec.getClass());
+        }
+        ExecutorType.setAccessible(true);
+        TableSimpleStatementExecutor executor = (TableSimpleStatementExecutor) ExecutorType.get(exec);
+        Field statementFactory = TableSimpleStatementExecutor.class.getDeclaredField("stmtFactory");
+        Field rowConverter = TableSimpleStatementExecutor.class.getDeclaredField("converter");
+        statementFactory.setAccessible(true);
+        rowConverter.setAccessible(true);
+        final StatementFactory stmtFactory = (StatementFactory) statementFactory.get(executor);
+        final JdbcRowConverter converter = (JdbcRowConverter) rowConverter.get(executor);
+        TableMetricStatementExecutor newExecutor =
+                new TableMetricStatementExecutor(stmtFactory, converter, dirtySinkHelper, sinkMetricData);
+        if (exec instanceof TableBufferedStatementExecutor) {
+            Field transform = TableBufferedStatementExecutor.class.getDeclaredField("valueTransform");
+            transform.setAccessible(true);
+            Function<RowData, RowData> valueTransform = (Function<RowData, RowData>) transform.get(exec);
+            newExecutor.setValueTransform(valueTransform);
+            return (JdbcExec) newExecutor;
+        }
+        ExecutorType.set(exec, newExecutor);
+        return null;
     }
 
     protected void attemptFlush() throws SQLException {
@@ -354,7 +482,9 @@ public class JdbcBatchingOutputFormat<
      * @param <T> The type of instance.
      */
     public interface StatementExecutorFactory<T extends JdbcBatchStatementExecutor<?>>
-            extends Function<RuntimeContext, T>, Serializable {
+            extends
+                Function<RuntimeContext, T>,
+                Serializable {
 
     }
 
@@ -371,6 +501,8 @@ public class JdbcBatchingOutputFormat<
         private String auditHostAndPorts;
         private JdbcExecutionOptions.Builder executionOptionsBuilder =
                 JdbcExecutionOptions.builder();
+        private DirtyOptions dirtyOptions;
+        private DirtySink<Object> dirtySink;
 
         /**
          * required, jdbc options.
@@ -450,8 +582,7 @@ public class JdbcBatchingOutputFormat<
          *
          * @return Configured JdbcUpsertOutputFormat
          */
-        public JdbcBatchingOutputFormat<Tuple2<Boolean, Row>, Row, JdbcBatchStatementExecutor<Row>>
-        build() {
+        public JdbcBatchingOutputFormat<Tuple2<Boolean, Row>, Row, JdbcBatchStatementExecutor<Row>> build() {
             checkNotNull(options, "No options supplied.");
             checkNotNull(fieldNames, "No fieldNames supplied.");
             JdbcDmlOptions dml =
@@ -468,7 +599,9 @@ public class JdbcBatchingOutputFormat<
                         dml,
                         executionOptionsBuilder.build(),
                         inlongMetric,
-                        auditHostAndPorts);
+                        auditHostAndPorts,
+                        dirtyOptions,
+                        dirtySink);
             } else {
                 // warn: don't close over builder fields
                 String sql =
@@ -480,17 +613,18 @@ public class JdbcBatchingOutputFormat<
                 return new JdbcBatchingOutputFormat<>(
                         new SimpleJdbcConnectionProvider(options),
                         executionOptionsBuilder.build(),
-                        ctx ->
-                                createSimpleRowExecutor(
-                                        sql,
-                                        dml.getFieldTypes(),
-                                        ctx.getExecutionConfig().isObjectReuseEnabled()),
+                        ctx -> createSimpleRowExecutor(
+                                sql,
+                                dml.getFieldTypes(),
+                                ctx.getExecutionConfig().isObjectReuseEnabled()),
                         tuple2 -> {
                             Preconditions.checkArgument(tuple2.f0);
                             return tuple2.f1;
                         },
                         inlongMetric,
-                        auditHostAndPorts);
+                        auditHostAndPorts,
+                        dirtyOptions,
+                        dirtySink);
             }
         }
     }

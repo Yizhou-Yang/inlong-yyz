@@ -18,6 +18,7 @@
 package org.apache.inlong.sdk.sort.manager;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.sdk.sort.api.ClientContext;
 import org.apache.inlong.sdk.sort.api.InlongTopicTypeEnum;
 import org.apache.inlong.sdk.sort.api.QueryConsumeConfig;
@@ -160,6 +161,7 @@ public class InlongMultiTopicManager extends TopicManager {
         }
         this.allTopics = assignedTopics.stream()
                 .map(InLongTopic::getTopic)
+                .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
 
         assignedTopics.stream()
@@ -262,7 +264,7 @@ public class InlongMultiTopicManager extends TopicManager {
 
         @Override
         protected void doWork() {
-            logger.debug("InLongTopicManagerImpl doWork");
+            logger.debug("InLongMultiTopicManagerImpl doWork");
             if (stopAssign) {
                 logger.warn("assign is stopped");
                 return;
@@ -270,16 +272,14 @@ public class InlongMultiTopicManager extends TopicManager {
             // get sortTask conf from manager
             if (queryConsumeConfig != null) {
                 long start = System.currentTimeMillis();
-                context.getDefaultStateCounter().addRequestManagerTimes(1);
+                context.addRequestManager();
                 ConsumeConfig consumeConfig = queryConsumeConfig
                         .queryCurrentConsumeConfig(context.getConfig().getSortTaskId());
-                context.getDefaultStateCounter().addRequestManagerTimeCost(System.currentTimeMillis() - start);
-
                 if (consumeConfig != null) {
                     handleUpdatedConsumeConfig(consumeConfig.getTopics());
                 } else {
                     logger.warn("subscribedInfo is null");
-                    context.getDefaultStateCounter().addRequestManagerFailTimes(1);
+                    context.addRequestManagerFail(System.currentTimeMillis() - start);
                 }
             } else {
                 logger.error("subscribedMetaDataInfo is null");

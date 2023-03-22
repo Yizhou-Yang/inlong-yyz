@@ -17,35 +17,42 @@
  * under the License.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Skeleton, Modal, message } from 'antd';
 import { ModalProps } from 'antd/es/modal';
 import { useRequest, useUpdateEffect } from '@/hooks';
 import { useTranslation } from 'react-i18next';
 import FormGenerator, { useForm } from '@/components/FormGenerator';
-import { useDefaultMeta, useLoadMeta, SinkMetaType } from '@/metas';
+import { useLoadMeta, SinkMetaType } from '@/metas';
 import request from '@/utils/request';
 
 export interface DetailModalProps extends ModalProps {
   inlongGroupId: string;
+  defaultType?: string;
   // (True operation, save and adjust interface) Need to upload when editing
   id?: string;
   // others
   onOk?: (values) => void;
 }
 
-const Comp: React.FC<DetailModalProps> = ({ inlongGroupId, id, ...modalProps }) => {
+const Comp: React.FC<DetailModalProps> = ({ inlongGroupId, defaultType, id, ...modalProps }) => {
   const [form] = useForm();
 
   const { t } = useTranslation();
-
-  const { defaultValue } = useDefaultMeta('sink');
 
   // Q: Why sinkType default = '' ?
   // A: Avoid the table of the fields triggering the monitoring of the column change.
   const [sinkType, setSinkType] = useState('');
 
+  const [changedValues, setChangedValues] = useState<Record<string, any>>({});
+
   const { Entity } = useLoadMeta<SinkMetaType>('sink', sinkType);
+
+  const { data: groupData, run: getGroupData } = useRequest(`/group/get/${inlongGroupId}`, {
+    manual: true,
+    ready: Boolean(inlongGroupId),
+    refreshDeps: [inlongGroupId],
+  });
 
   const {
     data,
@@ -65,14 +72,53 @@ const Comp: React.FC<DetailModalProps> = ({ inlongGroupId, id, ...modalProps }) 
     },
   );
 
+  const { data: streamDetail, run: getStreamDetail } = useRequest(
+    streamId => ({
+      url: `/stream/get`,
+      params: {
+        groupId: inlongGroupId,
+        streamId,
+      },
+    }),
+    {
+      manual: true,
+    },
+  );
+
+  useEffect(() => {
+    if (changedValues.inlongStreamId) {
+      getStreamDetail(changedValues.inlongStreamId);
+    }
+  }, [getStreamDetail, changedValues.inlongStreamId]);
+
+  useEffect(() => {
+    if (
+      Entity &&
+      streamDetail &&
+      streamDetail.fieldList?.length &&
+      Entity.FieldList?.some(item => item.name === 'sinkFieldList')
+    ) {
+      form.setFieldsValue({
+        sinkFieldList: streamDetail.fieldList.map(item => ({
+          sourceFieldName: item.fieldName,
+          sourceFieldType: item.fieldType,
+          fieldName: item.fieldName,
+          fieldType: '',
+        })),
+      });
+    }
+  }, [Entity, streamDetail, form]);
+
   useUpdateEffect(() => {
     if (modalProps.visible) {
       // open
+      getGroupData();
+      setChangedValues({});
       if (id) {
         getData(id);
       } else {
-        form.setFieldsValue({ inlongGroupId });
-        setSinkType(defaultValue);
+        form.setFieldsValue({ inlongGroupId, sinkType: defaultType });
+        setSinkType(defaultType);
       }
     } else {
       form.resetFields();
@@ -109,7 +155,7 @@ const Comp: React.FC<DetailModalProps> = ({ inlongGroupId, id, ...modalProps }) 
 
   return (
     <Modal
-      title="Sink"
+      title={id ? t('pages.GroupDetail.Sink.Edit') : t('pages.GroupDetail.Sink.New')}
       width={1200}
       {...modalProps}
       footer={[
@@ -119,9 +165,11 @@ const Comp: React.FC<DetailModalProps> = ({ inlongGroupId, id, ...modalProps }) 
         <Button key="save" type="primary" onClick={() => onOk(false)}>
           {t('pages.GroupDetail.Sink.Save')}
         </Button>,
-        <Button key="run" type="primary" onClick={() => onOk(true)}>
-          {t('pages.GroupDetail.Sink.SaveAndRun')}
-        </Button>,
+        groupData?.status === 130 && (
+          <Button key="run" type="primary" onClick={() => onOk(true)}>
+            {t('pages.GroupDetail.Sink.SaveAndRefresh')}
+          </Button>
+        ),
       ]}
     >
       {loading ? (
@@ -133,7 +181,10 @@ const Comp: React.FC<DetailModalProps> = ({ inlongGroupId, id, ...modalProps }) 
           content={formContent}
           form={form}
           initialValues={id ? data : { inlongGroupId }}
-          onValuesChange={(c, values) => setSinkType(values.sinkType)}
+          onValuesChange={(c, values) => {
+            setChangedValues(c);
+            setSinkType(values.sinkType);
+          }}
         />
       )}
     </Modal>

@@ -113,7 +113,8 @@ public class PulsarSourceOperator extends AbstractSourceOperator {
         String adminUrl = pulsarCluster.getAdminUrl();
         String serviceUrl = pulsarCluster.getUrl();
         String tenant = StringUtils.isEmpty(pulsarCluster.getTenant())
-                ? InlongConstants.DEFAULT_PULSAR_TENANT : pulsarCluster.getTenant();
+                ? InlongConstants.DEFAULT_PULSAR_TENANT
+                : pulsarCluster.getTenant();
 
         Map<String, List<StreamSource>> sourceMap = Maps.newHashMap();
         streamInfos.forEach(streamInfo -> {
@@ -126,6 +127,12 @@ public class PulsarSourceOperator extends AbstractSourceOperator {
             pulsarSource.setAdminUrl(adminUrl);
             pulsarSource.setServiceUrl(serviceUrl);
             pulsarSource.setInlongComponent(true);
+            if (StringUtils.isNotBlank(streamInfo.getDataType())) {
+                String serializationType = DataTypeEnum.forType(streamInfo.getDataType()).getType();
+                pulsarSource.setSerializationType(serializationType);
+            }
+            pulsarSource.setWrapWithInlongMsg(streamInfo.getWrapWithInlongMsg());
+            pulsarSource.setIgnoreParseError(streamInfo.getIgnoreParseError());
 
             // set the token info
             if (StringUtils.isNotBlank(pulsarCluster.getToken())) {

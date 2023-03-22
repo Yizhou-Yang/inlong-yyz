@@ -1,4 +1,3 @@
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with
@@ -54,14 +53,13 @@ public class AllMigratePostgreSQLTest {
                 new MetaFieldInfo("data", MetaField.DATA_BYTES_CANAL));
         Map<String, String> option = new HashMap<>();
         option.put("source.multiple.enable", "true");
-        //List<String> tableNames = Arrays.asList("vote_record_01", "vote_record_02");
+        // List<String> tableNames = Arrays.asList("vote_record_01", "vote_record_02");
         List<String> tableNames = Arrays.asList("vote_record_02");
-        //List<String> tableNames = Arrays.asList("*");
+        // List<String> tableNames = Arrays.asList("*");
         PostgresExtractNode node = new PostgresExtractNode("1", "pg_input", fields,
                 null, option, null, tableNames, "localhost", "user",
                 "password", "database", "schema", 5432,
-                null, "Asia/Shanghai", null
-        );
+                null, "Asia/Shanghai", null);
         return node;
     }
 
@@ -74,8 +72,7 @@ public class AllMigratePostgreSQLTest {
         PostgresExtractNode node = new PostgresExtractNode("1", "pg_input", fields,
                 null, option, null, tableNames, "localhost", "user",
                 "password", "database", "schema", 5432,
-                null, null, null
-        );
+                null, null, null);
         return node;
     }
 
@@ -112,7 +109,7 @@ public class AllMigratePostgreSQLTest {
                 .singletonList(new FieldRelation(new FieldInfo("data", new VarBinaryFormatInfo()),
                         new FieldInfo("data", new VarBinaryFormatInfo())));
         Map<String, String> option = new HashMap<>();
-        //option.put("sink.properties.format", "csv");
+        // option.put("sink.properties.format", "csv");
         return new DorisLoadNode("2", "doris_output", fields, relations,
                 null, null, 1, option,
                 "localhost:8030", "user", "password", null,
@@ -154,8 +151,8 @@ public class AllMigratePostgreSQLTest {
         env.enableCheckpointing(10000);
         StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env, settings);
         Node inputNode = buildAllMigrateExtractNode();
-//        Node outputNode = buildAllMigrateKafkaNode();
-//        Node outputNode = buildAllMigrateDorisNode();
+        // Node outputNode = buildAllMigrateKafkaNode();
+        // Node outputNode = buildAllMigrateDorisNode();
         Node outputNode = buildAllMigrateStarRocksNode();
         StreamInfo streamInfo = new StreamInfo("1", Arrays.asList(inputNode, outputNode),
                 Collections.singletonList(buildNodeRelation(Collections.singletonList(inputNode),
@@ -163,7 +160,7 @@ public class AllMigratePostgreSQLTest {
         GroupInfo groupInfo = new GroupInfo("1", Collections.singletonList(streamInfo));
         FlinkSqlParser parser = FlinkSqlParser.getInstance(tableEnv, groupInfo);
         ParseResult result = parser.parse();
-        //Assert.assertTrue(result.tryExecute());
+        // Assert.assertTrue(result.tryExecute());
         result.execute();
 
         Thread.sleep(10000 * 1000);

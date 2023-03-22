@@ -30,9 +30,10 @@ export interface Props extends ModalProps {
   // When editing, use the ID to call the interface for obtaining details
   id?: string;
   inlongGroupId?: string;
+  defaultType?: string;
 }
 
-const Comp: React.FC<Props> = ({ id, inlongGroupId, ...modalProps }) => {
+const Comp: React.FC<Props> = ({ id, inlongGroupId, defaultType, ...modalProps }) => {
   const [form] = useForm();
   const { t } = useTranslation();
 
@@ -82,11 +83,11 @@ const Comp: React.FC<Props> = ({ id, inlongGroupId, ...modalProps }) => {
       if (id) {
         getData(id);
       } else {
-        form.setFieldsValue({ inlongGroupId });
+        setType(defaultType);
+        form.setFieldsValue({ inlongGroupId, sourceType: defaultType });
       }
     } else {
       form.resetFields();
-      setType(defaultValue);
     }
   }, [modalProps.visible]);
 
@@ -96,7 +97,12 @@ const Comp: React.FC<Props> = ({ id, inlongGroupId, ...modalProps }) => {
 
   return (
     <>
-      <Modal {...modalProps} title="Source" width={666} onOk={onOk}>
+      <Modal
+        {...modalProps}
+        title={id ? t('pages.GroupDetail.Sources.Edit') : t('pages.GroupDetail.Sources.Create')}
+        width={666}
+        onOk={onOk}
+      >
         <FormGenerator
           content={formContent}
           onValuesChange={(c, values) => setType(values.sourceType)}

@@ -18,7 +18,6 @@
 package org.apache.inlong.dataproxy.sink;
 
 import static org.apache.inlong.dataproxy.consts.AttrConstants.SEP_HASHTAG;
-import static org.apache.inlong.dataproxy.consts.ConfigConstants.MAX_MONITOR_CNT;
 
 import com.google.common.base.Preconditions;
 import java.util.HashSet;
@@ -84,7 +83,7 @@ public class TubeSink extends AbstractSink implements Configurable {
     private String usedMasterAddr = null;
     private Set<String> masterHostAndPortLists;
     // statistic info log
-    private int maxMonitorCnt = 300000;
+    private int maxMonitorCnt = ConfigConstants.DEF_MONITOR_STAT_CNT;
     private int statIntervalSec = 60;
     private MonitorIndex monitorIndex;
     private MonitorIndexExt monitorIndexExt;
@@ -137,29 +136,37 @@ public class TubeSink extends AbstractSink implements Configurable {
         // start message deduplication handler
         MSG_DEDUP_HANDLER.start(tubeConfig.getClientIdCache(),
                 tubeConfig.getMaxSurvivedTime(), tubeConfig.getMaxSurvivedSize());
-        // get statistic configure items
-        maxMonitorCnt = context.getInteger(MAX_MONITOR_CNT, 300000);
+        // get maxMonitorCnt's configure value
+        try {
+            maxMonitorCnt = context.getInteger(
+                    ConfigConstants.MAX_MONITOR_CNT, ConfigConstants.DEF_MONITOR_STAT_CNT);
+        } catch (NumberFormatException e) {
+            logger.warn("Property {} must specify an integer value: {}",
+                    ConfigConstants.MAX_MONITOR_CNT, context.getString(ConfigConstants.MAX_MONITOR_CNT));
+        }
+        Preconditions.checkArgument(maxMonitorCnt >= 0, "maxMonitorCnt must be >= 0");
         statIntervalSec = tubeConfig.getStatIntervalSec();
         Preconditions.checkArgument(statIntervalSec >= 0, "statIntervalSec must be >= 0");
         // initial TubeMQ configure
-        //     initial resend queue size
+        // initial resend queue size
         int badEventQueueSize = tubeConfig.getBadEventQueueSize();
         Preconditions.checkArgument(badEventQueueSize > 0, "badEventQueueSize must be > 0");
         resendQueue = new LinkedBlockingQueue<>(badEventQueueSize);
-        //     initial sink thread pool
+        // initial sink thread pool
         int threadNum = tubeConfig.getThreadNum();
         Preconditions.checkArgument(threadNum > 0, "threadNum must be > 0");
         sinkThreadPool = new Thread[threadNum];
-        //     initial event queue size
+        // initial event queue size
         int eventQueueSize = tubeConfig.getEventQueueSize();
         Preconditions.checkArgument(eventQueueSize > 0, "eventQueueSize must be > 0");
         eventQueue = new LinkedBlockingQueue<>(eventQueueSize);
-        //     initial disk rate limiter
+        // initial disk rate limiter
         if (tubeConfig.getDiskIoRatePerSec() != 0) {
             diskRateLimiter = RateLimiter.create(tubeConfig.getDiskIoRatePerSec());
         }
         // register configure change callback functions
         configManager.getTopicConfig().addUpdateCallback(new ConfigUpdateCallback() {
+
             @Override
             public void update() {
                 diffSetPublish(new HashSet<>(topicProperties.values()),
@@ -167,6 +174,7 @@ public class TubeSink extends AbstractSink implements Configurable {
             }
         });
         configManager.getMqClusterHolder().addUpdateCallback(new ConfigUpdateCallback() {
+
             @Override
             public void update() {
                 diffUpdateTubeClient(masterHostAndPortLists,
@@ -301,6 +309,7 @@ public class TubeSink extends AbstractSink implements Configurable {
     }
 
     private class TubeSinkTask implements Runnable {
+
         public TubeSinkTask() {
             // ignore
         }
@@ -478,7 +487,7 @@ public class TubeSink extends AbstractSink implements Configurable {
          * @param sendTime   the send time when success processed
          */
         private void addStatistics(Event event, boolean isSuccess,
-                                   boolean isException, long sendTime) {
+                boolean isException, long sendTime) {
             if (event == null) {
                 return;
             }
@@ -547,7 +556,7 @@ public class TubeSink extends AbstractSink implements Configurable {
      * resend event
      */
     private void resendEvent(EventStat es, boolean sendFinished,
-                             DataProxyErrCode errCode, String errMsg) {
+            DataProxyErrCode errCode, String errMsg) {
         try {
             if (sendFinished) {
                 inflightMsgCnt.decrementAndGet();
@@ -635,7 +644,7 @@ public class TubeSink extends AbstractSink implements Configurable {
      * @param newClusterSet new masterHostAndPortList set
      */
     private void diffUpdateTubeClient(Set<String> curClusterSet,
-                                      Set<String> newClusterSet) {
+            Set<String> newClusterSet) {
         if (!this.started.get()) {
             logger.info(getName() + " not started, ignore this change!");
         }
@@ -654,7 +663,7 @@ public class TubeSink extends AbstractSink implements Configurable {
             newProducerHolder.start(new HashSet<>(configManager.getTopicProperties().values()));
         } catch (Throwable e) {
             logger.error(getName() + " create new producer holder for " + newMasterAddr
-                            + " failure, throw exception is  {}", e.getMessage());
+                    + " failure, throw exception is  {}", e.getMessage());
             return;
         }
         // replace current producer holder

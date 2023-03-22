@@ -47,15 +47,14 @@ import static org.apache.inlong.agent.metrics.AgentMetricItem.KEY_PLUGIN_ID;
 public abstract class AbstractReader implements Reader {
 
     protected static final AtomicLong METRIC_INDEX = new AtomicLong(0);
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReader.class);
     protected String inlongGroupId;
     protected String inlongStreamId;
-    //metric
+    // metric
     protected AgentMetricItemSet metricItemSet;
     protected AgentMetricItem readerMetric;
     protected String metricName;
     protected Map<String, String> dimensions;
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReader.class);
 
     @Override
     public void init(JobProfile jobConf) {

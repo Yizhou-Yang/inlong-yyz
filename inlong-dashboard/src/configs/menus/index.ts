@@ -33,7 +33,7 @@ const menus: MenuItemType[] = [
   },
   {
     path: '/consume',
-    name: i18n.t('configs.menus.Consumes'),
+    name: i18n.t('configs.menus.Subscribe'),
   },
   {
     name: i18n.t('configs.menus.Clusters'),
@@ -66,7 +66,7 @@ const menus: MenuItemType[] = [
       },
       {
         path: '/approval',
-        name: i18n.t('configs.menus.ApprovalManagement'),
+        name: i18n.t('configs.menus.ProcessManagement'),
       },
     ],
   },

@@ -1,20 +1,18 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.inlong.sort.iceberg.catalog.hybris;
@@ -82,6 +80,7 @@ import static org.apache.iceberg.TableProperties.GC_ENABLED;
  * avoid code duplication between this class and Metacat Tables.
  */
 public class HiveTableOperations extends BaseMetastoreTableOperations {
+
     private static final Logger LOG = LoggerFactory.getLogger(HiveTableOperations.class);
 
     private static final String HIVE_ACQUIRE_LOCK_TIMEOUT_MS = "iceberg.hive.lock-timeout-ms";
@@ -104,9 +103,8 @@ public class HiveTableOperations extends BaseMetastoreTableOperations {
             .build();
     private static final BiMap<String, String> ICEBERG_TO_HMS_TRANSLATION = ImmutableBiMap.of(
             // gc.enabled in Iceberg and external.table.purge in Hive
-            //      are meant to do the same things but with different names
-            GC_ENABLED, "external.table.purge"
-    );
+            // are meant to do the same things but with different names
+            GC_ENABLED, "external.table.purge");
 
     private static Cache<String, ReentrantLock> commitLockCache;
 
@@ -137,6 +135,7 @@ public class HiveTableOperations extends BaseMetastoreTableOperations {
     }
 
     private static class WaitingForLockException extends RuntimeException {
+
         WaitingForLockException(String message) {
             super(message);
         }
@@ -214,7 +213,8 @@ public class HiveTableOperations extends BaseMetastoreTableOperations {
     @Override
     protected void doCommit(TableMetadata base, TableMetadata metadata) {
         String newMetadataLocation = base == null && metadata.metadataFileLocation() != null
-                ? metadata.metadataFileLocation() : writeNewMetadata(metadata, currentVersion() + 1);
+                ? metadata.metadataFileLocation()
+                : writeNewMetadata(metadata, currentVersion() + 1);
         boolean hiveEngineEnabled = hiveEngineEnabled(metadata, conf);
         boolean keepHiveStats = conf.getBoolean(ConfigProperties.KEEP_HIVE_STATS, false);
 
@@ -315,8 +315,7 @@ public class HiveTableOperations extends BaseMetastoreTableOperations {
         if (updateHiveTable) {
             metaClients.run(client -> {
                 EnvironmentContext envContext = new EnvironmentContext(
-                        ImmutableMap.of(StatsSetupConst.DO_NOT_UPDATE_STATS, StatsSetupConst.TRUE)
-                );
+                        ImmutableMap.of(StatsSetupConst.DO_NOT_UPDATE_STATS, StatsSetupConst.TRUE));
                 ALTER_TABLE.invoke(client, database, tableName, hmsTable, envContext);
                 return null;
             });

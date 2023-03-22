@@ -17,29 +17,33 @@
  * under the License.
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
+import i18n from '@/i18n';
 import { Button, Card, Modal, message } from 'antd';
 import { PageContainer, Container } from '@/components/PageContainer';
 import HighTable from '@/components/HighTable';
 import { DashboardCardList } from '@/components/DashboardCard';
 import request from '@/utils/request';
-import { useTranslation } from 'react-i18next';
 import { useRequest, useHistory } from '@/hooks';
 import { defaultSize } from '@/configs/pagination';
-import ExecutionLogModal from './ExecutionLogModal';
-import { dashCardList, getFilterFormContent, useColumns } from './config';
+import { GroupLogs } from '@/components/GroupLogs';
+import { dashCardList, useColumns } from './config';
+import { statusList } from '@/metas/groups/common/status';
+import { useDefaultMeta } from '@/metas';
 
 const Comp: React.FC = () => {
-  const { t } = useTranslation();
+  const { options: groups } = useDefaultMeta('group');
+
   const history = useHistory();
   const [options, setOptions] = useState({
     // keyword: '',
     // status: '',
+    // mqType: '',
     pageSize: defaultSize,
     pageNum: 1,
   });
 
-  const [executionLogModal, setExecutionLogModal] = useState({
+  const [groupLogs, setGroupLogs] = useState({
     visible: false,
     inlongGroupId: '',
   });
@@ -65,20 +69,20 @@ const Comp: React.FC = () => {
 
   const onDelete = ({ inlongGroupId }) => {
     Modal.confirm({
-      title: t('pages.GroupDashboard.ConfirmDelete'),
+      title: i18n.t('pages.GroupDashboard.ConfirmDelete'),
       onOk: async () => {
         await request({
           url: `/group/delete/${inlongGroupId}`,
           method: 'DELETE',
         });
         await getList();
-        message.success(t('pages.GroupDashboard.SuccessfullyDeleted'));
+        message.success(i18n.t('pages.GroupDashboard.SuccessfullyDeleted'));
       },
     });
   };
 
   const openModal = ({ inlongGroupId }) => {
-    setExecutionLogModal({ visible: true, inlongGroupId: inlongGroupId });
+    setGroupLogs({ visible: true, inlongGroupId: inlongGroupId });
   };
 
   const onChange = ({ current: pageNum, pageSize }) => {
@@ -110,6 +114,42 @@ const Comp: React.FC = () => {
 
   const columns = useColumns({ onDelete, openModal });
 
+  const getFilterFormContent = useCallback(
+    defaultValues => [
+      {
+        type: 'inputsearch',
+        name: 'keyword',
+        initialValue: defaultValues.keyword,
+        props: {
+          allowClear: true,
+        },
+      },
+      {
+        type: 'select',
+        name: 'status',
+        label: i18n.t('basic.Status'),
+        initialValue: defaultValues.status,
+        props: {
+          allowClear: true,
+          options: statusList,
+          dropdownMatchSelectWidth: false,
+        },
+      },
+      {
+        type: 'select',
+        name: 'mqType',
+        label: i18n.t('meta.Group.MQType'),
+        initialValue: defaultValues.mqType,
+        props: {
+          allowClear: true,
+          options: groups.filter(x => x.value),
+          dropdownMatchSelectWidth: false,
+        },
+      },
+    ],
+    [groups],
+  );
+
   return (
     <PageContainer useDefaultBreadcrumb={false} useDefaultContainer={false}>
       <Container>
@@ -121,7 +161,7 @@ const Comp: React.FC = () => {
           <HighTable
             suffix={
               <Button type="primary" onClick={() => history.push('/group/create')}>
-                {t('pages.GroupDashboard.Create')}
+                {i18n.t('pages.GroupDashboard.Create')}
               </Button>
             }
             filterForm={{
@@ -140,10 +180,10 @@ const Comp: React.FC = () => {
         </Card>
       </Container>
 
-      <ExecutionLogModal
-        {...executionLogModal}
-        onOk={() => setExecutionLogModal({ visible: false, inlongGroupId: '' })}
-        onCancel={() => setExecutionLogModal({ visible: false, inlongGroupId: '' })}
+      <GroupLogs
+        {...groupLogs}
+        onOk={() => setGroupLogs({ visible: false, inlongGroupId: '' })}
+        onCancel={() => setGroupLogs({ visible: false, inlongGroupId: '' })}
       />
     </PageContainer>
   );

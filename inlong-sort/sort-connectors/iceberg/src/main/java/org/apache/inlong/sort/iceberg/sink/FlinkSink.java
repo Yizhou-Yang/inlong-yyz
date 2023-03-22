@@ -1,20 +1,18 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.inlong.sort.iceberg.sink;
@@ -59,6 +57,8 @@ import org.apache.iceberg.relocated.com.google.common.collect.Maps;
 import org.apache.iceberg.relocated.com.google.common.collect.Sets;
 import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.util.PropertyUtil;
+import org.apache.inlong.sort.base.dirty.DirtyOptions;
+import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.apache.inlong.sort.base.sink.MultipleSinkOption;
 import org.apache.inlong.sort.iceberg.sink.multiple.IcebergMultipleFilesCommiter;
 import org.apache.inlong.sort.iceberg.sink.multiple.IcebergMultipleStreamWriter;
@@ -71,6 +71,7 @@ import org.apache.inlong.sort.iceberg.sink.multiple.DynamicSchemaHandleOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
@@ -88,6 +89,7 @@ import static org.apache.iceberg.TableProperties.WRITE_DISTRIBUTION_MODE;
  * Add option `inlong.metric` and `metrics.audit.proxy.hosts` to support collect inlong metrics and audit.
  */
 public class FlinkSink {
+
     private static final Logger LOG = LoggerFactory.getLogger(FlinkSink.class);
 
     private static final String ICEBERG_STREAM_WRITER_NAME = IcebergSingleStreamWriter.class.getSimpleName();
@@ -148,6 +150,7 @@ public class FlinkSink {
     }
 
     public static class Builder {
+
         private Function<String, DataStream<RowData>> inputCreator = null;
         private TableLoader tableLoader;
         private Table table;
@@ -168,6 +171,8 @@ public class FlinkSink {
         private CatalogLoader catalogLoader = null;
         private boolean multipleSink = false;
         private MultipleSinkOption multipleSinkOption = null;
+        private DirtyOptions dirtyOptions;
+        private @Nullable DirtySink<Object> dirtySink;
         private ReadableConfig tableOptions;
 
         private Builder() {
@@ -312,6 +317,16 @@ public class FlinkSink {
         public Builder metric(String inlongMetric, String auditHostAndPorts) {
             this.inlongMetric = inlongMetric;
             this.auditHostAndPorts = auditHostAndPorts;
+            return this;
+        }
+
+        public Builder dirtyOptions(DirtyOptions dirtyOptions) {
+            this.dirtyOptions = dirtyOptions;
+            return this;
+        }
+
+        public Builder dirtySink(DirtySink<Object> dirtySink) {
+            this.dirtySink = dirtySink;
             return this;
         }
 
@@ -460,7 +475,6 @@ public class FlinkSink {
             return appendDummySink(committerStream);
         }
 
-
         /**
          * Append the iceberg sink operators to write records to iceberg table.
          *
@@ -581,7 +595,8 @@ public class FlinkSink {
             }
 
             IcebergProcessOperator<RowData, WriteResult> streamWriter = createStreamWriter(
-                    table, flinkRowType, equalityFieldIds, flinkWriteConf, appendMode, inlongMetric, auditHostAndPorts);
+                    table, flinkRowType, equalityFieldIds, flinkWriteConf, appendMode, inlongMetric,
+                    auditHostAndPorts, dirtyOptions, dirtySink);
 
             int parallelism = writeParallelism == null ? input.getParallelism() : writeParallelism;
             SingleOutputStreamOperator<WriteResult> writerStream = input
@@ -601,8 +616,7 @@ public class FlinkSink {
 
             int parallelism = writeParallelism == null ? input.getParallelism() : writeParallelism;
             DynamicSchemaHandleOperator routeOperator = new DynamicSchemaHandleOperator(
-                    catalogLoader,
-                    multipleSinkOption);
+                    catalogLoader, multipleSinkOption, dirtyOptions, dirtySink, inlongMetric, auditHostAndPorts);
             SingleOutputStreamOperator<RecordWithSchema> routeStream = input
                     .transform(operatorName(ICEBERG_WHOLE_DATABASE_MIGRATION_NAME),
                             TypeInformation.of(RecordWithSchema.class),
@@ -611,7 +625,8 @@ public class FlinkSink {
 
             IcebergProcessOperator streamWriter =
                     new IcebergProcessOperator(new IcebergMultipleStreamWriter(
-                            appendMode, catalogLoader, inlongMetric, auditHostAndPorts, multipleSinkOption));
+                            appendMode, catalogLoader, inlongMetric, auditHostAndPorts,
+                            multipleSinkOption, dirtyOptions, dirtySink));
             SingleOutputStreamOperator<MultipleWriteResult> writerStream = routeStream
                     .transform(operatorName(ICEBERG_MULTIPLE_STREAM_WRITER_NAME),
                             TypeInformation.of(IcebergProcessOperator.class),
@@ -718,7 +733,10 @@ public class FlinkSink {
             FlinkWriteConf flinkWriteConf,
             boolean appendMode,
             String inlongMetric,
-            String auditHostAndPorts) {
+            String auditHostAndPorts,
+            DirtyOptions dirtyOptions,
+            @Nullable DirtySink<Object> dirtySink) {
+        // flink A, iceberg a
         Preconditions.checkArgument(table != null, "Iceberg table should't be null");
 
         Table serializableTable = SerializableTable.copyOf(table);
@@ -734,7 +752,8 @@ public class FlinkSink {
                         appendMode);
 
         return new IcebergProcessOperator<>(new IcebergSingleStreamWriter<>(
-                table.name(), taskWriterFactory, inlongMetric, auditHostAndPorts));
+                table.name(), taskWriterFactory, inlongMetric, auditHostAndPorts,
+                null, dirtyOptions, dirtySink, false));
     }
 
 }

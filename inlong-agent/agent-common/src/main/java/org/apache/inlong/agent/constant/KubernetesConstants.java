@@ -32,4 +32,5 @@ public class KubernetesConstants {
     public static final String POD_NAME = "pod.name";
     public static final String CONTAINER_NAME = "container.name";
     public static final String CONTAINER_ID = "container.id";
+
 }

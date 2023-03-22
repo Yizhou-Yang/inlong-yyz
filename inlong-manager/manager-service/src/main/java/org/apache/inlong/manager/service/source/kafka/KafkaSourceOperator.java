@@ -20,6 +20,8 @@ package org.apache.inlong.manager.service.source.kafka;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.inlong.common.enums.DataTypeEnum;
 import org.apache.inlong.manager.common.consts.SourceType;
 import org.apache.inlong.manager.common.enums.ClusterType;
 import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
@@ -109,12 +111,22 @@ public class KafkaSourceOperator extends AbstractSourceOperator {
             kafkaSource.setSourceName(streamId);
             kafkaSource.setBootstrapServers(bootstrapServers);
             kafkaSource.setTopic(streamInfo.getMqResource());
+            String serializationType = DataTypeEnum.forType(streamInfo.getDataType()).getType();
+            kafkaSource.setSerializationType(serializationType);
+            kafkaSource.setIgnoreParseError(streamInfo.getIgnoreParseError());
+
             for (StreamSource sourceInfo : streamSources) {
                 if (!Objects.equals(streamId, sourceInfo.getInlongStreamId())) {
                     continue;
                 }
-                kafkaSource.setSerializationType(sourceInfo.getSerializationType());
+                if (StringUtils.isEmpty(kafkaSource.getSerializationType()) && StringUtils.isNotEmpty(
+                        sourceInfo.getSerializationType())) {
+                    kafkaSource.setSerializationType(sourceInfo.getSerializationType());
+                }
             }
+
+            kafkaSource.setWrapWithInlongMsg(streamInfo.getWrapWithInlongMsg());
+
             kafkaSource.setAutoOffsetReset(KafkaOffset.EARLIEST.getName());
             kafkaSource.setFieldList(streamInfo.getFieldList());
             sourceMap.computeIfAbsent(streamId, key -> Lists.newArrayList()).add(kafkaSource);

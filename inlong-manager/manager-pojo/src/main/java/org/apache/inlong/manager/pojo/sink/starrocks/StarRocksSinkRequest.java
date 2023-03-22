@@ -35,6 +35,7 @@ import org.apache.inlong.manager.pojo.sink.SinkRequest;
 @ApiModel(value = "StarRocks sink request")
 @JsonTypeDefine(value = SinkType.STARROCKS)
 public class StarRocksSinkRequest extends SinkRequest {
+
     @ApiModelProperty("StarRocks jdbc url")
     private String jdbcUrl;
 
@@ -67,4 +68,14 @@ public class StarRocksSinkRequest extends SinkRequest {
 
     @ApiModelProperty("The multiple table-pattern of sink")
     private String tablePattern;
+
+    @ApiModelProperty("The table engine,  like: OLAP, MYSQL, ELASTICSEARCH, etc, default is OLAP")
+    private String tableEngine = "OLAP";
+
+    @ApiModelProperty("The table replication num")
+    private Integer replicationNum = 3;
+
+    @ApiModelProperty("The table barrel size")
+    private Integer barrelSize = 8;
+
 }

@@ -82,6 +82,15 @@
         where template_id = #{templateId,jdbcType=INTEGER}
         and is_deleted = 0
     </select>
+    <select id="selectByTemplateIdAndIp" resultType="org.apache.inlong.manager.dao.entity.StreamSourceEntity">
+        select
+        <include refid="Base_Column_List"/>
+        from stream_source
+        where template_id = #{templateId,jdbcType=INTEGER}
+        and agent_ip = #{agentIp, jdbcType=VARCHAR}
+        and is_deleted = 0
+        limit 1
+    </select>
     <select id="selectByIdForUpdate" resultType="org.apache.inlong.manager.dao.entity.StreamSourceEntity">
         select
         <include refid="Base_Column_List"/>
@@ -256,7 +265,7 @@
         <include refid="Base_Column_List"/>
         from stream_source
         <where>
-            inlong_cluster_name = #{clusterName, jdbcType=VARCHAR}
+            (inlong_cluster_name = #{clusterName, jdbcType=VARCHAR} or inlong_cluster_name is NULL)
             and agent_ip = #{agentIp, jdbcType=VARCHAR}
             and `status` in
             <foreach item="item" index="index" collection="statusList" open="(" close=")" separator=",">
@@ -410,7 +419,9 @@
         set previous_status = status,
         status = #{nextStatus, jdbcType=INTEGER}
         <where>
-            inlong_group_id = #{groupId, jdbcType=VARCHAR}
+            is_deleted = 0
+            and status != 101
+            and inlong_group_id = #{groupId, jdbcType=VARCHAR}
             <if test="streamId != null">
                 and inlong_stream_id = #{streamId, jdbcType=VARCHAR}
             </if>

@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +18,7 @@
 package org.apache.inlong.sdk.dataproxy;
 
 import org.apache.inlong.common.msg.AttributeConstants;
+import org.apache.inlong.common.util.MessageUtils;
 import org.apache.inlong.sdk.dataproxy.codec.EncodeObject;
 import org.apache.inlong.sdk.dataproxy.config.ProxyConfigEntry;
 import org.apache.inlong.sdk.dataproxy.config.ProxyConfigManager;
@@ -51,7 +51,7 @@ public class DefaultMessageSender implements MessageSender {
     private static final SequentialID idGenerator = new SequentialID(Utils.getLocalIp());
     private final Sender sender;
     private final IndexCollectThread indexCol;
-    /* Store index <groupId_streamId,cnt>*/
+    /* Store index <groupId_streamId,cnt> */
     private final Map<String, Long> storeIndex = new ConcurrentHashMap<String, Long>();
     private String groupId;
     private int msgtype = ConfigConstants.MSG_TYPE;
@@ -280,7 +280,7 @@ public class DefaultMessageSender implements MessageSender {
         if (isProxySend) {
             extraAttrMap.put(AttributeConstants.MESSAGE_PROXY_SEND, "true");
         }
-        StringBuilder attrs = ProxyUtils.convertAttrToStr(extraAttrMap);
+        StringBuilder attrs = MessageUtils.convertAttrToStr(extraAttrMap);
 
         boolean isCompressEnd = (isCompress && (body.length > cpsSize));
 
@@ -295,11 +295,11 @@ public class DefaultMessageSender implements MessageSender {
             if (isCompressEnd) {
                 attrs.append("&cp=snappy");
                 return sender.syncSendMessage(new EncodeObject(body, attrs.toString(),
-                                idGenerator.getNextId(), this.getMsgtype(), true, groupId),
+                        idGenerator.getNextId(), this.getMsgtype(), true, groupId),
                         msgUUID, timeout, timeUnit);
             } else {
                 return sender.syncSendMessage(new EncodeObject(body, attrs.toString(),
-                                idGenerator.getNextId(), this.getMsgtype(), false, groupId), msgUUID,
+                        idGenerator.getNextId(), this.getMsgtype(), false, groupId), msgUUID,
                         timeout, timeUnit);
             }
         }
@@ -392,7 +392,7 @@ public class DefaultMessageSender implements MessageSender {
         if (isProxySend) {
             extraAttrMap.put(AttributeConstants.MESSAGE_PROXY_SEND, "true");
         }
-        StringBuilder attrs = ProxyUtils.convertAttrToStr(extraAttrMap);
+        StringBuilder attrs = MessageUtils.convertAttrToStr(extraAttrMap);
 
         if (msgtype == 7 || msgtype == 8) {
             EncodeObject encodeObject = new EncodeObject(bodyList, msgtype, isCompress, isReport,
@@ -406,11 +406,11 @@ public class DefaultMessageSender implements MessageSender {
             if (isCompress) {
                 attrs.append("&cp=snappy");
                 return sender.syncSendMessage(new EncodeObject(bodyList, attrs.toString(),
-                                idGenerator.getNextId(), this.getMsgtype(), true, groupId),
+                        idGenerator.getNextId(), this.getMsgtype(), true, groupId),
                         msgUUID, timeout, timeUnit);
             } else {
                 return sender.syncSendMessage(new EncodeObject(bodyList, attrs.toString(),
-                                idGenerator.getNextId(), this.getMsgtype(), false, groupId),
+                        idGenerator.getNextId(), this.getMsgtype(), false, groupId),
                         msgUUID, timeout, timeUnit);
             }
         }
@@ -468,14 +468,15 @@ public class DefaultMessageSender implements MessageSender {
                     proxySend = "&" + proxySend;
                 }
                 sender.asyncSendMessage(new EncodeObject(body, "groupId="
-                                + groupId + "&streamId=" + streamId + "&dt=" + dt + "&cp=snappy" + proxySend,
-                                idGenerator.getNextId(), this.getMsgtype(), true, groupId),
+                        + groupId + "&streamId=" + streamId + "&dt=" + dt + "&cp=snappy" + proxySend,
+                        idGenerator.getNextId(), this.getMsgtype(), true, groupId),
                         callback, msgUUID, timeout, timeUnit);
             } else {
                 sender.asyncSendMessage(
                         new EncodeObject(body, "groupId=" + groupId + "&streamId="
                                 + streamId + "&dt=" + dt + proxySend, idGenerator.getNextId(),
-                                this.getMsgtype(), false, groupId), callback,
+                                this.getMsgtype(), false, groupId),
+                        callback,
                         msgUUID, timeout, timeUnit);
             }
         }
@@ -514,7 +515,7 @@ public class DefaultMessageSender implements MessageSender {
         if (isProxySend) {
             extraAttrMap.put(AttributeConstants.MESSAGE_PROXY_SEND, "true");
         }
-        StringBuilder attrs = ProxyUtils.convertAttrToStr(extraAttrMap);
+        StringBuilder attrs = MessageUtils.convertAttrToStr(extraAttrMap);
 
         boolean isCompressEnd = (isCompress && (body.length > cpsSize));
         if (msgtype == 7 || msgtype == 8) {
@@ -528,11 +529,11 @@ public class DefaultMessageSender implements MessageSender {
             if (isCompressEnd) {
                 attrs.append("&cp=snappy");
                 sender.asyncSendMessage(new EncodeObject(body, attrs.toString(),
-                                idGenerator.getNextId(), this.getMsgtype(), true, groupId),
+                        idGenerator.getNextId(), this.getMsgtype(), true, groupId),
                         callback, msgUUID, timeout, timeUnit);
             } else {
                 sender.asyncSendMessage(new EncodeObject(body, attrs.toString(), idGenerator.getNextId(),
-                                this.getMsgtype(), false, groupId),
+                        this.getMsgtype(), false, groupId),
                         callback, msgUUID, timeout, timeUnit);
             }
         }
@@ -584,12 +585,14 @@ public class DefaultMessageSender implements MessageSender {
                         new EncodeObject(bodyList, "groupId=" + groupId + "&streamId=" + streamId
                                 + "&dt=" + dt + "&cp=snappy" + "&cnt=" + bodyList.size() + proxySend,
                                 idGenerator.getNextId(),
-                                this.getMsgtype(), true, groupId), callback, msgUUID, timeout, timeUnit);
+                                this.getMsgtype(), true, groupId),
+                        callback, msgUUID, timeout, timeUnit);
             } else {
                 sender.asyncSendMessage(
                         new EncodeObject(bodyList,
                                 "groupId=" + groupId + "&streamId=" + streamId + "&dt=" + dt + "&cnt=" + bodyList.size()
-                                        + proxySend, idGenerator.getNextId(), this.getMsgtype(), false, groupId),
+                                        + proxySend,
+                                idGenerator.getNextId(), this.getMsgtype(), false, groupId),
                         callback, msgUUID, timeout, timeUnit);
             }
         }
@@ -629,10 +632,10 @@ public class DefaultMessageSender implements MessageSender {
         if (isProxySend) {
             extraAttrMap.put(AttributeConstants.MESSAGE_PROXY_SEND, "true");
         }
-        StringBuilder attrs = ProxyUtils.convertAttrToStr(extraAttrMap);
+        StringBuilder attrs = MessageUtils.convertAttrToStr(extraAttrMap);
 
         if (msgtype == 7 || msgtype == 8) {
-//            if (!isGroupIdTransfer)
+            // if (!isGroupIdTransfer)
             EncodeObject encodeObject = new EncodeObject(bodyList, this.getMsgtype(),
                     isCompress, isReport, isGroupIdTransfer, dt / 1000, idGenerator.getNextInt(),
                     groupId, streamId, attrs.toString());
@@ -742,7 +745,7 @@ public class DefaultMessageSender implements MessageSender {
         }
         addIndexCnt(groupId, streamId, bodyList.size());
 
-        StringBuilder attrs = ProxyUtils.convertAttrToStr(extraAttrMap);
+        StringBuilder attrs = MessageUtils.convertAttrToStr(extraAttrMap);
 
         if (msgtype == 7 || msgtype == 8) {
             EncodeObject encodeObject = new EncodeObject(bodyList, msgtype,
@@ -792,7 +795,7 @@ public class DefaultMessageSender implements MessageSender {
         }
         addIndexCnt(groupId, streamId, bodyList.size());
 
-        StringBuilder attrs = ProxyUtils.convertAttrToStr(extraAttrMap);
+        StringBuilder attrs = MessageUtils.convertAttrToStr(extraAttrMap);
 
         if (msgtype == 7 || msgtype == 8) {
             EncodeObject encodeObject = new EncodeObject(bodyList, msgtype, isCompress,

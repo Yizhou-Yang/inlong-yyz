@@ -18,14 +18,7 @@
 package org.apache.inlong.dataproxy.sink.pulsar;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flume.Event;
 import org.apache.flume.FlumeException;
@@ -48,9 +41,19 @@ import org.apache.pulsar.client.api.PulsarClientException.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
 public class PulsarClientService {
 
     private static final Logger logger = LoggerFactory.getLogger(PulsarClientService.class);
+    private MQClusterConfig pulsarConfig;
     public Map<String, List<TopicProducerInfo>> producerInfoMap;
     public Map<String, AtomicLong> topicSendIndexMap;
     public Map<String, PulsarClient> pulsarClients = new ConcurrentHashMap<>();
@@ -86,7 +89,7 @@ public class PulsarClientService {
      * @param pulsarConfig
      */
     public PulsarClientService(MQClusterConfig pulsarConfig, int sinkThreadPoolSize) {
-
+        this.pulsarConfig = pulsarConfig;
         this.sinkThreadPoolSize = sinkThreadPoolSize;
 
         authType = pulsarConfig.getAuthType();
@@ -138,7 +141,7 @@ public class PulsarClientService {
      * send message
      */
     public boolean sendMessage(int poolIndex, String topic,
-                               EventStat es, PulsarSink pulsarSink) {
+            EventStat es, PulsarSink pulsarSink) {
         boolean result;
         TopicProducerInfo producerInfo = null;
         Event event = es.getEvent();
@@ -155,15 +158,13 @@ public class PulsarClientService {
             errMsg = "Get producer failed for topic=" + topic + ", reason is " + e.getMessage();
         }
         /*
-         * If the producer is a null value,\ it means that the topic is not yet
-         * ready, and it needs to be played back into the file channel
+         * If the producer is a null value,\ it means that the topic is not yet ready, and it needs to be played back
+         * into the file channel
          */
         if (producerInfo == null) {
             /*
-             * Data within 30s is placed in the exception channel to
-             * prevent frequent checks
-             * After 30s, reopen the topic check, if it is still a null value,
-             *  put it back into the illegal map
+             * Data within 30s is placed in the exception channel to prevent frequent checks After 30s, reopen the topic
+             * check, if it is still a null value, put it back into the illegal map
              */
             pulsarSink.handleRequestProcError(topic, es,
                     false, DataProxyErrCode.NO_AVAILABLE_PRODUCER, errMsg);
@@ -268,7 +269,9 @@ public class PulsarClientService {
         builder.serviceUrl(pulsarUrl)
                 .ioThreads(pulsarClientIoThreads)
                 .connectionsPerBroker(pulsarConnectionsPreBroker)
-                .connectionTimeout(clientTimeout, TimeUnit.SECONDS);
+                .connectionTimeout(clientTimeout, TimeUnit.SECONDS)
+                .statsInterval(pulsarConfig.getStatIntervalSec(),
+                        TimeUnit.SECONDS);
         return builder.build();
     }
 
@@ -402,7 +405,7 @@ public class PulsarClientService {
                 pulsarClients.put(url, client);
                 callBack.handleCreateClientSuccess(url);
 
-                //create related topicProducers
+                // create related topicProducers
                 for (String topic : topicSet) {
                     TopicProducerInfo info = new TopicProducerInfo(client, sinkThreadPoolSize,
                             topic);

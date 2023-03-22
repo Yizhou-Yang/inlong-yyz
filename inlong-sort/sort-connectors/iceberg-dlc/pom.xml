@@ -16,24 +16,20 @@
   ~  See the License for the specific language governing permissions and
   ~  limitations under the License.
   -->
-
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <parent>
-        <artifactId>sort-connectors</artifactId>
-        <groupId>org.apache.inlong</groupId>
-        <version>1.4.0</version>
-    </parent>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.apache.inlong</groupId>
+        <artifactId>sort-connectors</artifactId>
+        <version>1.5.0-SNAPSHOT</version>
+    </parent>
 
     <artifactId>sort-connector-iceberg-dlc</artifactId>
-    <name>Apache InLong - Sort-connector-iceberg-dlc</name>
     <packaging>jar</packaging>
-    <description>
-        DLC is a data lake product. It's storage is based on iceberg.
-        Here is the product: https://cloud.tencent.com/product/dlc
-    </description>
+    <name>Apache InLong - Sort-connector-iceberg-dlc</name>
+    <description>DLC is a data lake product. It's storage is based on iceberg.
+        Here is the product: https://cloud.tencent.com/product/dlc</description>
 
     <dependencies>
         <dependency>
@@ -51,8 +47,8 @@
             <artifactId>lakefs-cloud-plugin</artifactId>
             <exclusions>
                 <exclusion>
-                    <artifactId>tencentcloud-sdk-java</artifactId>
                     <groupId>com.tencentcloudapi</groupId>
+                    <artifactId>tencentcloud-sdk-java</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -65,16 +61,16 @@
                     <artifactId>tencentcloud-sdk-java</artifactId>
                 </exclusion>
                 <exclusion>
-                    <artifactId>tencentcloud-sdk-java-common</artifactId>
                     <groupId>com.tencentcloudapi</groupId>
+                    <artifactId>tencentcloud-sdk-java-common</artifactId>
                 </exclusion>
                 <exclusion>
                     <groupId>com.tencent.cloud.wedata</groupId>
                     <artifactId>wedata-credential-utils</artifactId>
                 </exclusion>
                 <exclusion>
-                    <artifactId>cos_api</artifactId>
                     <groupId>com.qcloud</groupId>
+                    <artifactId>cos_api</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -183,10 +179,10 @@
                 <executions>
                     <execution>
                         <id>shade-flink</id>
-                        <phase>package</phase>
                         <goals>
                             <goal>shade</goal>
                         </goals>
+                        <phase>package</phase>
                         <configuration>
                             <artifactSet>
                                 <includes>
@@ -208,6 +204,8 @@
                                     <include>com.google.code.gson:gson</include>
                                     <include>javax.xml.bind:jaxb-api</include>
                                     <include>com.tencent.cloud.wedata:*</include>
+                                    <include>com.amazonaws:*</include>
+                                    <include>com.fasterxml.jackson.core:jackson-databind</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -222,15 +220,20 @@
                             <relocations>
                                 <relocation>
                                     <pattern>org.apache.inlong.sort.base</pattern>
-                                    <shadedPattern>
-                                        org.apache.inlong.sort.iceberg.shaded.org.apache.inlong.sort.base
-                                    </shadedPattern>
+                                    <shadedPattern>org.apache.inlong.sort.iceberg.shaded.org.apache.inlong.sort.base</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.fasterxml.jackson.databind</pattern>
+                                    <shadedPattern>org.apache.inlong.sort.iceberg.shaded.com.fasterxml.jackson.databind</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.amazonaws</pattern>
+                                    <shadedPattern>org.apache.inlong.sort.iceberg.shaded.com.amazonaws</shadedPattern>
+                                    <shadedPattern>org.apache.inlong.sort.iceberg.shaded.org.apache.inlong.sort.base</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.commons.codec.digest</pattern>
-                                    <shadedPattern>
-                                        org.apache.inlong.sort.iceberg.shaded.org.apache.commons.codec.digest
-                                    </shadedPattern>
+                                    <shadedPattern>org.apache.inlong.sort.iceberg.shaded.org.apache.commons.codec.digest</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
@@ -242,26 +245,41 @@
 
     <repositories>
         <repository>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
             <id>dlc-snapshot</id>
             <name>dlc_snapshot_mirror</name>
             <url>https://mirrors.tencent.com/repository/maven/dlc-snapshot</url>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
         </repository>
         <repository>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
             <id>dlc</id>
             <name>dlc_mirror</name>
             <url>https://mirrors.tencent.com/repository/maven/dlc</url>
+        </repository>
+        <repository>
+            <id>tencent_public</id>
+            <name>tencent_public</name>
+            <url>https://mirrors.tencent.com/repository/maven/tencent_public</url>
+        </repository>
+        <repository>
             <releases>
-                <enabled>true</enabled>
+                <enabled>false</enabled>
             </releases>
             <snapshots>
-                <enabled>false</enabled>
+                <enabled>true</enabled>
             </snapshots>
+            <id>tencent.snapshots</id>
+            <url>https://mirrors.tencent.com/repository/maven/tencent_public_snapshots/</url>
         </repository>
     </repositories>
 </project>

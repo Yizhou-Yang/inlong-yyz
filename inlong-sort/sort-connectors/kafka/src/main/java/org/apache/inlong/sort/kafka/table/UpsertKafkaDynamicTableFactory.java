@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -45,6 +44,9 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.factories.SerializationFormatFactory;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.RowKind;
+import org.apache.inlong.sort.base.dirty.DirtyOptions;
+import org.apache.inlong.sort.base.dirty.sink.DirtySink;
+import org.apache.inlong.sort.base.dirty.utils.DirtySinkFactoryUtils;
 import org.apache.inlong.sort.kafka.KafkaDynamicSink;
 
 import java.time.Duration;
@@ -67,8 +69,10 @@ import static org.apache.flink.streaming.connectors.kafka.table.KafkaOptions.aut
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaOptions.createKeyFormatProjection;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaOptions.createValueFormatProjection;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaOptions.getKafkaProperties;
+import static org.apache.inlong.sort.base.Constants.DIRTY_PREFIX;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
 import static org.apache.inlong.sort.kafka.table.KafkaOptions.KAFKA_IGNORE_ALL_CHANGELOG;
 
 /**
@@ -78,7 +82,9 @@ import static org.apache.inlong.sort.kafka.table.KafkaOptions.KAFKA_IGNORE_ALL_C
  * Add an option `inlong.metric` to support metrics.
  */
 public class UpsertKafkaDynamicTableFactory
-        implements DynamicTableSourceFactory, DynamicTableSinkFactory {
+        implements
+            DynamicTableSourceFactory,
+            DynamicTableSinkFactory {
 
     public static final String IDENTIFIER = "upsert-kafka-inlong";
 
@@ -198,7 +204,7 @@ public class UpsertKafkaDynamicTableFactory
                 helper.discoverDecodingFormat(DeserializationFormatFactory.class, VALUE_FORMAT);
 
         // Validate the option data type.
-        helper.validateExcept(KafkaOptions.PROPERTIES_PREFIX);
+        helper.validateExcept(KafkaOptions.PROPERTIES_PREFIX, DIRTY_PREFIX);
         TableSchema schema = context.getCatalogTable().getSchema();
         validateSource(tableOptions, keyDecodingFormat, valueDecodingFormat, schema);
 
@@ -208,7 +214,10 @@ public class UpsertKafkaDynamicTableFactory
         Properties properties = getKafkaProperties(context.getCatalogTable().getOptions());
         // always use earliest to keep data integrity
         StartupMode earliest = StartupMode.EARLIEST;
-
+        // Build the dirty data side-output
+        final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(tableOptions);
+        final DirtySink<String> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
+        final String inlongMetric = tableOptions.getOptional(INLONG_METRIC).orElse(null);
         return new KafkaDynamicSource(
                 schema.toPhysicalRowDataType(),
                 keyDecodingFormat,
@@ -222,7 +231,11 @@ public class UpsertKafkaDynamicTableFactory
                 earliest,
                 Collections.emptyMap(),
                 0,
-                true, null, null);
+                true,
+                inlongMetric,
+                null,
+                dirtyOptions,
+                dirtySink);
     }
 
     @Override
@@ -239,7 +252,7 @@ public class UpsertKafkaDynamicTableFactory
                 helper.discoverEncodingFormat(SerializationFormatFactory.class, VALUE_FORMAT);
 
         // Validate the option data type.
-        helper.validateExcept(KafkaOptions.PROPERTIES_PREFIX);
+        helper.validateExcept(KafkaOptions.PROPERTIES_PREFIX, DIRTY_PREFIX);
         TableSchema schema = context.getCatalogTable().getSchema();
         validateSink(tableOptions, keyEncodingFormat, valueEncodingFormat, schema);
 
@@ -256,6 +269,10 @@ public class UpsertKafkaDynamicTableFactory
                 new SinkBufferFlushMode(batchSize, batchInterval.toMillis());
         String inlongMetric = tableOptions.getOptional(INLONG_METRIC).orElse(null);
         final String auditHostAndPorts = tableOptions.getOptional(INLONG_AUDIT).orElse(null);
+        // Build the dirty data side-output
+        final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(tableOptions);
+        final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
+        final boolean multipleSink = tableOptions.getOptional(SINK_MULTIPLE_FORMAT).isPresent();
 
         // use {@link org.apache.kafka.clients.producer.internals.DefaultPartitioner}.
         // it will use hash partition if key is set else in round-robin behaviour.
@@ -278,7 +295,10 @@ public class UpsertKafkaDynamicTableFactory
                 inlongMetric,
                 auditHostAndPorts,
                 null,
-                null);
+                null,
+                dirtyOptions,
+                dirtySink,
+                multipleSink);
     }
 
     private Tuple2<int[], int[]> createKeyValueProjections(CatalogTable catalogTable) {
@@ -306,7 +326,8 @@ public class UpsertKafkaDynamicTableFactory
      * for insert-only format.
      */
     protected static class DecodingFormatWrapper
-            implements DecodingFormat<DeserializationSchema<RowData>> {
+            implements
+                DecodingFormat<DeserializationSchema<RowData>> {
 
         private static final ChangelogMode SOURCE_CHANGELOG_MODE =
                 ChangelogMode.newBuilder()
@@ -356,7 +377,8 @@ public class UpsertKafkaDynamicTableFactory
      * for insert-only format.
      */
     protected static class EncodingFormatWrapper
-            implements EncodingFormat<SerializationSchema<RowData>> {
+            implements
+                EncodingFormat<SerializationSchema<RowData>> {
 
         public static final ChangelogMode SINK_CHANGELOG_MODE =
                 ChangelogMode.newBuilder()

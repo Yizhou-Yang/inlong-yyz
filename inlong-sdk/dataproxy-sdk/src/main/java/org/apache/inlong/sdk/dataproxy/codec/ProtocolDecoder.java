@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -93,11 +92,21 @@ public class ProtocolDecoder extends MessageToMessageDecoder<ByteBuf> {
             out.add(object);
 
         } else if (msgType == 8) {
-            int attrlen = buffer.getShort(4 + 1 + 4 + 1 + 4 + 2);
-            buffer.skipBytes(13 + attrlen + 2);
-            EncodeObject object = new EncodeObject();
+            // dataTime(4) + body_ver(1) + body_len(4) + body + attr_len(2) + attr + magic(2)
+            buffer.skipBytes(4 + 1 + 4); // skip datatime, body_ver and body_len
+            final short load = buffer.readShort(); // read from body
+            int attrLen = buffer.readShort();
+            byte[] attrBytes = null;
+            if (attrLen > 0) {
+                attrBytes = new byte[attrLen];
+                buffer.readBytes(attrBytes);
+            }
+            buffer.skipBytes(2); // skip magic
+
+            String attrs = (attrBytes == null ? "" : new String(attrBytes, StandardCharsets.UTF_8));
+            EncodeObject object = new EncodeObject(attrs);
             object.setMsgtype(8);
-            object.setLoad(buffer.getShort(4 + 1 + 4 + 1 + 4));
+            object.setLoad(load);
             out.add(object);
         }
     }

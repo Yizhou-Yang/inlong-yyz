@@ -32,7 +32,6 @@ import org.apache.inlong.manager.pojo.group.InlongGroupUtils;
 import org.apache.inlong.manager.pojo.workflow.form.process.GroupResourceProcessForm;
 import org.apache.inlong.manager.service.group.InlongGroupService;
 import org.apache.inlong.manager.service.source.StreamSourceService;
-import org.apache.inlong.manager.service.stream.InlongStreamProcessService;
 import org.apache.inlong.manager.service.stream.InlongStreamService;
 import org.apache.inlong.manager.workflow.WorkflowContext;
 import org.apache.inlong.manager.workflow.event.ListenerResult;
@@ -51,8 +50,6 @@ public class InitGroupCompleteListener implements ProcessEventListener {
     private InlongGroupService groupService;
     @Autowired
     private InlongGroupEntityMapper groupMapper;
-    @Autowired
-    private InlongStreamProcessService streamProcessService;
     @Autowired
     private InlongStreamService streamService;
     @Autowired
@@ -75,29 +72,35 @@ public class InitGroupCompleteListener implements ProcessEventListener {
         String groupId = form.getInlongGroupId();
         log.info("begin to execute InitGroupCompleteListener for groupId={}", groupId);
 
-        // update inlong group status and other info
-        InlongGroupInfo groupInfo = form.getGroupInfo();
-        String operator = context.getOperator();
-        groupService.updateStatus(groupId, GroupStatus.CONFIG_SUCCESSFUL.getCode(), operator);
-        if (InlongGroupUtils.isBatchTask(form.getGroupInfo())) {
-            groupService.updateStatus(groupId, GroupStatus.FINISH.getCode(), operator);
-        }
-        InlongGroupEntity existGroup = groupMapper.selectByGroupId(groupId);
-        InlongGroupRequest updateGroupRequest = groupInfo.genRequest();
-        updateGroupRequest.setVersion(existGroup.getVersion());
-        groupService.update(updateGroupRequest, operator);
+        try {
+            // update inlong group status and other info
+            InlongGroupInfo groupInfo = form.getGroupInfo();
+            String operator = context.getOperator();
+            Integer nextStatus = InlongGroupUtils.isBatchTask(form.getGroupInfo())
+                    ? GroupStatus.FINISH.getCode()
+                    : GroupStatus.CONFIG_SUCCESSFUL.getCode();
+            groupService.updateStatus(groupId, nextStatus, operator);
 
-        // update status of other related configs
-        if (InlongConstants.DISABLE_CREATE_RESOURCE.equals(groupInfo.getEnableCreateResource())) {
-            streamService.updateStatus(groupId, null, StreamStatus.CONFIG_SUCCESSFUL.getCode(), operator);
-            if (InlongConstants.LIGHTWEIGHT_MODE.equals(groupInfo.getLightweight())) {
-                sourceService.updateStatus(groupId, null, SourceStatus.SOURCE_NORMAL.getCode(), operator);
-            } else {
-                sourceService.updateStatus(groupId, null, SourceStatus.TO_BE_ISSUED_ADD.getCode(), operator);
+            InlongGroupEntity existGroup = groupMapper.selectByGroupId(groupId);
+            InlongGroupRequest updateGroupRequest = groupInfo.genRequest();
+            updateGroupRequest.setVersion(existGroup.getVersion());
+            groupService.update(updateGroupRequest, operator);
+
+            // update status of other related configs
+            if (InlongConstants.DISABLE_CREATE_RESOURCE.equals(groupInfo.getEnableCreateResource())) {
+                streamService.updateStatus(groupId, null, StreamStatus.CONFIG_SUCCESSFUL.getCode(), operator);
+                if (InlongConstants.LIGHTWEIGHT_MODE.equals(groupInfo.getLightweight())) {
+                    sourceService.updateStatus(groupId, null, SourceStatus.SOURCE_NORMAL.getCode(), operator);
+                } else {
+                    sourceService.updateStatus(groupId, null, SourceStatus.TO_BE_ISSUED_ADD.getCode(), operator);
+                }
             }
+
+            log.info("success to execute InitGroupCompleteListener for groupId={}", groupId);
+            return ListenerResult.success();
+        } catch (Exception e) {
+            throw new WorkflowListenerException(e);
         }
-        log.info("success to execute InitGroupCompleteListener for groupId={}", groupId);
-        return ListenerResult.success();
     }
 
 }

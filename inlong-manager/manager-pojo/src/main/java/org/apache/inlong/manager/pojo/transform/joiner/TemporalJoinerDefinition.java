@@ -38,13 +38,13 @@ import java.util.List;
 public class TemporalJoinerDefinition extends TransformDefinition {
 
     public TemporalJoinerDefinition(TemporalJoinWay temporalJoinWay,
-                                    StreamNode leftNode,
-                                    String leftTimeColumn,
-                                    String rightTimeColumn,
-                                    StreamNode rightNode,
-                                    List<StreamField> leftJoinFields,
-                                    List<StreamField> rightJoinFields,
-                                    JoinerDefinition.JoinMode joinMode) {
+            StreamNode leftNode,
+            String leftTimeColumn,
+            String rightTimeColumn,
+            StreamNode rightNode,
+            List<StreamField> leftJoinFields,
+            List<StreamField> rightJoinFields,
+            JoinerDefinition.JoinMode joinMode) {
         this.transformType = TransformType.TEMPORAL_JOINER;
         this.temporalJoinWay = temporalJoinWay;
         this.leftNode = leftNode;

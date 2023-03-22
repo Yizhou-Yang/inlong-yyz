@@ -57,6 +57,8 @@ public class HeartbeatManager implements AbstractHeartbeatManager {
     public static final String DEFAULT_CLUSTER_TAG = "default_cluster";
     public static final String DEFAULT_CLUSTER_NAME = "default_dataproxy";
     public static final String DEFAULT_CLUSTER_INCHARGES = "admin";
+    // predefined format of ext tag: {key}={value}
+    public static final String DEFAULT_CLUSTER_EXT_TAG = "default=true";
 
     private final CloseableHttpClient httpClient;
     private final Gson gson;
@@ -129,7 +131,8 @@ public class HeartbeatManager implements AbstractHeartbeatManager {
             return null;
         }
         heartbeatMsg.setNodeSrvStatus(ConfigManager.getInstance().isMqClusterReady()
-                ? NodeSrvStatus.OK : NodeSrvStatus.SERVICE_UNREADY);
+                ? NodeSrvStatus.OK
+                : NodeSrvStatus.SERVICE_UNREADY);
         heartbeatMsg.setIp(reportInfo.getIp());
         heartbeatMsg.setPort(reportInfo.getPort());
         heartbeatMsg.setProtocolType(reportInfo.getProtocolType());
@@ -143,6 +146,8 @@ public class HeartbeatManager implements AbstractHeartbeatManager {
                 ConfigConstants.PROXY_CLUSTER_NAME, DEFAULT_CLUSTER_NAME));
         heartbeatMsg.setInCharges(commonProperties.getOrDefault(
                 ConfigConstants.PROXY_CLUSTER_INCHARGES, DEFAULT_CLUSTER_INCHARGES));
+        heartbeatMsg.setExtTag(commonProperties.getOrDefault(
+                ConfigConstants.PROXY_CLUSTER_EXT_TAG, DEFAULT_CLUSTER_EXT_TAG));
 
         Map<String, String> groupIdMappings = configManager.getGroupIdMappingProperties();
         Map<String, Map<String, String>> streamIdMappings = configManager.getStreamIdMappingProperties();

@@ -162,15 +162,15 @@ public class NodeRelationUtils {
                             break;
                         case INTERVAL_JOINER:
                             if (transformDefinition instanceof IntervalJoinerDefinition) {
-                                joinRelations.add(getNodeRelation((IntervalJoinerDefinition)
-                                        transformDefinition, relation));
+                                joinRelations
+                                        .add(getNodeRelation((IntervalJoinerDefinition) transformDefinition, relation));
                             }
                             shipIterator.remove();
                             break;
                         case TEMPORAL_JOINER:
                             assert transformDefinition instanceof TemporalJoinerDefinition;
-                            joinRelations.add(getNodeRelation((TemporalJoinerDefinition)
-                                    transformDefinition, relation));
+                            joinRelations
+                                    .add(getNodeRelation((TemporalJoinerDefinition) transformDefinition, relation));
                             shipIterator.remove();
                             break;
                         default:
@@ -237,7 +237,7 @@ public class NodeRelationUtils {
         Map<String, List<FilterFunction>> joinConditions = new HashMap<>();
         joinConditions.put(rightNode, filterFunctions);
         FieldInfo systemTime = new FieldInfo(MetaField.PROCESS_TIME.name());
-        return new LeftOuterTemporalJoinRelation(preNodes, nodeRelation.getOutputs(), joinConditions,systemTime);
+        return new LeftOuterTemporalJoinRelation(preNodes, nodeRelation.getOutputs(), joinConditions, systemTime);
     }
 
     private static NodeRelation getNodeRelation(IntervalJoinerDefinition joinerDefinition, NodeRelation nodeRelation) {

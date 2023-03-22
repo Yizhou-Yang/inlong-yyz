@@ -66,8 +66,7 @@ public class TidbSource extends StreamSource {
     @ApiModelProperty("Kafka servers address")
     private String bootstrapServers;
 
-    @ApiModelProperty(value = "The strategy of auto offset reset",
-            notes = "including earliest(the default), latest, none")
+    @ApiModelProperty(value = "The strategy of auto offset reset", notes = "including earliest(the default), latest, none")
     private String autoOffsetReset;
 
     @ApiModelProperty(value = "Data encoding format: json, craft")

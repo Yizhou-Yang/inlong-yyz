@@ -25,7 +25,7 @@ import org.apache.inlong.common.pojo.sdk.CacheZone;
 import org.apache.inlong.common.pojo.sdk.CacheZoneConfig;
 import org.apache.inlong.common.pojo.sdk.SortSourceConfigResponse;
 import org.apache.inlong.common.pojo.sdk.Topic;
-import org.apache.inlong.manager.common.consts.MQType;
+import org.apache.inlong.common.constant.MQType;
 import org.apache.inlong.manager.common.enums.ClusterType;
 import org.apache.inlong.manager.common.exceptions.BusinessException;
 import org.apache.inlong.manager.dao.entity.InlongGroupExtEntity;
@@ -50,6 +50,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -69,6 +70,7 @@ public class SortSourceServiceImpl implements SortSourceService {
 
     private static final Gson GSON = new Gson();
     private static final Set<String> SUPPORTED_MQ_TYPE = new HashSet<String>() {
+
         {
             add(MQType.KAFKA);
             add(MQType.TUBEMQ);
@@ -288,8 +290,8 @@ public class SortSourceServiceImpl implements SortSourceService {
         // get group infos
         List<SortSourceStreamSinkInfo> sinkInfoList = sinkList.stream()
                 .filter(sinkInfo -> groupInfos.containsKey(sinkInfo.getGroupId())
-                                && allStreams.containsKey(sinkInfo.getGroupId())
-                                && allStreams.get(sinkInfo.getGroupId()).containsKey(sinkInfo.getStreamId()))
+                        && allStreams.containsKey(sinkInfo.getGroupId())
+                        && allStreams.get(sinkInfo.getGroupId()).containsKey(sinkInfo.getStreamId()))
                 .collect(Collectors.toList());
 
         // group them by cluster tag.
@@ -315,8 +317,7 @@ public class SortSourceServiceImpl implements SortSourceService {
                         (zone1, zone2) -> {
                             zone1.getTopics().addAll(zone2.getTopics());
                             return zone1;
-                        })
-                );
+                        }));
     }
 
     private List<CacheZone> parseCacheZonesByTag(
@@ -347,7 +348,8 @@ public class SortSourceServiceImpl implements SortSourceService {
             SortSourceClusterInfo cluster,
             boolean isBackupTag) {
         switch (cluster.getType()) {
-            case ClusterType.PULSAR: return parsePulsarZone(sinks, cluster, isBackupTag);
+            case ClusterType.PULSAR:
+                return parsePulsarZone(sinks, cluster, isBackupTag);
             default:
                 throw new BusinessException(String.format("do not support cluster type=%s of cluster=%s",
                         cluster.getType(), cluster));
@@ -367,24 +369,29 @@ public class SortSourceServiceImpl implements SortSourceService {
                     String streamId = sink.getStreamId();
                     SortSourceGroupInfo groupInfo = groupInfos.get(groupId);
                     SortSourceStreamInfo streamInfo = allStreams.get(groupId).get(streamId);
-
-                    String namespace = groupInfo.getMqResource();
-                    String topic = streamInfo.getMqResource();
-                    if (isBackupTag) {
-                        if (backupGroupMqResource.containsKey(groupId)) {
-                            namespace = backupGroupMqResource.get(groupId);
+                    try {
+                        String namespace = groupInfo.getMqResource();
+                        String topic = streamInfo.getMqResource();
+                        if (isBackupTag) {
+                            if (backupGroupMqResource.containsKey(groupId)) {
+                                namespace = backupGroupMqResource.get(groupId);
+                            }
+                            if (backupStreamMqResource.containsKey(groupId)
+                                    && backupStreamMqResource.get(groupId).containsKey(streamId)) {
+                                topic = backupStreamMqResource.get(groupId).get(streamId);
+                            }
                         }
-                        if (backupStreamMqResource.containsKey(groupId)
-                                && backupStreamMqResource.get(groupId).containsKey(streamId)) {
-                            topic = backupStreamMqResource.get(groupId).get(streamId);
-                        }
+                        String fullTopic = tenant.concat("/").concat(namespace).concat("/").concat(topic);
+                        return Topic.builder()
+                                .topic(fullTopic)
+                                .topicProperties(sink.getExtParamsMap())
+                                .build();
+                    } catch (Exception e) {
+                        LOGGER.error("fail to parse topic of groupId={}, streamId={}", groupId, streamId, e);
+                        return null;
                     }
-                    String fullTopic = tenant.concat("/").concat(namespace).concat("/").concat(topic);
-                    return Topic.builder()
-                            .topic(fullTopic)
-                            .topicProperties(streamInfo.getExtParamsMap())
-                            .build();
                 })
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
         return CacheZone.builder()
                 .zoneName(cluster.getName())

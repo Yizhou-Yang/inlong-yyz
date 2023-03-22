@@ -26,6 +26,7 @@ import io.debezium.heartbeat.Heartbeat;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.inlong.sort.cdc.mongodb.debezium.DebeziumDeserializationSchema;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
