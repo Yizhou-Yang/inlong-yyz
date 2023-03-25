@@ -168,13 +168,13 @@
         <if test="type != null and type != ''">
             and type  = #{type,jdbcType=VARCHAR}
         </if>
-        <if test="status != null and type != ''">
-            and statue = #{status,jdbcType=INTEGER}
+        <if test="status != null and status != ''">
+            and status = #{status,jdbcType=INTEGER}
         </if>
         <if test="ip != null and ip != ''">
             and ip = #{ip,jdbcType=VARCHAR}
         </if>
-        <if test="ext_params != null and ext_params != ''">
+        <if test="extParams != null and extParams != ''">
             and ext_params like CONCAT("%", #{extParams}, "%")
         </if>
     </update>

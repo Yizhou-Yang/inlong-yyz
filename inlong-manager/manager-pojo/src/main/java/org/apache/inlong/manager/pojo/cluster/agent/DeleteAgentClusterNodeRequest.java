@@ -19,12 +19,18 @@ package org.apache.inlong.manager.pojo.cluster.agent;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * Inlong cluster node request
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @ApiModel("Cluster node request")
 public class DeleteAgentClusterNodeRequest {
 
