@@ -22,6 +22,8 @@ import org.apache.flink.configuration.ConfigOptions;
 import org.apache.inlong.sort.base.sink.PartitionPolicy;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 
+import java.util.Map;
+
 /**
  * connector base option constant
  */
@@ -170,6 +172,20 @@ public final class Constants {
                     .noDefaultValue()
                     .withDescription(
                             "The format of multiple sink, it represents the real format of the raw binary data");
+
+    public static final ConfigOption<Map<String, String>> PATTERN_PARTITION_MAP =
+            ConfigOptions.key("pattern.partition.map")
+                    .mapType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Pattern rules and partition maps");
+
+    public static final ConfigOption<Map<String, String>> DATASOURCE_PARTITION_MAP =
+            ConfigOptions.key("datasource.partition.map")
+                    .mapType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Datasource and partition maps");
 
     public static final ConfigOption<String> SINK_MULTIPLE_DATABASE_PATTERN =
             ConfigOptions.key("sink.multiple.database-pattern")
