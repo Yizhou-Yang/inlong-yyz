@@ -56,4 +56,6 @@ public class PostgresConstant {
 
     public static final String JDBC = "jdbc";
 
+    public static final String JDBC_PG = "jdbcPG";
+
 }
