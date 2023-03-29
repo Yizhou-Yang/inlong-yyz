@@ -17,6 +17,7 @@
 
 package org.apache.inlong.manager.pojo.cluster.agent;
 
+import javax.validation.constraints.NotBlank;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.AllArgsConstructor;
@@ -41,9 +42,11 @@ public class DeleteAgentClusterNodeRequest {
     private Integer parentId;
 
     @ApiModelProperty(value = "Cluster type, including AGENT, DATAPROXY, etc.")
+    @NotBlank(message = "type cannot be blank")
     private String type;
 
     @ApiModelProperty(value = "Cluster IP")
+    @NotBlank(message = "ip cannot be blank")
     private String ip;
 
     @ApiModelProperty(value = "Extended params")

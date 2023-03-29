@@ -1657,7 +1657,6 @@ public class InlongClusterServiceImpl implements InlongClusterService {
         clusterPageRequest.setType(agentClusterNodeRequest.getType());
         clusterPageRequest.setClusterTag(agentClusterNodeRequest.getClusterTags());
         try {
-
             List<InlongClusterEntity> inlongClusterEntities = clusterMapper.selectByCondition(clusterPageRequest);
             LOGGER.info("inlongClusterEntities: {}", GSON.toJson(inlongClusterEntities));
             if (CollectionUtils.isNotEmpty(inlongClusterEntities)) {
@@ -1666,18 +1665,9 @@ public class InlongClusterServiceImpl implements InlongClusterService {
                         agentClusterNodeRequest.getDeleteAgentClusterNodeRequests();
                 for (DeleteAgentClusterNodeRequest clusterNodeRequest : deleteAgentClusterNodeRequests) {
                     clusterNodeRequest.setParentId(clusterId);
-                    // clusterNodeRequest.setStatus(clusterNodeRequest.getStatus());
-                    // clusterNodeRequest.setType(clusterNodeRequest.getType());
-                    // clusterNodeRequest.setIp(clusterNodeRequest.getIp());
                     LOGGER.info("clusterNodeRequest: {}", GSON.toJson(clusterNodeRequest));
-                    if (InlongConstants.AFFECTED_ONE_ROW != clusterNodeMapper
-                            .logicDeleteNodeByAgentGroup(clusterNodeRequest)) {
-                        LOGGER.error(
-                                "agent cluster node has already updated with parentId={}, type={}, ip={}, extParams={}",
-                                clusterId, clusterNodeRequest.getType(),
-                                clusterNodeRequest.getIp(), clusterNodeRequest.getExtParams());
-                        throw new BusinessException(ErrorCodeEnum.CONFIG_EXPIRED);
-                    }
+                    clusterNodeMapper
+                            .logicDeleteNodeByAgentGroup(clusterNodeRequest);
                 }
             }
         } catch (Exception e) {
