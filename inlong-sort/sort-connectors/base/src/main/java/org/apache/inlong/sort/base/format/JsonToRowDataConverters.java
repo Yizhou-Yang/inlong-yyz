@@ -18,6 +18,7 @@
 package org.apache.inlong.sort.base.format;
 
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.time.ZoneId;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.formats.common.TimestampFormat;
@@ -54,6 +55,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalQueries;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -236,6 +238,7 @@ public class JsonToRowDataConverters implements Serializable {
         return localTime.toSecondOfDay() * 1000;
     }
 
+    private static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.S");
     private TimestampData convertToTimestamp(JsonNode jsonNode) {
         TemporalAccessor parsedTimestamp;
         switch (timestampFormat) {
@@ -243,7 +246,12 @@ public class JsonToRowDataConverters implements Serializable {
                 parsedTimestamp = SQL_TIMESTAMP_FORMAT.parse(jsonNode.asText());
                 break;
             case ISO_8601:
-                parsedTimestamp = ISO8601_TIMESTAMP_FORMAT.parse(jsonNode.asText());
+                try {
+                    parsedTimestamp = ISO8601_TIMESTAMP_FORMAT.parse(jsonNode.asText());
+                } catch (Exception e) {
+                    String sd = sdf.format(new Date(Long.parseLong(jsonNode.asText())));
+                    parsedTimestamp = ISO8601_TIMESTAMP_FORMAT.parse(sd);
+                }
                 break;
             default:
                 throw new TableException(
@@ -257,6 +265,7 @@ public class JsonToRowDataConverters implements Serializable {
         return TimestampData.fromEpochMillis(Timestamp.valueOf(LocalDateTime.of(localDate, localTime)).getTime());
     }
 
+    private static SimpleDateFormat sdfWithTimezone = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.S'Z'");
     private TimestampData convertToTimestampWithLocalZone(JsonNode jsonNode) {
         TemporalAccessor parsedTimestampWithLocalZone;
         switch (timestampFormat) {
@@ -265,8 +274,13 @@ public class JsonToRowDataConverters implements Serializable {
                         SQL_TIMESTAMP_WITH_LOCAL_TIMEZONE_FORMAT.parse(jsonNode.asText());
                 break;
             case ISO_8601:
-                parsedTimestampWithLocalZone =
-                        ISO8601_TIMESTAMP_WITH_LOCAL_TIMEZONE_FORMAT.parse(jsonNode.asText());
+                try {
+                    parsedTimestampWithLocalZone =
+                            ISO8601_TIMESTAMP_WITH_LOCAL_TIMEZONE_FORMAT.parse(jsonNode.asText());
+                } catch (Exception e) {
+                    String sd = sdfWithTimezone.format(new Date(Long.parseLong(jsonNode.asText())));
+                    parsedTimestampWithLocalZone = ISO8601_TIMESTAMP_WITH_LOCAL_TIMEZONE_FORMAT.parse(sd);
+                }
                 break;
             default:
                 throw new TableException(
