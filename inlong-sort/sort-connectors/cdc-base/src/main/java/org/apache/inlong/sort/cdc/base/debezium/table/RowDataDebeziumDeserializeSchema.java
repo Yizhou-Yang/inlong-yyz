@@ -687,7 +687,30 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 
     @Override
     public void deserialize(SourceRecord record, Collector<RowData> out) throws Exception {
-        deserialize(record, out);
+        Envelope.Operation op = Envelope.operationFor(record);
+        Struct value = (Struct) record.value();
+        Schema valueSchema = record.valueSchema();
+        if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
+            GenericRowData insert = extractAfterRow(value, valueSchema);
+            insert.setRowKind(RowKind.INSERT);
+            emit(record, insert, null, out);
+        } else if (op == Envelope.Operation.DELETE) {
+            GenericRowData delete = extractBeforeRow(value, valueSchema);
+            delete.setRowKind(RowKind.DELETE);
+            emit(record, delete, null, out);
+        } else {
+            if (!appendSource) {
+                GenericRowData before = extractBeforeRow(value, valueSchema);
+                if (before != null) {
+                    before.setRowKind(RowKind.UPDATE_BEFORE);
+                    emit(record, before, null, out);
+                }
+            }
+
+            GenericRowData after = extractAfterRow(value, valueSchema);
+            after.setRowKind(RowKind.UPDATE_AFTER);
+            emit(record, after, null, out);
+        }
     }
 
     @Override
@@ -758,16 +781,16 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
         return (GenericRowData) physicalConverter.convert(before, beforeSchema);
     }
 
-
     /**
-     * Extract ddl record from gh-ost ddl statements
+     * Extract ghost ddl record
      *
-     * @param data a record with sql statement
-     * @return ddl record
+     * @param data
+     * @return
      * @throws Exception
      */
     private GenericRowData extractGhostRecord(GenericRowData data) throws Exception {
-        String ddl = ((Map<String, String>) data.getField(0)).get(DDL_FIELD_NAME);
+        String ddl = ((Map<String, String>)data.getField(0)).get(DDL_FIELD_NAME);
+        // According ghost table regex to find ghost table
         if (this.ghostTableRegex.startsWith(CARET) && this.ghostTableRegex.endsWith(DOLLAR)) {
             this.ghostTableRegex = this.ghostTableRegex.substring(1, this.ghostTableRegex.length() - 1);
         }
