@@ -289,7 +289,7 @@ public class IcebergMultipleStreamWriter extends IcebergProcessFunction<RecordWi
                                 dirtySink.invoke(builder.build());
                                 if (sinkMetricData != null) {
                                     sinkMetricData.outputDirtyMetricsWithEstimate(dataBaseName,
-                                            null, tableName, data.toString());
+                                            tableName, 1, size);
                                 }
                             } catch (Exception ex) {
                                 if (!dirtyOptions.ignoreSideOutputErrors()) {
