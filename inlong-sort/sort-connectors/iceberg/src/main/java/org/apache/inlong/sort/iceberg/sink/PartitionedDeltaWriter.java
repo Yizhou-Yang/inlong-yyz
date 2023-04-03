@@ -30,8 +30,6 @@ import org.apache.iceberg.io.OutputFileFactory;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
 import org.apache.iceberg.util.Tasks;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -92,13 +90,13 @@ class PartitionedDeltaWriter extends BaseDeltaTaskWriter {
     public void close() {
         try {
             Tasks.foreach(writers.values())
+                    .executeWith(EXECUTOR_SERVICE)
                     .throwFailureWhenFinished()
                     .noRetry()
-                    .executeWith(EXECUTOR_SERVICE)
-                    .run(RowDataDeltaWriter::close, IOException.class);
+                    .run(RowDataDeltaWriter::close, Exception.class);
             writers.clear();
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to close equality delta writer", e);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to close equality delta writer", e);
         }
     }
 }
