@@ -49,9 +49,9 @@ public class CreateTableOperation extends Operation {
 
     @JsonCreator
     public CreateTableOperation(@JsonProperty("columns") List<Column> columns,
-        @JsonProperty("indexes") List<Index> indexes,
-        @JsonProperty("likeTable") String likeTable,
-        @JsonProperty("comment") String comment) {
+            @JsonProperty("indexes") List<Index> indexes,
+            @JsonProperty("likeTable") String likeTable,
+            @JsonProperty("comment") String comment) {
         super(OperationType.CREATE);
         this.columns = columns;
         this.indexes = indexes;

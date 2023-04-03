@@ -20,7 +20,6 @@ package org.apache.inlong.sort.ddl.Utils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import net.sf.jsqlparser.statement.alter.AlterExpression.ColumnDataType;
 import net.sf.jsqlparser.statement.create.table.ColDataType;
 import net.sf.jsqlparser.statement.create.table.ColumnDefinition;
 import org.apache.inlong.sort.ddl.Column;
@@ -45,8 +44,8 @@ public class ColumnUtils {
      * to determine whether the column is in the first position of one table.
      */
     public static Column parseColumnWithPosition(boolean isFirst,
-        Map<String, Integer> sqlType,
-        ColumnDefinition columnDefinition) {
+            Map<String, Integer> sqlType,
+            ColumnDefinition columnDefinition) {
 
         ColDataType colDataType = columnDefinition.getColDataType();
 
@@ -60,10 +59,10 @@ public class ColumnUtils {
         ColumnBuilder columnBuilder = Column.builder();
         String columnName = removeContinuousBackQuotes(columnDefinition.getColumnName());
         columnBuilder.name(columnName)
-            .definition(definitions).isNullable(parseNullable(columnSpecs))
-            .defaultValue(parseDefaultValue(columnSpecs))
-            .jdbcType(sqlType.get(columnName))
-            .comment(parseComment(columnSpecs));
+                .definition(definitions).isNullable(parseNullable(columnSpecs))
+                .defaultValue(parseDefaultValue(columnSpecs))
+                .jdbcType(sqlType.get(columnName))
+                .comment(parseComment(columnSpecs));
 
         if (isFirst) {
             // the column is in the first position of one table
@@ -83,7 +82,7 @@ public class ColumnUtils {
      * @return the column list
      */
     public static List<Column> parseColumns(Map<String, Integer> sqlType,
-        List<ColumnDefinition> columnDefinitions) {
+            List<ColumnDefinition> columnDefinitions) {
         List<Column> columns = new ArrayList<>();
         columnDefinitions.forEach(columnDefinition -> {
             columns.add(parseColumnWithPosition(false, sqlType, columnDefinition));
@@ -119,7 +118,7 @@ public class ColumnUtils {
      * @return the string before or after the specific string
      */
     public static String parseAdjacentString(List<String> stringList,
-        String specificString, boolean front) {
+            String specificString, boolean front) {
 
         if (stringList == null || stringList.isEmpty()) {
             return "";
