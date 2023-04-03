@@ -136,6 +136,8 @@ public final class Constants {
 
     public static final String AUTO_DESERIALIZE_FALSE = "autoDeserialize=false";
 
+    public static final String DDL_FIELD_NAME = "ddl";
+
     public static final ConfigOption<String> AUDIT_KEYS =
             ConfigOptions.key("metrics.audit.key")
                     .stringType()
