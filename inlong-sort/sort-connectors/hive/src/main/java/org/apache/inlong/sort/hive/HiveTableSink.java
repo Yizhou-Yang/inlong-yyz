@@ -129,6 +129,7 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
 
     private final SchemaUpdateExceptionPolicy schemaUpdatePolicy;
     private final PartitionPolicy partitionPolicy;
+    private final boolean sinkMultipleEnable;
 
     public HiveTableSink(
             ReadableConfig flinkConf,
@@ -141,7 +142,8 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
             SchemaUpdateExceptionPolicy schemaUpdatePolicy,
-            PartitionPolicy partitionPolicy) {
+            PartitionPolicy partitionPolicy,
+            boolean sinkMultipleEnable) {
         this.flinkConf = flinkConf;
         this.jobConf = jobConf;
         this.identifier = identifier;
@@ -159,6 +161,7 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
         this.dirtySink = dirtySink;
         this.schemaUpdatePolicy = schemaUpdatePolicy;
         this.partitionPolicy = partitionPolicy;
+        this.sinkMultipleEnable = sinkMultipleEnable;
     }
 
     @Override
@@ -204,7 +207,8 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
                         getPartitionKeyArray(),
                         tableProps,
                         hiveShim,
-                        isCompressed);
+                        isCompressed,
+                        sinkMultipleEnable);
             } else {
                 Table table = client.getTable(dbName, identifier.getObjectName());
                 sd = table.getSd();
@@ -218,7 +222,8 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
                         getPartitionKeyArray(),
                         tableProps,
                         hiveShim,
-                        isCompressed);
+                        isCompressed,
+                        sinkMultipleEnable);
             }
 
             String extension =
@@ -312,6 +317,7 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
         partComputer = new HiveRowDataPartitionComputer(
                 jobConf,
                 hiveShim,
+                hiveVersion,
                 JobConfUtils.getDefaultPartitionName(jobConf),
                 tableSchema.getFieldNames(),
                 tableSchema.getFieldDataTypes(),
@@ -435,7 +441,8 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
             OutputFileConfig outputFileConfig) {
         HiveBulkWriterFactory hadoopBulkFactory = new HiveBulkWriterFactory(recordWriterFactory);
         return new HadoopPathBasedBulkFormatBuilder<>(new Path(sd.getLocation()), hadoopBulkFactory, jobConf, assigner,
-                dirtyOptions, dirtySink, schemaUpdatePolicy, partitionPolicy)
+                dirtyOptions, dirtySink, schemaUpdatePolicy, partitionPolicy, hiveShim, hiveVersion,
+                sinkMultipleEnable)
                         .withRollingPolicy(rollingPolicy)
                         .withOutputFileConfig(outputFileConfig);
     }
@@ -544,7 +551,8 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
                         dirtyOptions,
                         dirtySink,
                         schemaUpdatePolicy,
-                        partitionPolicy);
+                        partitionPolicy,
+                        sinkMultipleEnable);
         sink.staticPartitionSpec = staticPartitionSpec;
         sink.overwrite = overwrite;
         sink.dynamicGrouping = dynamicGrouping;

@@ -26,14 +26,12 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.io.Writable;
-import org.apache.inlong.sort.hive.table.HiveTableInlongFactory;
 
 public class InLongHadoopPathBasedBulkWriter implements HadoopPathBasedBulkWriter<RowData> {
 
     private FileSinkOperator.RecordWriter recordWriter;
     private Function<RowData, Writable> rowConverter;
     private FileSystem fs;
-    private Path targetPath;
     private Path inProgressPath;
 
     public InLongHadoopPathBasedBulkWriter(FileSinkOperator.RecordWriter recordWriter,
@@ -50,16 +48,16 @@ public class InLongHadoopPathBasedBulkWriter implements HadoopPathBasedBulkWrite
         this.recordWriter = recordWriter;
     }
 
-    public void setFs(FileSystem fs) {
-        this.fs = fs;
+    public void setInProgressPath(Path inProgressPath) throws IOException {
+        this.inProgressPath = inProgressPath;
+        if (this.fs.getScheme().equals("file")) {
+            // update fs with hdfs scheme
+            this.fs = FileSystem.get(inProgressPath.toUri(), fs.getConf());
+        }
     }
 
     public void setRowConverter(Function<RowData, Writable> rowConverter) {
         this.rowConverter = rowConverter;
-    }
-
-    public void setTargetPath(Path targetPath) {
-        this.targetPath = targetPath;
     }
 
     @Override
@@ -90,9 +88,5 @@ public class InLongHadoopPathBasedBulkWriter implements HadoopPathBasedBulkWrite
     @Override
     public void finish() throws IOException {
         recordWriter.close(false);
-        if (targetPath != null) {
-            HiveTableInlongFactory.getRecordWriterHashMap().remove(targetPath);
-            HiveTableInlongFactory.getRowConverterHashMap().remove(targetPath);
-        }
     }
 }

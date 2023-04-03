@@ -26,6 +26,7 @@ import static org.apache.inlong.sort.base.Constants.SOURCE_PARTITION_FIELD_NAME;
 import static org.apache.inlong.sort.hive.HiveOptions.SINK_PARTITION_NAME;
 
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -37,9 +38,9 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.collections.map.CaseInsensitiveMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.connectors.hive.FlinkHiveException;
-import org.apache.flink.connectors.hive.util.HiveConfUtils;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,7 +50,6 @@ import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.hive.client.HiveMetastoreClientFactory;
 import org.apache.flink.table.catalog.hive.client.HiveMetastoreClientWrapper;
 import org.apache.flink.table.catalog.hive.client.HiveShim;
-import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.table.catalog.hive.util.HiveReflectionUtils;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.types.AtomicDataType;
@@ -83,26 +83,28 @@ public class HiveTableUtil {
 
     private static final Logger LOG = LoggerFactory.getLogger(HiveTableUtil.class);
 
-    private final static ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static boolean changeSchema(RowType schema,
             String[] hiveColumns,
             DataType[] hiveTypes,
             String databaseName,
-            String tableName) {
+            String tableName,
+            String hiveVersion) {
         boolean changed = false;
 
         Map<String, LogicalType> flinkTypeMap = new HashMap<>();
         for (RowField field : schema.getFields()) {
-            flinkTypeMap.put(field.getName(), field.getType());
+            // lowercase field name as Oracle field name is uppercase
+            flinkTypeMap.put(field.getName().toLowerCase(), field.getType());
         }
 
-        List<String> columnsFromData = new ArrayList<>(schema.getFieldNames());
+        List<String> columnsFromData = new ArrayList<>(flinkTypeMap.keySet());
         List<String> columnsFromHive = Arrays.asList(hiveColumns);
         columnsFromData.removeAll(columnsFromHive);
         // add new field
         for (String fieldName : columnsFromData) {
-            boolean result = alterTable(databaseName, tableName, fieldName, flinkTypeMap.get(fieldName));
+            boolean result = alterTable(databaseName, tableName, fieldName, flinkTypeMap.get(fieldName), hiveVersion);
             if (result) {
                 changed = true;
             }
@@ -117,7 +119,7 @@ public class HiveTableUtil {
             LogicalType flinkType = flinkTypeMap.get(hiveColumns[i]);
             if (hiveTypes[i].getLogicalType().getTypeRoot() != flinkType.getTypeRoot()) {
                 // field type changed
-                boolean result = alterTable(databaseName, tableName, hiveColumns[i], flinkType);
+                boolean result = alterTable(databaseName, tableName, hiveColumns[i], flinkType, hiveVersion);
                 if (result) {
                     changed = true;
                 }
@@ -126,15 +128,14 @@ public class HiveTableUtil {
         return changed;
     }
 
-    public static boolean alterTable(String databaseName, String tableName, String fieldName, LogicalType type) {
-        JobConf jobConf = new JobConf(HiveTableInlongFactory.getHiveConf());
-        String hiveVersion = jobConf.get(HiveCatalogFactoryOptions.HIVE_VERSION.key());
-        try (HiveMetastoreClientWrapper client = HiveMetastoreClientFactory.create(HiveConfUtils.create(jobConf),
-                hiveVersion)) {
+    public static boolean alterTable(String databaseName, String tableName, String fieldName, LogicalType type,
+            String hiveVersion) {
+        HiveConf hiveConf = HiveTableInlongFactory.getHiveConf();
+        try (HiveMetastoreClientWrapper client = HiveMetastoreClientFactory.create(hiveConf, hiveVersion)) {
             FieldSchema schema = new FieldSchema(fieldName, flinkType2HiveType(type), "");
 
             Table table = client.getTable(databaseName, tableName);
-            ObjectIdentifier identifier = ObjectIdentifier.of("default_catalog", databaseName, tableName);
+            ObjectIdentifier identifier = createObjectIdentifier(databaseName, tableName);
             List<FieldSchema> fieldSchemaList = getTableFields(client, identifier);
             // remove partition keys
             fieldSchemaList.removeAll(table.getPartitionKeys());
@@ -180,17 +181,17 @@ public class HiveTableUtil {
      * @param tableName table name
      * @param schema flink field type
      * @param partitionPolicy policy of partitioning table
+     * @param hiveVersion hive version
      */
     public static void createTable(String databaseName, String tableName, RowType schema,
-            PartitionPolicy partitionPolicy) {
-        JobConf jobConf = new JobConf(HiveTableInlongFactory.getHiveConf());
-        String hiveVersion = jobConf.get(HiveCatalogFactoryOptions.HIVE_VERSION.key());
-        try (HiveMetastoreClientWrapper client = HiveMetastoreClientFactory.create(HiveConfUtils.create(jobConf),
-                hiveVersion)) {
+            PartitionPolicy partitionPolicy, String hiveVersion) {
+        HiveConf hiveConf = HiveTableInlongFactory.getHiveConf();
+        try (HiveMetastoreClientWrapper client = HiveMetastoreClientFactory.create(hiveConf, hiveVersion)) {
 
             List<String> dbs = client.getAllDatabases();
+            boolean dbExist = dbs.stream().anyMatch(databaseName::equalsIgnoreCase);
             // create database if not exists
-            if (!dbs.contains(databaseName)) {
+            if (!dbExist) {
                 Database defaultDb = client.getDatabase("default");
                 Database targetDb = new Database();
                 targetDb.setName(databaseName);
@@ -198,7 +199,7 @@ public class HiveTableUtil {
                 client.createDatabase(targetDb);
             }
 
-            String sinkPartitionName = jobConf.get(SINK_PARTITION_NAME.key(), SINK_PARTITION_NAME.defaultValue());
+            String sinkPartitionName = hiveConf.get(SINK_PARTITION_NAME.key(), SINK_PARTITION_NAME.defaultValue());
             FieldSchema defaultPartition = new FieldSchema(sinkPartitionName, "string", "");
 
             List<FieldSchema> fieldSchemaList = new ArrayList<>();
@@ -236,17 +237,19 @@ public class HiveTableUtil {
      * Cache hive wrtier factory
      *
      * @param hiveShim hiveShim object
+     * @param hiveVersion hive version
      * @param identifier object identifier
      * @return hive writer factory
      */
-    public static HiveWriterFactory getWriterFactory(HiveShim hiveShim, ObjectIdentifier identifier) {
+    public static HiveWriterFactory getWriterFactory(HiveShim hiveShim, String hiveVersion,
+            ObjectIdentifier identifier) {
         if (!HiveTableInlongFactory.getFactoryMap().containsKey(identifier)) {
-            JobConf jobConf = new JobConf(HiveTableInlongFactory.getHiveConf());
-            String hiveVersion = jobConf.get(HiveCatalogFactoryOptions.HIVE_VERSION.key());
-            try (HiveMetastoreClientWrapper client = HiveMetastoreClientFactory.create(HiveConfUtils.create(jobConf),
-                    hiveVersion)) {
+            HiveConf hiveConf = HiveTableInlongFactory.getHiveConf();
+            try (HiveMetastoreClientWrapper client = HiveMetastoreClientFactory.create(hiveConf, hiveVersion)) {
                 List<String> tableNames = client.getAllTables(identifier.getDatabaseName());
-                if (!tableNames.contains(identifier.getObjectName())) {
+                LOG.info("table names: {}", Arrays.deepToString(tableNames.toArray()));
+                boolean tableExist = tableNames.stream().anyMatch(identifier.getObjectName()::equalsIgnoreCase);
+                if (!tableExist) {
                     return null;
                 }
 
@@ -273,9 +276,10 @@ public class HiveTableUtil {
                 TableSchema schema = builder.build();
 
                 Class hiveOutputFormatClz = hiveShim.getHiveOutputFormatClass(Class.forName(sd.getOutputFormat()));
-                boolean isCompressed = jobConf.getBoolean(HiveConf.ConfVars.COMPRESSRESULT.varname, false);
-                HiveWriterFactory writerFactory = new HiveWriterFactory(jobConf, hiveOutputFormatClz, sd, schema,
-                        partitions, HiveReflectionUtils.getTableMetadata(hiveShim, table), hiveShim, isCompressed);
+                boolean isCompressed = hiveConf.getBoolean(HiveConf.ConfVars.COMPRESSRESULT.varname, false);
+                HiveWriterFactory writerFactory = new HiveWriterFactory(new JobConf(hiveConf), hiveOutputFormatClz, sd,
+                        schema, partitions, HiveReflectionUtils.getTableMetadata(hiveShim, table), hiveShim,
+                        isCompressed, true);
                 HiveTableInlongFactory.getFactoryMap().put(identifier, writerFactory);
             } catch (TException e) {
                 throw new CatalogException("Failed to query Hive metaStore", e);
@@ -442,7 +446,8 @@ public class HiveTableUtil {
         GenericRowData genericRowData = new GenericRowData(RowKind.INSERT, allColumns.length);
         for (int index = 0; index < allColumns.length; index++) {
             String columnName = allColumns[index];
-            LogicalTypeRoot typeRoot = allTypes[index].getLogicalType().getTypeRoot();
+            LogicalType logicalType = allTypes[index].getLogicalType();
+            LogicalTypeRoot typeRoot = logicalType.getTypeRoot();
             Object raw = record.get(columnName);
             switch (typeRoot) {
                 case BOOLEAN:
@@ -459,6 +464,8 @@ public class HiveTableUtil {
                     genericRowData.setField(index, bytes);
                     break;
                 case DECIMAL:
+                    genericRowData.setField(index, raw != null ? new BigDecimal(String.valueOf(raw)) : null);
+                    break;
                 case DOUBLE:
                     genericRowData.setField(index, raw != null ? Double.valueOf(String.valueOf(raw)) : null);
                     break;
@@ -502,6 +509,14 @@ public class HiveTableUtil {
         return genericRowData;
     }
 
+    /**
+     * Convert json node to hash map.
+     * Lowercase the keys of map, because Oracle cdc sends record with uppercase field name, but hive table only
+     * supports lowercase field name
+     *
+     * @param data json node
+     * @return list of map data
+     */
     public static List<Map<String, Object>> jsonNode2Map(JsonNode data) {
         if (data == null) {
             return new ArrayList<>();
@@ -509,14 +524,34 @@ public class HiveTableUtil {
         List<Map<String, Object>> values = new ArrayList<>();
         if (data.isArray()) {
             for (int i = 0; i < data.size(); i++) {
-                values.add(objectMapper.convertValue(data.get(i), new TypeReference<Map<String, Object>>() {
-                }));
+                values.add(jsonObject2Map(data.get(0)));
             }
         } else {
-            values.add(objectMapper.convertValue(data, new TypeReference<Map<String, Object>>() {
-            }));
+            values.add(jsonObject2Map(data));
         }
         return values;
     }
 
+    /**
+     * convert json object, such as JsonNode, JsonObject, to map
+     * @param data json object, such as JsonNode, JsonObject
+     * @return Map data
+     */
+    private static Map<String, Object> jsonObject2Map(Object data) {
+        CaseInsensitiveMap map = new CaseInsensitiveMap();
+        map.putAll(objectMapper.convertValue(data, new TypeReference<Map<String, Object>>() {
+        }));
+        return map;
+    }
+
+    /**
+     * create object identifier
+     *
+     * @param databaseName database name
+     * @param tableName table name
+     * @return
+     */
+    public static ObjectIdentifier createObjectIdentifier(String databaseName, String tableName) {
+        return ObjectIdentifier.of("default_catalog", databaseName, tableName);
+    }
 }

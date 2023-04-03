@@ -23,7 +23,9 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
 import static org.apache.inlong.sort.hive.HiveOptions.HIVE_SCHEMA_SCAN_INTERVAL;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -46,7 +48,6 @@ import org.apache.flink.streaming.api.functions.sink.filesystem.WriterProperties
 
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.hive.client.HiveShim;
-import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
@@ -73,7 +74,6 @@ import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
 import org.apache.inlong.sort.base.sink.PartitionPolicy;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.hive.HiveBulkWriterFactory;
-import org.apache.inlong.sort.hive.HiveTableMetaStoreFactory;
 import org.apache.inlong.sort.hive.HiveTableUtil;
 import org.apache.inlong.sort.hive.HiveWriterFactory;
 import org.apache.inlong.sort.hive.table.HiveTableInlongFactory;
@@ -87,14 +87,17 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
 
     private static final Logger LOG = LoggerFactory.getLogger(HadoopPathBasedPartFileWriter.class);
 
-    private InLongHadoopPathBasedBulkWriter writer;
+    private final InLongHadoopPathBasedBulkWriter writer;
 
-    private HadoopFileCommitter fileCommitter;
+    private final HadoopFileCommitter fileCommitter;
 
     private BucketID bucketID;
     private Path targetPath;
     private Path inProgressPath;
     private final HiveShim hiveShim;
+
+    private final String hiveVersion;
+
     private final boolean sinkMultipleEnable;
     private final String sinkMultipleFormat;
 
@@ -108,11 +111,11 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
     private transient JsonDynamicSchemaFormat jsonFormat;
 
     @Nullable
-    private transient SinkTableMetricData metricData;
+    private final transient SinkTableMetricData metricData;
 
-    private DirtyOptions dirtyOptions;
+    private final DirtyOptions dirtyOptions;
 
-    private @Nullable DirtySink<Object> dirtySink;
+    private final @Nullable DirtySink<Object> dirtySink;
 
     public HadoopPathBasedPartFileWriter(final BucketID bucketID,
             Path targetPath,
@@ -121,6 +124,7 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
             HadoopFileCommitter fileCommitter,
             long createTime,
             HiveShim hiveShim,
+            String hiveVersion,
             boolean sinkMultipleEnable,
             String sinkMultipleFormat,
             String databasePattern,
@@ -138,6 +142,7 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
         this.writer = writer;
         this.fileCommitter = fileCommitter;
         this.hiveShim = hiveShim;
+        this.hiveVersion = hiveVersion;
         this.sinkMultipleEnable = sinkMultipleEnable;
         this.sinkMultipleFormat = sinkMultipleFormat;
         this.databasePattern = databasePattern;
@@ -167,6 +172,7 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
                 byte[] rawData = (byte[]) rowData.getField(0);
                 recordSize = rawData.length;
                 rootNode = jsonFormat.deserialize(rawData);
+                LOG.debug("root node: {}", rootNode);
                 boolean isDDL = jsonFormat.extractDDLFlag(rootNode);
                 if (isDDL) {
                     // Ignore ddl change for now
@@ -179,7 +185,7 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
                         jsonFormat.getPhysicalData(rootNode));
                 recordNum = physicalDataList.size();
 
-                identifier = ObjectIdentifier.of("default_catalog", databaseName, tableName);
+                identifier = HiveTableUtil.createObjectIdentifier(databaseName, tableName);
 
                 // ignore writing data into this table
                 if (ignoreWritingTableMap.containsKey(identifier)) {
@@ -188,38 +194,45 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
 
                 List<String> pkListStr = jsonFormat.extractPrimaryKeyNames(rootNode);
                 RowType schema = jsonFormat.extractSchema(rootNode, pkListStr);
-                HiveWriterFactory writerFactory = getHiveWriterFactory(identifier, schema);
-
-                // collect metaStoreFactory of all tables for committing partitions
-                collectMetastoreFactory(identifier, writerFactory);
+                HiveWriterFactory writerFactory = getHiveWriterFactory(identifier, schema, hiveVersion);
 
                 // parse the real location of hive table
-                Pair<Path, Path> pathPair = getHdfsPath(writerFactory);
-                Path targetPath = pathPair.getLeft();
-                Path inProgressFilePath = pathPair.getRight();
+                Path inProgressFilePath = getInProgressPath(writerFactory);
 
-                // reset paths of file committer
-                HadoopRenameFileCommitter committer = (HadoopRenameFileCommitter) fileCommitter;
-                committer.setTargetFilePath(targetPath);
-                committer.setTempFilePath(inProgressFilePath);
-
+                LOG.debug("in progress file path: {}", inProgressFilePath);
                 Pair<RecordWriter, Function<RowData, Writable>> pair = getRecordWriterAndRowConverter(writerFactory,
                         inProgressFilePath);
                 // reset record writer and row converter
                 writer.setRecordWriter(pair.getLeft());
                 writer.setRowConverter(pair.getRight());
-                // reset target path
-                writer.setTargetPath(targetPath);
+                writer.setInProgressPath(inProgressFilePath);
 
                 boolean replaceLineBreak = writerFactory.getStorageDescriptor().getInputFormat()
                         .contains("TextInputFormat");
 
                 for (Map<String, Object> record : physicalDataList) {
                     // check and alter hive table if schema has changed
-                    checkSchema(identifier, writerFactory, schema, inProgressFilePath);
+                    boolean changed = checkSchema(identifier, writerFactory, schema);
+                    if (changed) {
+                        // remove cache and reload hive writer factory
+                        HiveTableInlongFactory.getFactoryMap().remove(identifier);
+                        writerFactory = HiveTableUtil.getWriterFactory(hiveShim, hiveVersion, identifier);
+                        assert writerFactory != null;
+                        FileSinkOperator.RecordWriter recordWriter = writerFactory.createRecordWriter(
+                                inProgressFilePath);
+                        Function<RowData, Writable> rowConverter = writerFactory.createRowDataConverter();
+                        writer.setRecordWriter(recordWriter);
+                        writer.setRowConverter(rowConverter);
+                        HiveTableInlongFactory.getRecordWriterHashMap().put(inProgressFilePath, recordWriter);
+                        HiveTableInlongFactory.getRowConverterHashMap().put(inProgressFilePath, rowConverter);
+                    }
 
+                    LOG.debug("record: {}", record);
+                    LOG.debug("columns : {}", Arrays.deepToString(writerFactory.getAllColumns()));
+                    LOG.debug("types: {}", Arrays.deepToString(writerFactory.getAllTypes()));
                     GenericRowData genericRowData = HiveTableUtil.getRowData(record, writerFactory.getAllColumns(),
                             writerFactory.getAllTypes(), replaceLineBreak);
+                    LOG.debug("generic row data: {}", genericRowData);
                     writer.addElement(genericRowData);
                 }
                 if (metricData != null) {
@@ -330,31 +343,15 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
      * @param schema hive field with flink type
      * @return hive writer factory
      */
-    private HiveWriterFactory getHiveWriterFactory(ObjectIdentifier identifier, RowType schema) {
-        HiveWriterFactory writerFactory = HiveTableUtil.getWriterFactory(hiveShim, identifier);
+    private HiveWriterFactory getHiveWriterFactory(ObjectIdentifier identifier, RowType schema, String hiveVersion) {
+        HiveWriterFactory writerFactory = HiveTableUtil.getWriterFactory(hiveShim, hiveVersion, identifier);
         if (writerFactory == null) {
             // hive table may not exist, auto create
-            HiveTableUtil.createTable(identifier.getDatabaseName(), identifier.getObjectName(), schema,
-                    partitionPolicy);
-            writerFactory = HiveTableUtil.getWriterFactory(hiveShim, identifier);
+            HiveTableUtil.createTable(identifier.getDatabaseName(), identifier.getObjectName(), schema, partitionPolicy,
+                    hiveVersion);
+            writerFactory = HiveTableUtil.getWriterFactory(hiveShim, hiveVersion, identifier);
         }
         return writerFactory;
-    }
-
-    /**
-     * collect metastore factory for committing partitions
-     *
-     * @param identifier hive database and table name
-     * @param writerFactory hive writer factory
-     */
-    private void collectMetastoreFactory(ObjectIdentifier identifier, HiveWriterFactory writerFactory) {
-        if (!HiveTableInlongFactory.getTableMetaStoreMap().containsKey(identifier)) {
-            assert writerFactory != null;
-            String hiveVersion = writerFactory.getJobConf().get(HiveCatalogFactoryOptions.HIVE_VERSION.key());
-            HiveTableMetaStoreFactory metaStoreFactory = new HiveTableMetaStoreFactory(writerFactory.getJobConf(),
-                    hiveVersion, identifier.getDatabaseName(), identifier.getObjectName());
-            HiveTableInlongFactory.getTableMetaStoreMap().put(identifier, metaStoreFactory);
-        }
     }
 
     /**
@@ -363,13 +360,12 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
      * @param writerFactory hive writer factory
      * @return pair of target path and temp path
      */
-    private Pair<Path, Path> getHdfsPath(HiveWriterFactory writerFactory) throws IOException, ClassNotFoundException {
+    private Path getInProgressPath(HiveWriterFactory writerFactory) throws IOException, ClassNotFoundException {
         String location = writerFactory.getStorageDescriptor().getLocation();
         String path = targetPath.toUri().getPath();
         path = path.substring(path.indexOf("/tmp/") + 5);
         Path targetPath = new Path(location + "/" + path);
-        Path inProgressFilePath = new Path(targetPath.getParent() + "/" + inProgressPath.getName());
-        return new ImmutablePair<>(targetPath, inProgressFilePath);
+        return new Path(targetPath.getParent() + "/" + inProgressPath.getName());
     }
 
     /**
@@ -383,14 +379,14 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
             HiveWriterFactory writerFactory, Path inProgressFilePath) {
         FileSinkOperator.RecordWriter recordWriter;
         Function<RowData, Writable> rowConverter;
-        if (!HiveTableInlongFactory.getRecordWriterHashMap().containsKey(targetPath)) {
+        if (!HiveTableInlongFactory.getRecordWriterHashMap().containsKey(inProgressFilePath)) {
             recordWriter = writerFactory.createRecordWriter(inProgressFilePath);
             rowConverter = writerFactory.createRowDataConverter();
-            HiveTableInlongFactory.getRecordWriterHashMap().put(targetPath, recordWriter);
-            HiveTableInlongFactory.getRowConverterHashMap().put(targetPath, rowConverter);
+            HiveTableInlongFactory.getRecordWriterHashMap().put(inProgressFilePath, recordWriter);
+            HiveTableInlongFactory.getRowConverterHashMap().put(inProgressFilePath, rowConverter);
         } else {
-            recordWriter = HiveTableInlongFactory.getRecordWriterHashMap().get(targetPath);
-            rowConverter = HiveTableInlongFactory.getRowConverterHashMap().get(targetPath);
+            recordWriter = HiveTableInlongFactory.getRecordWriterHashMap().get(inProgressFilePath);
+            rowConverter = HiveTableInlongFactory.getRowConverterHashMap().get(inProgressFilePath);
         }
         return new ImmutablePair<>(recordWriter, rowConverter);
     }
@@ -401,10 +397,9 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
      * @param identifier hive database name and table name
      * @param writerFactory hive writer factory
      * @param schema hive field with flink types
-     * @param inProgressFilePath temp hdfs file path for writing data
+     * @return if schema has changed
      */
-    private void checkSchema(ObjectIdentifier identifier, HiveWriterFactory writerFactory, RowType schema,
-            Path inProgressFilePath) {
+    private boolean checkSchema(ObjectIdentifier identifier, HiveWriterFactory writerFactory, RowType schema) {
         HashMap<ObjectIdentifier, Long> schemaCheckTimeMap = HiveTableInlongFactory.getSchemaCheckTimeMap();
         if (!schemaCheckTimeMap.containsKey(identifier)) {
             schemaCheckTimeMap.put(identifier, System.currentTimeMillis());
@@ -413,23 +408,13 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
         // handle the schema every `HIVE_SCHEMA_SCAN_INTERVAL` milliseconds
         int scanSchemaInterval = Integer.parseInt(writerFactory.getJobConf()
                 .get(HIVE_SCHEMA_SCAN_INTERVAL.key(), HIVE_SCHEMA_SCAN_INTERVAL.defaultValue() + ""));
+        boolean changed = false;
         if (System.currentTimeMillis() - lastUpdate >= scanSchemaInterval) {
-            boolean changed = HiveTableUtil.changeSchema(schema, writerFactory.getAllColumns(),
-                    writerFactory.getAllTypes(), identifier.getDatabaseName(), identifier.getObjectName());
-            if (changed) {
-                // remove cache and reload hive writer factory
-                HiveTableInlongFactory.getFactoryMap().remove(identifier);
-                writerFactory = HiveTableUtil.getWriterFactory(hiveShim, identifier);
-                assert writerFactory != null;
-                FileSinkOperator.RecordWriter recordWriter = writerFactory.createRecordWriter(inProgressFilePath);
-                Function<RowData, Writable> rowConverter = writerFactory.createRowDataConverter();
-                writer.setRecordWriter(recordWriter);
-                writer.setRowConverter(rowConverter);
-                HiveTableInlongFactory.getRecordWriterHashMap().put(targetPath, recordWriter);
-                HiveTableInlongFactory.getRowConverterHashMap().put(targetPath, rowConverter);
-            }
+            changed = HiveTableUtil.changeSchema(schema, writerFactory.getAllColumns(),
+                    writerFactory.getAllTypes(), identifier.getDatabaseName(), identifier.getObjectName(), hiveVersion);
             schemaCheckTimeMap.put(identifier, System.currentTimeMillis());
         }
+        return changed;
     }
 
     @Override
@@ -439,9 +424,41 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
 
     @Override
     public PendingFileRecoverable closeForCommit() throws IOException {
-        writer.flush();
-        writer.finish();
-        fileCommitter.preCommit();
+        if (sinkMultipleEnable) {
+            LOG.info("record writer cache {}", HiveTableInlongFactory.getRecordWriterHashMap());
+            Iterator<Path> iterator = HiveTableInlongFactory.getRecordWriterHashMap().keySet().iterator();
+            while (iterator.hasNext()) {
+                Path inProgressFilePath = iterator.next();
+                // one flink batch writes many hive tables, they are the same inProgressPath
+                if (inProgressFilePath.getName().equals(this.inProgressPath.getName())) {
+                    FileSinkOperator.RecordWriter recordWriter = HiveTableInlongFactory.getRecordWriterHashMap()
+                            .get(inProgressFilePath);
+                    writer.setRecordWriter(recordWriter);
+                    writer.flush();
+                    writer.finish();
+                    // clear cache
+                    iterator.remove();
+                    HiveTableInlongFactory.getRowConverterHashMap().remove(inProgressFilePath);
+
+                    // parse the target location of hive table
+                    String tmpFileName = inProgressFilePath.getName();
+                    String targetPathName = tmpFileName.substring(1, tmpFileName.lastIndexOf(".inprogress"));
+                    Path targetPath = new Path(inProgressFilePath.getParent() + "/" + targetPathName);
+
+                    LOG.info("file committer target path {}, in progress file {}", targetPath, inProgressFilePath);
+                    HadoopRenameFileCommitter committer = new HadoopRenameFileCommitter(
+                            ((HadoopRenameFileCommitter) fileCommitter).getConfiguration(),
+                            targetPath,
+                            inProgressFilePath,
+                            true);
+                    HiveTableInlongFactory.getFileCommitterHashMap().put(inProgressFilePath, committer);
+                }
+            }
+        } else {
+            writer.flush();
+            writer.finish();
+            fileCommitter.preCommit();
+        }
         return new HadoopPathBasedPendingFile(fileCommitter, getSize()).getRecoverable();
     }
 
@@ -656,23 +673,27 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
         private final HiveWriterFactory hiveWriterFactory;
 
         @Nullable
-        private transient SinkTableMetricData metricData;
+        private final transient SinkTableMetricData metricData;
 
-        private DirtyOptions dirtyOptions;
+        private final DirtyOptions dirtyOptions;
 
-        private @Nullable DirtySink<Object> dirtySink;
+        private final @Nullable DirtySink<Object> dirtySink;
 
-        private SchemaUpdateExceptionPolicy schemaUpdatePolicy;
+        private final SchemaUpdateExceptionPolicy schemaUpdatePolicy;
 
-        private PartitionPolicy partitionPolicy;
+        private final PartitionPolicy partitionPolicy;
+
+        private final HiveShim hiveShim;
+        private final String hiveVersion;
 
         public HadoopPathBasedBucketWriter(Configuration configuration,
                 HadoopPathBasedBulkWriter.Factory<IN> bulkWriterFactory,
                 HadoopFileCommitterFactory fileCommitterFactory, @Nullable SinkTableMetricData metricData,
                 DirtyOptions dirtyOptions, @Nullable DirtySink<Object> dirtySink,
                 SchemaUpdateExceptionPolicy schemaUpdatePolicy,
-                PartitionPolicy partitionPolicy) {
-
+                PartitionPolicy partitionPolicy,
+                HiveShim hiveShim,
+                String hiveVersion) {
             this.configuration = configuration;
             this.bulkWriterFactory = bulkWriterFactory;
             this.hiveWriterFactory = ((HiveBulkWriterFactory) this.bulkWriterFactory).getFactory();
@@ -682,6 +703,8 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
             this.dirtySink = dirtySink;
             this.schemaUpdatePolicy = schemaUpdatePolicy;
             this.partitionPolicy = partitionPolicy;
+            this.hiveShim = hiveShim;
+            this.hiveVersion = hiveVersion;
         }
 
         @Override
@@ -705,7 +728,8 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
                     writer,
                     fileCommitter,
                     creationTime,
-                    hiveWriterFactory.getHiveShim(),
+                    hiveShim,
+                    hiveVersion,
                     sinkMultipleEnable,
                     sinkMultipleFormat,
                     databasePattern,

@@ -46,12 +46,16 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
 import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
 import org.apache.inlong.sort.base.sink.PartitionPolicy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A {@link RowDataPartitionComputer} that converts Flink objects to Hive objects before computing
  * the partition value strings.
  */
 public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
+
+    private static final Logger LOG = LoggerFactory.getLogger(HiveRowDataPartitionComputer.class);
 
     private final DataFormatConverters.DataFormatConverter[] partitionConverters;
     private final HiveObjectConversion[] hiveObjectConversions;
@@ -61,7 +65,9 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
     private final String sinkMultipleFormat;
     private final String databasePattern;
     private final String tablePattern;
-    private HiveShim hiveShim;
+    private final HiveShim hiveShim;
+
+    private final String hiveVersion;
 
     private final String sinkPartitionName;
 
@@ -70,6 +76,7 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
     public HiveRowDataPartitionComputer(
             JobConf jobConf,
             HiveShim hiveShim,
+            String hiveVersion,
             String defaultPartValue,
             String[] columnNames,
             DataType[] columnTypes,
@@ -77,6 +84,7 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
             PartitionPolicy partitionPolicy) {
         super(defaultPartValue, columnNames, columnTypes, partitionColumns);
         this.hiveShim = hiveShim;
+        this.hiveVersion = hiveVersion;
         this.partitionConverters =
                 Arrays.stream(partitionTypes)
                         .map(TypeConversions::fromLogicalToDataType)
@@ -120,11 +128,11 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
                 RowType schema = jsonFormat.extractSchema(rootNode, pkListStr);
 
                 Map<String, Object> rawData = physicalDataList.get(0);
-                ObjectIdentifier identifier = ObjectIdentifier.of("default_catalog", databaseName, tableName);
-                HiveWriterFactory hiveWriterFactory = HiveTableUtil.getWriterFactory(hiveShim, identifier);
+                ObjectIdentifier identifier = HiveTableUtil.createObjectIdentifier(databaseName, tableName);
+                HiveWriterFactory hiveWriterFactory = HiveTableUtil.getWriterFactory(hiveShim, hiveVersion, identifier);
                 if (hiveWriterFactory == null) {
-                    HiveTableUtil.createTable(databaseName, tableName, schema, partitionPolicy);
-                    hiveWriterFactory = HiveTableUtil.getWriterFactory(hiveShim, identifier);
+                    HiveTableUtil.createTable(databaseName, tableName, schema, partitionPolicy, hiveVersion);
+                    hiveWriterFactory = HiveTableUtil.getWriterFactory(hiveShim, hiveVersion, identifier);
                 }
 
                 String[] partitionColumns = hiveWriterFactory.getPartitionColumns();

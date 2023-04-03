@@ -47,7 +47,6 @@ import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.apache.inlong.sort.base.dirty.utils.DirtySinkFactoryUtils;
 import org.apache.inlong.sort.base.sink.PartitionPolicy;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
-import org.apache.inlong.sort.hive.HiveTableMetaStoreFactory;
 import org.apache.inlong.sort.hive.HiveTableSink;
 
 import java.util.Collections;
@@ -55,6 +54,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.inlong.sort.hive.HiveWriterFactory;
+import org.apache.inlong.sort.hive.filesystem.HadoopRenameFileCommitter;
 
 import static org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions.DEFAULT_DATABASE;
 import static org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions.HADOOP_CONF_DIR;
@@ -63,7 +63,6 @@ import static org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOp
 import static org.apache.flink.table.factories.FactoryUtil.PROPERTY_VERSION;
 import static org.apache.flink.table.filesystem.FileSystemOptions.STREAMING_SOURCE_ENABLE;
 import static org.apache.flink.table.filesystem.FileSystemOptions.STREAMING_SOURCE_PARTITION_INCLUDE;
-import static org.apache.inlong.sort.base.Constants.DIRTY_PREFIX;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_DATABASE_PATTERN;
@@ -83,21 +82,6 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
     private static final HiveConf hiveConf = new HiveConf();
 
     /**
-     * wild sink properties' prefix
-     */
-    public static final String SINK_PROPERTIES_PREFIX = "sink.";
-
-    /**
-     * wild partition properties' prefix
-     */
-    public static final String PARTITION_PROPERTIES_PREFIX = "partition.";
-
-    /**
-     * wild hive properties' prefix
-     */
-    public static final String HIVE_PROPERTIES_PREFIX = "hive.";
-
-    /**
      * hive writer factory cache
      */
     private static final HashMap<ObjectIdentifier, HiveWriterFactory> factoryMap = new HashMap<>(16);
@@ -106,13 +90,13 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
      */
     private static final HashMap<Path, FileSinkOperator.RecordWriter> recordWriterHashMap = new HashMap<>(16);
     /**
+     * hive hdfs file committer cache
+     */
+    private static final HashMap<Path, HadoopRenameFileCommitter> fileCommitterHashMap = new HashMap<>(16);
+    /**
      * hive row converter cache
      */
     private static final HashMap<Path, Function<RowData, Writable>> rowConverterHashMap = new HashMap<>(16);
-    /**
-     * hive table meta store factory cache
-     */
-    private static final HashMap<ObjectIdentifier, HiveTableMetaStoreFactory> tableMetaStoreMap = new HashMap<>(16);
     /**
      * hive schema check time cache
      */
@@ -155,8 +139,6 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
     @Override
     public DynamicTableSink createDynamicTableSink(Context context) {
         final FactoryUtil.TableFactoryHelper helper = FactoryUtil.createTableFactoryHelper(this, context);
-        helper.validateExcept(SINK_PROPERTIES_PREFIX, HIVE_PROPERTIES_PREFIX, PARTITION_PROPERTIES_PREFIX,
-                DIRTY_PREFIX);
         final boolean isHiveTable = HiveCatalog.isHiveTable(context.getCatalogTable().getOptions());
         Map<String, String> options = context.getCatalogTable().getOptions();
         // temporary table doesn't have the IS_GENERIC flag but we still consider it generic
@@ -171,6 +153,7 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
             SchemaUpdateExceptionPolicy schemaUpdatePolicy = helper.getOptions()
                     .get(SINK_MULTIPLE_SCHEMA_UPDATE_POLICY);
             PartitionPolicy partitionPolicy = helper.getOptions().get(SINK_PARTITION_POLICY);
+            boolean sinkMultipleEnable = helper.getOptions().get(SINK_MULTIPLE_ENABLE);
             return new HiveTableSink(
                     context.getConfiguration(),
                     new JobConf(hiveConf),
@@ -182,7 +165,8 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
                     dirtyOptions,
                     dirtySink,
                     schemaUpdatePolicy,
-                    partitionPolicy);
+                    partitionPolicy,
+                    sinkMultipleEnable);
         } else {
             return FactoryUtil.createTableSink(
                     null, // we already in the factory of catalog
@@ -262,12 +246,12 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
         return rowConverterHashMap;
     }
 
-    public static HashMap<ObjectIdentifier, HiveTableMetaStoreFactory> getTableMetaStoreMap() {
-        return tableMetaStoreMap;
-    }
-
     public static HashMap<ObjectIdentifier, HiveWriterFactory> getFactoryMap() {
         return factoryMap;
+    }
+
+    public static HashMap<Path, HadoopRenameFileCommitter> getFileCommitterHashMap() {
+        return fileCommitterHashMap;
     }
 
     public static HashMap<ObjectIdentifier, Long> getSchemaCheckTimeMap() {

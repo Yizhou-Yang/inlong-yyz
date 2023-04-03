@@ -25,23 +25,26 @@ import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 
-/** The default hadoop file committer factory which always use {@link HadoopRenameFileCommitter}. */
+/**
+ * The default hadoop file committer factory which always use {@link HadoopRenameFileCommitter}.
+ */
 public class DefaultHadoopFileCommitterFactory implements HadoopFileCommitterFactory {
 
     private static final long serialVersionUID = 1L;
 
-    @Override
-    public HadoopFileCommitter create(Configuration configuration, Path targetFilePath)
-            throws IOException {
+    private final boolean sinkMultipleEnable;
 
-        return new HadoopRenameFileCommitter(configuration, targetFilePath);
+    public DefaultHadoopFileCommitterFactory(boolean sinkMultipleEnable) {
+        this.sinkMultipleEnable = sinkMultipleEnable;
     }
 
     @Override
-    public HadoopFileCommitter recoverForCommit(
-            Configuration configuration, Path targetFilePath, Path tempFilePath)
-            throws IOException {
+    public HadoopFileCommitter create(Configuration configuration, Path targetFilePath) throws IOException {
+        return new HadoopRenameFileCommitter(configuration, targetFilePath, sinkMultipleEnable);
+    }
 
-        return new HadoopRenameFileCommitter(configuration, targetFilePath, tempFilePath);
+    @Override
+    public HadoopFileCommitter recoverForCommit(Configuration configuration, Path targetFilePath, Path tempFilePath) {
+        return new HadoopRenameFileCommitter(configuration, targetFilePath, tempFilePath, sinkMultipleEnable);
     }
 }

@@ -31,6 +31,7 @@ import org.apache.flink.streaming.api.functions.sink.filesystem.SerializableConf
 import org.apache.flink.streaming.api.functions.sink.filesystem.StreamingFileSink;
 import org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.CheckpointRollingPolicy;
 import org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.OnCheckpointRollingPolicy;
+import org.apache.flink.table.catalog.hive.client.HiveShim;
 import org.apache.flink.util.Preconditions;
 
 import org.apache.hadoop.conf.Configuration;
@@ -51,9 +52,9 @@ public class HadoopPathBasedBulkFormatBuilder<IN, BucketID, T extends HadoopPath
 
     private final Path basePath;
 
-    private HadoopPathBasedBulkWriter.Factory<IN> writerFactory;
+    private final HadoopPathBasedBulkWriter.Factory<IN> writerFactory;
 
-    private HadoopFileCommitterFactory fileCommitterFactory;
+    private final HadoopFileCommitterFactory fileCommitterFactory;
 
     private SerializableConfiguration serializableConfiguration;
 
@@ -74,6 +75,8 @@ public class HadoopPathBasedBulkFormatBuilder<IN, BucketID, T extends HadoopPath
 
     private final SchemaUpdateExceptionPolicy schemaUpdatePolicy;
     private final PartitionPolicy partitionPolicy;
+    private final HiveShim hiveShim;
+    private final String hiveVersion;
 
     public HadoopPathBasedBulkFormatBuilder(
             org.apache.hadoop.fs.Path basePath,
@@ -83,12 +86,14 @@ public class HadoopPathBasedBulkFormatBuilder<IN, BucketID, T extends HadoopPath
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
             SchemaUpdateExceptionPolicy schemaUpdatePolicy,
-            PartitionPolicy partitionPolicy) {
-
+            PartitionPolicy partitionPolicy,
+            HiveShim hiveShim,
+            String hiveVersion,
+            boolean sinkMultipleEnable) {
         this(
                 basePath,
                 writerFactory,
-                new DefaultHadoopFileCommitterFactory(),
+                new DefaultHadoopFileCommitterFactory(sinkMultipleEnable),
                 configuration,
                 assigner,
                 OnCheckpointRollingPolicy.build(),
@@ -97,7 +102,9 @@ public class HadoopPathBasedBulkFormatBuilder<IN, BucketID, T extends HadoopPath
                 dirtyOptions,
                 dirtySink,
                 schemaUpdatePolicy,
-                partitionPolicy);
+                partitionPolicy,
+                hiveShim,
+                hiveVersion);
     }
 
     public HadoopPathBasedBulkFormatBuilder(
@@ -112,7 +119,9 @@ public class HadoopPathBasedBulkFormatBuilder<IN, BucketID, T extends HadoopPath
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
             SchemaUpdateExceptionPolicy schemaUpdatePolicy,
-            PartitionPolicy partitionPolicy) {
+            PartitionPolicy partitionPolicy,
+            HiveShim hiveShim,
+            String hiveVersion) {
 
         this.basePath = new Path(Preconditions.checkNotNull(basePath).toString());
         this.writerFactory = writerFactory;
@@ -126,6 +135,8 @@ public class HadoopPathBasedBulkFormatBuilder<IN, BucketID, T extends HadoopPath
         this.dirtySink = dirtySink;
         this.schemaUpdatePolicy = schemaUpdatePolicy;
         this.partitionPolicy = partitionPolicy;
+        this.hiveShim = hiveShim;
+        this.hiveVersion = hiveVersion;
     }
 
     public T withBucketAssigner(BucketAssigner<IN, BucketID> assigner) {
@@ -163,7 +174,9 @@ public class HadoopPathBasedBulkFormatBuilder<IN, BucketID, T extends HadoopPath
                 dirtyOptions,
                 dirtySink,
                 schemaUpdatePolicy,
-                partitionPolicy);
+                partitionPolicy,
+                hiveShim,
+                hiveVersion);
     }
 
     @Override

@@ -150,9 +150,8 @@ public class StreamingSink {
             Configuration options) {
         DataStream<?> stream = writer;
         if (options.contains(SINK_PARTITION_COMMIT_POLICY_KIND)) {
-            PartitionCommitter committer =
-                    new PartitionCommitter(
-                            locationPath, identifier, partitionKeys, msFactory, fsFactory, options);
+            PartitionCommitter committer = new PartitionCommitter(locationPath, identifier, partitionKeys, msFactory,
+                    fsFactory, options);
             stream =
                     writer.transform(
                             PartitionCommitter.class.getSimpleName(), Types.VOID, committer)
@@ -162,4 +161,5 @@ public class StreamingSink {
 
         return stream.addSink(new DiscardingSink<>()).name("end").setParallelism(1);
     }
+
 }

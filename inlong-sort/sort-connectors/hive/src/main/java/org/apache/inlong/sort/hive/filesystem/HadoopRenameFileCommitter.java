@@ -17,6 +17,7 @@
 
 package org.apache.inlong.sort.hive.filesystem;
 
+import java.util.Iterator;
 import org.apache.flink.formats.hadoop.bulk.HadoopFileCommitter;
 
 import org.apache.hadoop.conf.Configuration;
@@ -25,6 +26,9 @@ import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.util.UUID;
+import org.apache.inlong.sort.hive.table.HiveTableInlongFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 
@@ -34,26 +38,34 @@ import static org.apache.flink.util.Preconditions.checkArgument;
  */
 public class HadoopRenameFileCommitter implements HadoopFileCommitter {
 
+    private static final Logger LOG = LoggerFactory.getLogger(HadoopRenameFileCommitter.class);
+
     private final Configuration configuration;
 
     private Path targetFilePath;
 
     private Path tempFilePath;
 
-    public HadoopRenameFileCommitter(Configuration configuration, Path targetFilePath)
+    private boolean sinkMultipleEnable;
+
+    public HadoopRenameFileCommitter(Configuration configuration,
+            Path targetFilePath,
+            boolean sinkMultipleEnable)
             throws IOException {
         this.configuration = configuration;
         this.targetFilePath = targetFilePath;
         this.tempFilePath = generateTempFilePath();
+        this.sinkMultipleEnable = sinkMultipleEnable;
     }
 
-    public HadoopRenameFileCommitter(
-            Configuration configuration, Path targetFilePath, Path inProgressPath)
-            throws IOException {
-
+    public HadoopRenameFileCommitter(Configuration configuration,
+            Path targetFilePath,
+            Path inProgressPath,
+            boolean sinkMultipleEnable) {
         this.configuration = configuration;
         this.targetFilePath = targetFilePath;
         this.tempFilePath = inProgressPath;
+        this.sinkMultipleEnable = sinkMultipleEnable;
     }
 
     @Override
@@ -66,12 +78,8 @@ public class HadoopRenameFileCommitter implements HadoopFileCommitter {
         return tempFilePath;
     }
 
-    public void setTargetFilePath(Path targetFilePath) {
-        this.targetFilePath = targetFilePath;
-    }
-
-    public void setTempFilePath(Path tempFilePath) {
-        this.tempFilePath = tempFilePath;
+    public Configuration getConfiguration() {
+        return configuration;
     }
 
     @Override
@@ -81,12 +89,33 @@ public class HadoopRenameFileCommitter implements HadoopFileCommitter {
 
     @Override
     public void commit() throws IOException {
-        rename(true);
+        if (sinkMultipleEnable) {
+            commitMultiple(true);
+        } else {
+            rename(true);
+        }
     }
 
     @Override
     public void commitAfterRecovery() throws IOException {
-        rename(false);
+        if (sinkMultipleEnable) {
+            commitMultiple(false);
+        } else {
+            rename(false);
+        }
+    }
+
+    private void commitMultiple(boolean assertFileExists) throws IOException {
+        LOG.info("file committer cache {}", HiveTableInlongFactory.getFileCommitterHashMap());
+        Iterator<Path> iterator = HiveTableInlongFactory.getFileCommitterHashMap().keySet().iterator();
+        while (iterator.hasNext()) {
+            Path path = iterator.next();
+            if (path.getName().equals(tempFilePath.getName())) {
+                HadoopRenameFileCommitter committer = HiveTableInlongFactory.getFileCommitterHashMap().get(path);
+                committer.rename(assertFileExists);
+                iterator.remove();
+            }
+        }
     }
 
     private void rename(boolean assertFileExists) throws IOException {

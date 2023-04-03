@@ -17,8 +17,6 @@
 
 package org.apache.inlong.sort.hive;
 
-import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
-
 import org.apache.flink.connectors.hive.CachedSerializedValue;
 import org.apache.flink.connectors.hive.FlinkHiveException;
 import org.apache.flink.connectors.hive.JobConfWrapper;
@@ -116,7 +114,8 @@ public class HiveWriterFactory implements Serializable {
             String[] partitionColumns,
             Properties tableProperties,
             HiveShim hiveShim,
-            boolean isCompressed) {
+            boolean isCompressed,
+            boolean sinkMultipleEnable) {
         Preconditions.checkArgument(HiveOutputFormat.class.isAssignableFrom(hiveOutputFormatClz),
                 "The output format should be an instance of HiveOutputFormat");
         this.confWrapper = new JobConfWrapper(jobConf);
@@ -132,7 +131,7 @@ public class HiveWriterFactory implements Serializable {
         this.tableProperties = tableProperties;
         this.hiveShim = hiveShim;
         this.isCompressed = isCompressed;
-        this.sinkMultipleEnable = Boolean.parseBoolean(jobConf.get(SINK_MULTIPLE_ENABLE.key(), "false"));
+        this.sinkMultipleEnable = sinkMultipleEnable;
     }
 
     /**
@@ -181,16 +180,8 @@ public class HiveWriterFactory implements Serializable {
         return allTypes;
     }
 
-    public HiveShim getHiveShim() {
-        return hiveShim;
-    }
-
     public String[] getPartitionColumns() {
         return partitionColumns;
-    }
-
-    public HiveObjectConversion[] getHiveConversions() {
-        return hiveConversions;
     }
 
     public void checkInitialize() throws Exception {

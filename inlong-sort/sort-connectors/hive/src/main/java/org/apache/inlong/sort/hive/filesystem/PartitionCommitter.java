@@ -17,7 +17,8 @@
 
 package org.apache.inlong.sort.hive.filesystem;
 
-import java.util.Arrays;
+import java.util.stream.Collectors;
+import org.apache.commons.lang.time.StopWatch;
 import org.apache.flink.api.common.state.CheckpointListener;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.FileSystem;
@@ -29,6 +30,8 @@ import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.table.catalog.ObjectIdentifier;
+import org.apache.flink.table.catalog.hive.client.HiveMetastoreClientFactory;
+import org.apache.flink.table.catalog.hive.client.HiveMetastoreClientWrapper;
 import org.apache.flink.table.catalog.hive.client.HiveShim;
 import org.apache.flink.table.catalog.hive.client.HiveShimLoader;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
@@ -46,9 +49,12 @@ import java.util.List;
 import org.apache.flink.table.filesystem.stream.PartitionCommitInfo;
 import org.apache.flink.table.filesystem.stream.PartitionCommitTrigger;
 import org.apache.flink.table.filesystem.stream.TaskTracker;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.inlong.sort.hive.HiveTableMetaStoreFactory;
-import org.apache.inlong.sort.hive.HiveTableUtil;
-import org.apache.inlong.sort.hive.HiveWriterFactory;
 import org.apache.inlong.sort.hive.table.HiveTableInlongFactory;
 
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_PARTITION_COMMIT_POLICY_CLASS;
@@ -75,6 +81,11 @@ public class PartitionCommitter extends AbstractStreamOperator<Void>
         implements
             OneInputStreamOperator<PartitionCommitInfo, Void> {
 
+    /**
+     * hdfs files which modified less than HDFS_FILE_MODIFIED_THRESHOLD will be committed partitions
+     */
+    private static final long HDFS_FILES_MODIFIED_THRESHOLD = 5 * 60 * 1000L;
+
     private static final long serialVersionUID = 1L;
 
     private final Configuration conf;
@@ -97,7 +108,9 @@ public class PartitionCommitter extends AbstractStreamOperator<Void>
 
     private transient List<PartitionCommitPolicy> policies;
 
-    private HiveShim hiveShim;
+    private final HiveShim hiveShim;
+
+    private final String hiveVersion;
 
     private final boolean sinkMultipleEnable;
 
@@ -117,8 +130,8 @@ public class PartitionCommitter extends AbstractStreamOperator<Void>
         PartitionCommitPolicy.validatePolicyChain(
                 metaStoreFactory instanceof EmptyMetaStoreFactory,
                 conf.get(SINK_PARTITION_COMMIT_POLICY_KIND));
-
-        hiveShim = HiveShimLoader.loadHiveShim(conf.get(HiveCatalogFactoryOptions.HIVE_VERSION));
+        this.hiveVersion = conf.get(HiveCatalogFactoryOptions.HIVE_VERSION);
+        this.hiveShim = HiveShimLoader.loadHiveShim(this.hiveVersion);
         this.sinkMultipleEnable = conf.get(SINK_MULTIPLE_ENABLE);
     }
 
@@ -173,49 +186,113 @@ public class PartitionCommitter extends AbstractStreamOperator<Void>
         }
 
         if (sinkMultipleEnable) {
-            if (HiveTableInlongFactory.getTableMetaStoreMap().size() > 0) {
-                for (HiveTableMetaStoreFactory factory : HiveTableInlongFactory.getTableMetaStoreMap().values()) {
-                    ObjectIdentifier identifier = ObjectIdentifier.of("default_catalog", factory.getDatabase(),
-                            factory.getTableName());
-                    HiveWriterFactory writerFactory = HiveTableUtil.getWriterFactory(hiveShim, identifier);
-                    String[] partitionColumns = writerFactory.getPartitionColumns();
-                    if (partitionColumns == null || partitionColumns.length == 0) {
-                        continue;
-                    }
-                    List<String> partitionColumnList = Arrays.asList(partitionColumns);
-                    try (TableMetaStoreFactory.TableMetaStore metaStore = factory.createTableMetaStore()) {
-                        for (String partition : partitions) {
-                            if (!matchPatition(partitionColumns, partition)) {
-                                continue;
+            StopWatch stopWatch = new StopWatch();
+            stopWatch.start();
+            HiveConf hiveConf = HiveTableInlongFactory.getHiveConf();
+            try (HiveMetastoreClientWrapper client = HiveMetastoreClientFactory.create(hiveConf, hiveVersion)) {
+                // we do not know which tables need to commit, so list all tables.
+                // if there are many dbs and tables, performance bottleneck may occur.
+                List<String> dbs = client.getAllDatabases().stream().filter(db -> !db.equalsIgnoreCase("default"))
+                        .collect(Collectors.toList());
+                // hdfs path directory where hive db locates
+                Path dbPath;
+                List<String> partitionColumns = new ArrayList<>();
+                // HashMap<String, Table> tableCache = new HashMap<>(16);
+                FileSystem fs;
+                for (String db : dbs) {
+                    Database database = client.getDatabase(db);
+                    dbPath = new Path(database.getLocationUri());
+                    try {
+                        List<String> tables = client.getAllTables(db);
+                        for (String tableName : tables) {
+                            if (partitionColumns.size() == 0) {
+                                Table table = client.getTable(db, tableName);
+                                // tableCache.put(db + "." + tableName, table);
+                                // all tables must have same name partition field
+                                partitionColumns = table.getPartitionKeys().stream().map(FieldSchema::getName)
+                                        .collect(Collectors.toList());
+                                if (partitionColumns.size() == 0) {
+                                    continue;
+                                }
                             }
-                            LinkedHashMap<String, String> partSpec = extractPartitionSpecFromPath(new Path(partition));
-                            LOG.info("Partition {} of table {} is ready to be committed", partSpec, identifier);
-                            Path path = new Path(writerFactory.getStorageDescriptor().getLocation(),
-                                    generatePartitionPath(partSpec));
-                            // reset partitionKeys and locationPath for MetastoreCommitPolicy
+
+                            // reset partitionKeys for MetastoreCommitPolicy
                             partitionKeys.clear();
-                            partitionKeys.addAll(partitionColumnList);
-                            locationPath = path;
-                            PartitionCommitPolicy.Context context = new CommitPolicyContextImpl(
-                                    new ArrayList<>(partSpec.values()), path);
-                            for (PartitionCommitPolicy policy : policies) {
-                                if (policy instanceof MetastoreCommitPolicy) {
-                                    ((MetastoreCommitPolicy) policy).setMetastore(metaStore);
-                                } else if (policy instanceof SuccessFileCommitPolicy) {
-                                    try {
-                                        String successFileName = conf.get(SINK_PARTITION_COMMIT_SUCCESS_FILE_NAME);
-                                        FileSystem fs = fsFactory.create(path.toUri());
-                                        policy = new SuccessFileCommitPolicy(successFileName, fs);
-                                    } catch (IOException e) {
-                                        throw new RuntimeException(e);
+                            partitionKeys.addAll(partitionColumns);
+
+                            for (String partition : partitions) {
+                                LinkedHashMap<String, String> partSpec = extractPartitionSpecFromPath(
+                                        new Path(partition));
+                                // All tables' hdfs files must be at the same path like
+                                // hdfs://0.0.0.0:9020/user/hive/warehouse.
+                                // Or the table will not be committed partition
+                                Path tablePath = new Path(dbPath, tableName);
+                                Path partitionPath = new Path(tablePath, generatePartitionPath(partSpec));
+
+                                fs = fsFactory.create(partitionPath.toUri());
+                                if (!fs.exists(partitionPath)) {
+                                    // partition path not exist
+                                    continue;
+                                    // if (!fs.exists(tablePath)) {
+                                    // LOG.debug("Table path {} not exist, load table from metastore",
+                                    // partitionPath.getParent());
+                                    // // table location maybe at other storage
+                                    // Table table = tableCache.get(db + "." + tableName);
+                                    // if (table == null) {
+                                    // table = client.getTable(db, tableName);
+                                    // tableCache.put(db + "." + tableName, table);
+                                    // }
+                                    // partitionPath = new Path(table.getSd().getLocation(),
+                                    // generatePartitionPath(partSpec));
+                                    // fs = fsFactory.create(partitionPath.toUri());
+                                    // if (!fs.exists(partitionPath)) {
+                                    // // partition path not exist
+                                    // continue;
+                                    // }
+                                    // // reset partitionKeys for MetastoreCommitPolicy partitionKeys.clear();
+                                    // partitionKeys.addAll(table.getPartitionKeys().stream().map(FieldSchema::getName)
+                                    // .collect(Collectors.toList()));
+                                    // }
+                                }
+
+                                if (stopWatch.getStartTime()
+                                        - fs.getFileStatus(partitionPath)
+                                                .getModificationTime() > HDFS_FILES_MODIFIED_THRESHOLD) {
+                                    // last modified more than HDFS_FILE_MODIFIED_THRESHOLD millis, no need to commit
+                                    continue;
+                                }
+
+                                // reset locationPath for MetastoreCommitPolicy
+                                locationPath = partitionPath;
+
+                                LOG.info("Partition {} of table {}.{} is ready to be committed", partSpec, db,
+                                        tableName);
+
+                                HiveTableMetaStoreFactory factory = new HiveTableMetaStoreFactory(
+                                        new JobConf(HiveTableInlongFactory.getHiveConf()), hiveVersion, db, tableName);
+                                try (TableMetaStoreFactory.TableMetaStore metaStore = factory.createTableMetaStore()) {
+                                    PartitionCommitPolicy.Context context = new CommitPolicyContextImpl(
+                                            new ArrayList<>(partSpec.values()), partitionPath);
+                                    for (PartitionCommitPolicy policy : policies) {
+                                        if (policy instanceof MetastoreCommitPolicy) {
+                                            ((MetastoreCommitPolicy) policy).setMetastore(metaStore);
+                                        } else if (policy instanceof SuccessFileCommitPolicy) {
+                                            String successFileName = conf.get(SINK_PARTITION_COMMIT_SUCCESS_FILE_NAME);
+                                            policy = new SuccessFileCommitPolicy(successFileName, fs);
+                                        }
+                                        policy.commit(context);
                                     }
                                 }
-                                policy.commit(context);
                             }
                         }
+                    } catch (Exception e) {
+                        LOG.error("Commit partition occurs error", e);
+                        break;
                     }
                 }
             }
+            stopWatch.stop();
+            LOG.info("Commit partitions spend {}ms", stopWatch.getTime());
         } else {
             try (TableMetaStoreFactory.TableMetaStore metaStore = metaStoreFactory.createTableMetaStore()) {
                 for (String partition : partitions) {
@@ -233,22 +310,6 @@ public class PartitionCommitter extends AbstractStreamOperator<Void>
                 }
             }
         }
-    }
-
-    public boolean matchPatition(String[] partitionColumns, String partition) {
-        if (partitionColumns == null || partitionColumns.length == 0) {
-            return false;
-        }
-        String[] parts = partition.split("/");
-        if (parts.length != partitionColumns.length) {
-            return false;
-        }
-        for (int i = 0; i < partitionColumns.length; i++) {
-            if (!parts[i].startsWith(partitionColumns[i] + "=")) {
-                return false;
-            }
-        }
-        return true;
     }
 
     @Override
