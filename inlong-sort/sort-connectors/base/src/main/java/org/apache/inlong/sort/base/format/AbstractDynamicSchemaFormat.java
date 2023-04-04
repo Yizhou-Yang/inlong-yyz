@@ -125,6 +125,14 @@ public abstract class AbstractDynamicSchemaFormat<T> {
      */
     public abstract boolean extractDDLFlag(T data);
 
+    /**
+     * Extract ddl statement
+     *
+     * @param data The raw data
+     * @return A ddl statement
+     */
+    public abstract String extractDDL(T data);
+
     public RowType extractSchema(T data) {
         return extractSchema(data, extractPrimaryKeyNames(data));
     }

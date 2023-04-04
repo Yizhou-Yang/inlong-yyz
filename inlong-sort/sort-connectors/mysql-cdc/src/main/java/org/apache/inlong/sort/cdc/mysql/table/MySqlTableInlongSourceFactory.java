@@ -36,6 +36,9 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import static org.apache.flink.util.Preconditions.checkState;
+import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
+import static org.apache.inlong.sort.base.Constants.GH_OST_DDL_CHANGE;
+import static org.apache.inlong.sort.base.Constants.GH_OST_TABLE_REGEX;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.cdc.base.debezium.table.DebeziumOptions.getDebeziumProperties;
@@ -47,6 +50,8 @@ import static org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceOptions.
 import static org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceOptions.DATABASE_NAME;
 import static org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceOptions.HOSTNAME;
+import static org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceOptions.INCLUDE_INCREMENTAL;
+import static org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceOptions.INCLUDE_SCHEMA_CHANGE;
 import static org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceOptions.MIGRATE_ALL;
 import static org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceOptions.PASSWORD;
 import static org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceOptions.PORT;
@@ -144,6 +149,7 @@ public class MySqlTableInlongSourceFactory implements DynamicTableSourceFactory 
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
         final boolean appendSource = config.get(APPEND_MODE);
         final boolean migrateAll = config.get(MIGRATE_ALL);
+        final boolean includeIncremental = config.get(INCLUDE_INCREMENTAL);
         double distributionFactorUpper = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         double distributionFactorLower = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
@@ -152,6 +158,9 @@ public class MySqlTableInlongSourceFactory implements DynamicTableSourceFactory 
                 ? ROW_KINDS_FILTERED.defaultValue()
                 : config.get(ROW_KINDS_FILTERED);
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        final boolean includeSchemaChange = config.get(INCLUDE_SCHEMA_CHANGE);
+        final boolean ghostDdlChange = config.get(GH_OST_DDL_CHANGE);
+        final String ghostTableRegex = config.get(GH_OST_TABLE_REGEX);
         if (enableParallelRead) {
             validateStartupOptionIfEnableParallel(startupOptions);
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -190,7 +199,12 @@ public class MySqlTableInlongSourceFactory implements DynamicTableSourceFactory 
                 heartbeatInterval,
                 migrateAll,
                 inlongMetric,
-                inlongAudit, rowKindFiltered);
+                inlongAudit,
+                rowKindFiltered,
+                includeSchemaChange,
+                includeIncremental,
+                ghostDdlChange,
+                ghostTableRegex);
     }
 
     @Override
@@ -235,6 +249,11 @@ public class MySqlTableInlongSourceFactory implements DynamicTableSourceFactory 
         options.add(INLONG_METRIC);
         options.add(INLONG_AUDIT);
         options.add(ROW_KINDS_FILTERED);
+        options.add(AUDIT_KEYS);
+        options.add(INCLUDE_INCREMENTAL);
+        options.add(INCLUDE_SCHEMA_CHANGE);
+        options.add(GH_OST_DDL_CHANGE);
+        options.add(GH_OST_TABLE_REGEX);
         return options;
     }
 

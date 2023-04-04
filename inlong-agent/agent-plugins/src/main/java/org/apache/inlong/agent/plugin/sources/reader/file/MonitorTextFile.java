@@ -159,7 +159,7 @@ public final class MonitorTextFile {
          * reset the position and bytePositionreset the position and bytePosition
          */
         private void resetPosition() {
-            LOGGER.info("reset position {}",fileReaderOperator.file.toPath());
+            LOGGER.info("reset position {}", fileReaderOperator.file.toPath());
             fileReaderOperator.position = 0;
             fileReaderOperator.bytePosition = 0;
         }

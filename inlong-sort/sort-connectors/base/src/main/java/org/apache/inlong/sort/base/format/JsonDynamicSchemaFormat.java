@@ -52,7 +52,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
-
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TYPE_MAP_COMPATIBLE_WITH_SPARK;
 
 /**
@@ -71,14 +70,12 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TYPE_MAP_COMPA
 @SuppressWarnings("LanguageDetectionInspection")
 public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaFormat<JsonNode> {
 
+    public static final int DEFAULT_DECIMAL_PRECISION = 15;
+    public static final int DEFAULT_DECIMAL_SCALE = 5;
     /**
      * The first item of array
      */
     private static final Integer FIRST = 0;
-
-    private static final int DEFAULT_DECIMAL_PRECISION = 15;
-    private static final int DEFAULT_DECIMAL_SCALE = 5;
-
     private static final Map<Integer, LogicalType> SQL_TYPE_2_FLINK_TYPE_MAPPING =
             ImmutableMap.<Integer, LogicalType>builder()
                     .put(java.sql.Types.CHAR, new CharType())
@@ -336,7 +333,7 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
         return new RowType(fields);
     }
 
-    private LogicalType sqlType2FlinkType(int jdbcType) {
+    public LogicalType sqlType2FlinkType(int jdbcType) {
         Map<Integer, LogicalType> typeMap = adaptSparkEngine
                 ? SQL_TYPE_2_SPARK_SUPPORTED_FLINK_TYPE_MAPPING
                 : SQL_TYPE_2_FLINK_TYPE_MAPPING;

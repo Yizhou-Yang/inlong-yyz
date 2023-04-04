@@ -84,6 +84,11 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final boolean migrateAll;
     private final String inlongMetric;
     private final String inlongAudit;
+    private final boolean includeIncremental;
+    private final boolean includeSchemaChange;
+    private final boolean ghostDdlChange;
+    private final String ghostTableRegex;
+
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
     // --------------------------------------------------------------------------------------------
@@ -123,74 +128,17 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             double distributionFactorLower,
             boolean appendSource,
             StartupOptions startupOptions,
-            Duration heartbeatInterval,
-            boolean migrateAll,
-            String inlongMetric,
-            String inlongAudit,
-            String rowKindsFiltered) {
-        this(
-                physicalSchema,
-                port,
-                hostname,
-                database,
-                tableName,
-                username,
-                password,
-                serverTimeZone,
-                dbzProperties,
-                serverId,
-                enableParallelRead,
-                splitSize,
-                splitMetaGroupSize,
-                fetchSize,
-                connectTimeout,
-                connectMaxRetries,
-                connectionPoolSize,
-                distributionFactorUpper,
-                distributionFactorLower,
-                appendSource,
-                startupOptions,
-                false,
-                new Properties(),
-                heartbeatInterval,
-                migrateAll,
-                inlongMetric,
-                inlongAudit,
-                rowKindsFiltered);
-    }
-
-    /**
-     * Constructor of MySqlTableSource.
-     */
-    public MySqlTableSource(
-            ResolvedSchema physicalSchema,
-            int port,
-            String hostname,
-            String database,
-            String tableName,
-            String username,
-            String password,
-            ZoneId serverTimeZone,
-            Properties dbzProperties,
-            @Nullable String serverId,
-            boolean enableParallelRead,
-            int splitSize,
-            int splitMetaGroupSize,
-            int fetchSize,
-            Duration connectTimeout,
-            int connectMaxRetries,
-            int connectionPoolSize,
-            double distributionFactorUpper,
-            double distributionFactorLower,
-            boolean appendSource,
-            StartupOptions startupOptions,
             boolean scanNewlyAddedTableEnabled,
             Properties jdbcProperties,
             Duration heartbeatInterval,
             boolean migrateAll,
             String inlongMetric,
             String inlongAudit,
-            String rowKindsFiltered) {
+            String rowKindsFiltered,
+            boolean includeSchemaChange,
+            boolean includeIncremental,
+            boolean ghostDdlChange,
+            String ghostTableRegex) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -222,6 +170,10 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.inlongMetric = inlongMetric;
         this.inlongAudit = inlongAudit;
         this.rowKindsFiltered = rowKindsFiltered;
+        this.includeIncremental = includeIncremental;
+        this.includeSchemaChange = includeSchemaChange;
+        this.ghostDdlChange = ghostDdlChange;
+        this.ghostTableRegex = ghostTableRegex;
     }
 
     @Override
@@ -255,6 +207,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         .setUserDefinedConverterFactory(
                                 MySqlDeserializationConverterFactory.instance())
                         .setMigrateAll(migrateAll)
+                        .setGhostDdlChange(ghostDdlChange)
+                        .setGhostTableRegex(ghostTableRegex)
                         .build();
         if (enableParallelRead) {
             MySqlSource<RowData> parallelSource =
@@ -279,10 +233,12 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                            .includeSchemaChanges(includeSchemaChange)
                             .jdbcProperties(jdbcProperties)
                             .heartbeatInterval(heartbeatInterval)
                             .inlongMetric(inlongMetric)
                             .inlongAudit(inlongAudit)
+                            .includeIncremental(includeIncremental)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -371,7 +327,12 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         heartbeatInterval,
                         migrateAll,
                         inlongMetric,
-                        inlongAudit, rowKindsFiltered);
+                        inlongAudit,
+                        rowKindsFiltered,
+                        includeSchemaChange,
+                        includeIncremental,
+                        ghostDdlChange,
+                        ghostTableRegex);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -411,7 +372,13 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(metadataKeys, that.metadataKeys)
                 && Objects.equals(jdbcProperties, that.jdbcProperties)
                 && Objects.equals(inlongMetric, that.inlongMetric)
-                && Objects.equals(inlongAudit, that.inlongAudit);
+                && Objects.equals(inlongAudit, that.inlongAudit)
+                && Objects.equals(inlongAudit, that.inlongAudit)
+                && Objects.equals(rowKindsFiltered, that.rowKindsFiltered)
+                && Objects.equals(includeSchemaChange, that.includeSchemaChange)
+                && Objects.equals(includeIncremental, that.includeIncremental)
+                && Objects.equals(ghostDdlChange, that.ghostDdlChange)
+                && Objects.equals(ghostDdlChange, that.ghostDdlChange);
     }
 
     @Override
@@ -442,7 +409,12 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 scanNewlyAddedTableEnabled,
                 jdbcProperties,
                 inlongMetric,
-                inlongAudit);
+                inlongAudit,
+                rowKindsFiltered,
+                includeSchemaChange,
+                includeIncremental,
+                ghostDdlChange,
+                ghostTableRegex);
     }
 
     @Override

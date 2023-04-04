@@ -24,7 +24,6 @@ import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.sink.SinkFunctionProvider;
-import org.apache.flink.types.RowKind;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
 import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
@@ -52,7 +51,11 @@ public class DorisDynamicTableSink implements DynamicTableSink {
     private final String auditHostAndPorts;
     private final Integer parallelism;
     private final DirtyOptions dirtyOptions;
-    private @Nullable final DirtySink<Object> dirtySink;
+    @Nullable
+    private final DirtySink<Object> dirtySink;
+    private final boolean enableSchemaChange;
+    @Nullable
+    private final String schemaChangePolicies;
 
     public DorisDynamicTableSink(DorisOptions options,
             DorisReadOptions readOptions,
@@ -68,7 +71,9 @@ public class DorisDynamicTableSink implements DynamicTableSink {
             String auditHostAndPorts,
             Integer parallelism,
             DirtyOptions dirtyOptions,
-            @Nullable DirtySink<Object> dirtySink) {
+            @Nullable DirtySink<Object> dirtySink,
+            boolean enableSchemaChange,
+            @Nullable String schemaChangePolicies) {
         this.options = options;
         this.readOptions = readOptions;
         this.executionOptions = executionOptions;
@@ -84,19 +89,13 @@ public class DorisDynamicTableSink implements DynamicTableSink {
         this.parallelism = parallelism;
         this.dirtyOptions = dirtyOptions;
         this.dirtySink = dirtySink;
+        this.enableSchemaChange = enableSchemaChange;
+        this.schemaChangePolicies = schemaChangePolicies;
     }
 
     @Override
     public ChangelogMode getChangelogMode(ChangelogMode changelogMode) {
-        if (this.multipleSink) {
-            return ChangelogMode.newBuilder()
-                    .addContainedKind(RowKind.INSERT)
-                    .addContainedKind(RowKind.DELETE)
-                    .addContainedKind(RowKind.UPDATE_AFTER)
-                    .build();
-        } else {
-            return ChangelogMode.all();
-        }
+        return ChangelogMode.all();
     }
 
     @SuppressWarnings({"unchecked"})
@@ -122,7 +121,9 @@ public class DorisDynamicTableSink implements DynamicTableSink {
                 .setIgnoreSingleTableErrors(ignoreSingleTableErrors)
                 .setSchemaUpdatePolicy(schemaUpdatePolicy)
                 .setDirtyOptions(dirtyOptions)
-                .setDirtySink(dirtySink);
+                .setDirtySink(dirtySink)
+                .setEnableSchemaChange(enableSchemaChange)
+                .setSchemaChangePolicies(schemaChangePolicies);
         return SinkFunctionProvider.of(
                 new GenericDorisSinkFunction<>(builder.build()), parallelism);
     }
@@ -143,7 +144,9 @@ public class DorisDynamicTableSink implements DynamicTableSink {
                 auditHostAndPorts,
                 parallelism,
                 dirtyOptions,
-                dirtySink);
+                dirtySink,
+                enableSchemaChange,
+                schemaChangePolicies);
     }
 
     @Override

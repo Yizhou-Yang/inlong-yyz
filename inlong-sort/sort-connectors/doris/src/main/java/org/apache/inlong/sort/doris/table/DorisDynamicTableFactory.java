@@ -39,14 +39,20 @@ import org.apache.inlong.sort.base.dirty.DirtyOptions;
 import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.apache.inlong.sort.base.dirty.utils.DirtySinkFactoryUtils;
 import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
+import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
+import org.apache.inlong.sort.protocol.enums.SchemaChangePolicy;
+import org.apache.inlong.sort.protocol.enums.SchemaChangeType;
+import org.apache.inlong.sort.util.SchemaChangeUtils;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
-import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
-
 import static org.apache.doris.flink.cfg.ConfigurationOptions.DORIS_BATCH_SIZE_DEFAULT;
 import static org.apache.doris.flink.cfg.ConfigurationOptions.DORIS_DESERIALIZE_ARROW_ASYNC_DEFAULT;
 import static org.apache.doris.flink.cfg.ConfigurationOptions.DORIS_DESERIALIZE_QUEUE_SIZE_DEFAULT;
@@ -56,6 +62,7 @@ import static org.apache.doris.flink.cfg.ConfigurationOptions.DORIS_REQUEST_QUER
 import static org.apache.doris.flink.cfg.ConfigurationOptions.DORIS_REQUEST_READ_TIMEOUT_MS_DEFAULT;
 import static org.apache.doris.flink.cfg.ConfigurationOptions.DORIS_REQUEST_RETRIES_DEFAULT;
 import static org.apache.doris.flink.cfg.ConfigurationOptions.DORIS_TABLET_SIZE_DEFAULT;
+import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.DIRTY_PREFIX;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
@@ -65,6 +72,8 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_IGNORE_SINGLE_TABLE_ERRORS;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_SCHEMA_UPDATE_POLICY;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
+import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_ENABLE;
+import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_POLICIES;
 
 /**
  * This class copy from {@link org.apache.doris.flink.table.DorisDynamicTableFactory}
@@ -173,6 +182,34 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
             .defaultValue(DorisExecutionOptions.DEFAULT_MAX_BATCH_BYTES)
             .withDescription("the flush max bytes (includes all append, upsert and delete records), over this number"
                     + " in batch, will flush data. The default value is 10MB.");
+    private static final Map<SchemaChangeType, List<SchemaChangePolicy>> SUPPORTS_POLICY_MAP = new HashMap<>();
+
+    static {
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.CREATE_TABLE,
+                Arrays.asList(SchemaChangePolicy.ENABLE, SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.DROP_TABLE,
+                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.RENAME_TABLE,
+                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.TRUNCATE_TABLE,
+                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.ADD_COLUMN,
+                Arrays.asList(SchemaChangePolicy.ENABLE, SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.DROP_COLUMN,
+                Arrays.asList(SchemaChangePolicy.ENABLE, SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.RENAME_COLUMN,
+                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.CHANGE_COLUMN_TYPE,
+                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+    }
 
     @Override
     public String factoryIdentifier() {
@@ -220,6 +257,9 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
         options.add(INLONG_METRIC);
         options.add(INLONG_AUDIT);
         options.add(FactoryUtil.SINK_PARALLELISM);
+        options.add(AUDIT_KEYS);
+        options.add(SINK_SCHEMA_CHANGE_ENABLE);
+        options.add(SINK_SCHEMA_CHANGE_POLICIES);
         return options;
     }
 
@@ -282,7 +322,7 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
     private Properties getStreamLoadProp(Map<String, String> tableOptions) {
         final Properties streamLoadProp = new Properties();
 
-        for (Map.Entry<String, String> entry : tableOptions.entrySet()) {
+        for (Entry<String, String> entry : tableOptions.entrySet()) {
             if (entry.getKey().startsWith(STREAM_LOAD_PROP_PREFIX)) {
                 String subKey = entry.getKey().substring(STREAM_LOAD_PROP_PREFIX.length());
                 streamLoadProp.put(subKey, entry.getValue());
@@ -304,10 +344,12 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
         boolean multipleSink = helper.getOptions().get(SINK_MULTIPLE_ENABLE);
         boolean ignoreSingleTableErrors = helper.getOptions().get(SINK_MULTIPLE_IGNORE_SINGLE_TABLE_ERRORS);
         SchemaUpdateExceptionPolicy schemaUpdatePolicy = helper.getOptions()
-                .getOptional(SINK_MULTIPLE_SCHEMA_UPDATE_POLICY).orElse(SchemaUpdateExceptionPolicy.THROW_WITH_STOP);
+                .get(SINK_MULTIPLE_SCHEMA_UPDATE_POLICY);
         String sinkMultipleFormat = helper.getOptions().getOptional(SINK_MULTIPLE_FORMAT).orElse(null);
-        validateSinkMultiple(physicalSchema.toPhysicalRowDataType(),
-                multipleSink, sinkMultipleFormat, databasePattern, tablePattern);
+        boolean enableSchemaChange = helper.getOptions().get(SINK_SCHEMA_CHANGE_ENABLE);
+        String schemaChangePolicies = helper.getOptions().getOptional(SINK_SCHEMA_CHANGE_POLICIES).orElse(null);
+        validateSinkMultiple(physicalSchema.toPhysicalRowDataType(), multipleSink, sinkMultipleFormat,
+                databasePattern, tablePattern, enableSchemaChange, schemaChangePolicies);
         String inlongMetric = helper.getOptions().getOptional(INLONG_METRIC).orElse(INLONG_METRIC.defaultValue());
         String auditHostAndPorts = helper.getOptions().getOptional(INLONG_AUDIT).orElse(INLONG_AUDIT.defaultValue());
         Integer parallelism = helper.getOptions().getOptional(FactoryUtil.SINK_PARALLELISM).orElse(null);
@@ -330,11 +372,13 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
                 auditHostAndPorts,
                 parallelism,
                 dirtyOptions,
-                dirtySink);
+                dirtySink,
+                enableSchemaChange,
+                schemaChangePolicies);
     }
 
     private void validateSinkMultiple(DataType physicalDataType, boolean multipleSink, String sinkMultipleFormat,
-            String databasePattern, String tablePattern) {
+            String databasePattern, String tablePattern, boolean enableSchemaChange, String schemaChangePolicies) {
         if (multipleSink) {
             if (StringUtils.isBlank(databasePattern)) {
                 throw new ValidationException(
@@ -363,6 +407,21 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
                 throw new ValidationException(
                         "Only supports 'BYTES' or 'VARBINARY(n)' of PhysicalDataType "
                                 + "when the option 'sink.multiple.enable' is 'true'");
+            }
+            if (enableSchemaChange) {
+                Map<SchemaChangeType, SchemaChangePolicy> policyMap = SchemaChangeUtils
+                        .deserialize(schemaChangePolicies);
+                for (Entry<SchemaChangeType, SchemaChangePolicy> kv : policyMap.entrySet()) {
+                    List<SchemaChangePolicy> policies = SUPPORTS_POLICY_MAP.get(kv.getKey());
+                    if (policies == null) {
+                        throw new ValidationException(
+                                String.format("Unsupported type of schemage-change: %s", kv.getKey()));
+                    }
+                    if (!policies.contains(kv.getValue())) {
+                        throw new ValidationException(
+                                String.format("Unsupported policy of schemage-change: %s", kv.getValue()));
+                    }
+                }
             }
         }
     }

@@ -18,6 +18,11 @@
 package org.apache.inlong.sort.cdc.base.debezium.table;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.inlong.sort.base.Constants.CARET;
+import static org.apache.inlong.sort.base.Constants.DDL_FIELD_NAME;
+import static org.apache.inlong.sort.base.Constants.DDL_OP_ALTER;
+import static org.apache.inlong.sort.base.Constants.DOLLAR;
+import static org.apache.inlong.sort.cdc.base.relational.JdbcSourceEventDispatcher.HISTORY_RECORD_FIELD;
 
 import io.debezium.data.Envelope;
 import io.debezium.data.SpecialValueDecimal;
@@ -42,7 +47,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
@@ -53,8 +61,10 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Collector;
+import org.apache.inlong.sort.base.Constants;
 import org.apache.inlong.sort.base.filter.RowValidator;
 import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.base.util.RecordUtils;
 import org.apache.inlong.sort.cdc.base.util.TemporalConversions;
 import org.apache.kafka.connect.data.ConnectSchema;
 import org.apache.kafka.connect.data.Decimal;
@@ -110,6 +120,11 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 
     private ZoneId serverTimeZone;
 
+    private boolean ghostDdlChange;
+    private String ghostTableRegex;
+
+    public final ObjectMapper objectMapper = new ObjectMapper();
+
     RowDataDebeziumDeserializeSchema(
             RowType physicalDataType,
             MetadataConverter[] metadataConverters,
@@ -118,7 +133,9 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
             ZoneId serverTimeZone,
             boolean appendSource,
             DeserializationRuntimeConverterFactory userDefinedConverterFactory,
-            boolean migrateAll) {
+            boolean migrateAll,
+            boolean ghostDdlChange,
+            String ghostTableRegex) {
         this.hasMetadata = checkNotNull(metadataConverters).length > 0;
         this.appendMetadataCollector = new AppendMetadataCollector(metadataConverters, migrateAll);
         this.migrateAll = migrateAll;
@@ -131,6 +148,8 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
         this.resultTypeInfo = checkNotNull(resultTypeInfo);
         this.rowKindValidator = rowValidator;
         this.appendSource = checkNotNull(appendSource);
+        this.ghostDdlChange = ghostDdlChange;
+        this.ghostTableRegex = ghostTableRegex;
     }
 
     /**
@@ -582,31 +601,44 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
             @Override
             public Object convert(Object dbzObj, Schema schema) {
 
-                ConnectSchema connectSchema = (ConnectSchema) schema;
-                List<Field> fields = connectSchema.fields();
+                if (dbzObj instanceof Struct) {
+                    ConnectSchema connectSchema = (ConnectSchema) schema;
+                    List<Field> fields = connectSchema.fields();
 
-                Map<String, Object> data = new HashMap<>();
-                Struct struct = (Struct) dbzObj;
+                    Map<String, Object> data = new HashMap<>();
+                    Struct struct = (Struct) dbzObj;
 
-                for (Field field : fields) {
-                    String fieldName = field.name();
-                    Object fieldValue = struct.getWithoutDefault(fieldName);
-                    Schema fieldSchema = schema.field(fieldName).schema();
-                    String schemaName = fieldSchema.name();
-                    if (schemaName != null) {
-                        fieldValue = getValueWithSchema(fieldValue, schemaName);
+                    for (Field field : fields) {
+                        String fieldName = field.name();
+                        Object fieldValue = struct.getWithoutDefault(fieldName);
+                        Schema fieldSchema = schema.field(fieldName).schema();
+                        String schemaName = fieldSchema.name();
+                        if (schemaName != null) {
+                            fieldValue = getValueWithSchema(fieldValue, schemaName);
+                        }
+                        if (fieldValue instanceof ByteBuffer) {
+                            // binary data (blob or varbinary in mysql) are stored in bytebuffer
+                            // use utf-8 to decode as a string by default
+                            fieldValue = new String(((ByteBuffer) fieldValue).array());
+                        }
+                        data.put(fieldName, fieldValue);
                     }
-                    if (fieldValue instanceof ByteBuffer) {
-                        // binary data (blob or varbinary in mysql) are stored in bytebuffer
-                        // use utf-8 to decode as a string by default
-                        fieldValue = new String(((ByteBuffer) fieldValue).array());
-                    }
-                    data.put(fieldName, fieldValue);
+
+                    GenericRowData row = new GenericRowData(1);
+                    row.setField(0, data);
+                    return row;
                 }
 
+                return constructDdlRow(dbzObj);
+
+            }
+
+            private GenericRowData constructDdlRow(Object ddl) {
+                Map<String, Object> data = new HashMap<>();
                 GenericRowData row = new GenericRowData(1);
                 row.setField(0, data);
-
+                data.put(DDL_FIELD_NAME, ddl);
+                row.setField(0, data);
                 return row;
             }
         };
@@ -655,7 +687,7 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 
     @Override
     public void deserialize(SourceRecord record, Collector<RowData> out) throws Exception {
-        deserialize(record, out, null);
+        deserialize(record, out);
     }
 
     @Override
@@ -665,6 +697,12 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
         Envelope.Operation op = Envelope.operationFor(record);
         Struct value = (Struct) record.value();
         Schema valueSchema = record.valueSchema();
+
+        if (RecordUtils.isDdlRecord(value)) {
+            extractDdlRecord(record, out, tableSchema, value);
+            return;
+        }
+
         if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
             GenericRowData insert = extractAfterRow(value, valueSchema);
             insert.setRowKind(RowKind.INSERT);
@@ -681,11 +719,31 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
                     emit(record, before, tableSchema, out);
                 }
             }
-
             GenericRowData after = extractAfterRow(value, valueSchema);
             after.setRowKind(RowKind.UPDATE_AFTER);
             emit(record, after, tableSchema, out);
         }
+    }
+
+    private void extractDdlRecord(SourceRecord record, Collector<RowData> out, TableChange tableSchema,
+            Struct value) {
+
+        try {
+            GenericRowData insert = (GenericRowData) physicalConverter.convert(
+                    objectMapper.readTree(value.get(HISTORY_RECORD_FIELD).toString()).get(DDL_FIELD_NAME).asText(),
+                    null);
+            if (ghostDdlChange) {
+                insert = extractGhostRecord(insert);
+                if (insert == null) {
+                    return;
+                }
+            }
+            insert.setRowKind(RowKind.INSERT);
+            emit(record, insert, tableSchema, out);
+        } catch (Exception e) {
+            LOG.error("Failed to extract DDL record {}", record, e);
+        }
+
     }
 
     private GenericRowData extractAfterRow(Struct value, Schema valueSchema) throws Exception {
@@ -698,6 +756,34 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
         Schema beforeSchema = valueSchema.field(Envelope.FieldName.BEFORE).schema();
         Struct before = value.getStruct(Envelope.FieldName.BEFORE);
         return (GenericRowData) physicalConverter.convert(before, beforeSchema);
+    }
+
+
+    /**
+     * Extract ddl record from gh-ost ddl statements
+     *
+     * @param data a record with sql statement
+     * @return ddl record
+     * @throws Exception
+     */
+    private GenericRowData extractGhostRecord(GenericRowData data) throws Exception {
+        String ddl = ((Map<String, String>) data.getField(0)).get(DDL_FIELD_NAME);
+        if (this.ghostTableRegex.startsWith(CARET) && this.ghostTableRegex.endsWith(DOLLAR)) {
+            this.ghostTableRegex = this.ghostTableRegex.substring(1, this.ghostTableRegex.length() - 1);
+        }
+        Pattern ghostTablePattern = Pattern.compile(this.ghostTableRegex);
+        Matcher ghostMatcher = ghostTablePattern.matcher(ddl);
+        if (ghostMatcher.find()) {
+            // Just need Alter statement
+            if (ddl.toUpperCase().contains(DDL_OP_ALTER)) {
+                String originTable = ghostMatcher.group(1);
+                return (GenericRowData) physicalConverter
+                        .convert(ddl.replaceAll(this.ghostTableRegex, originTable), null);
+            } else {
+                return null;
+            }
+        }
+        return data;
     }
 
     private void emit(SourceRecord inRecord, RowData physicalRow,
@@ -735,6 +821,8 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
         private ZoneId serverTimeZone = ZoneId.of("UTC");
         private boolean appendSource = false;
         private boolean migrateAll = false;
+        private boolean ghostDdlChange = false;
+        private String ghostTableRegex = Constants.GH_OST_TABLE_REGEX.defaultValue();
         private DeserializationRuntimeConverterFactory userDefinedConverterFactory =
                 DeserializationRuntimeConverterFactory.DEFAULT;
 
@@ -779,6 +867,16 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
             return this;
         }
 
+        public Builder setGhostDdlChange(boolean ghostDdlChange) {
+            this.ghostDdlChange = ghostDdlChange;
+            return this;
+        }
+
+        public Builder setGhostTableRegex(String ghostTableRegex) {
+            this.ghostTableRegex = ghostTableRegex;
+            return this;
+        }
+
         public RowDataDebeziumDeserializeSchema build() {
             return new RowDataDebeziumDeserializeSchema(
                     physicalRowType,
@@ -788,7 +886,9 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
                     serverTimeZone,
                     appendSource,
                     userDefinedConverterFactory,
-                    migrateAll);
+                    migrateAll,
+                    ghostDdlChange,
+                    ghostTableRegex);
         }
     }
 }
