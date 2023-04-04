@@ -129,6 +129,8 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
 
     private final SchemaUpdateExceptionPolicy schemaUpdatePolicy;
     private final PartitionPolicy partitionPolicy;
+    private final String partitionField;
+    private final String timePattern;
     private final boolean sinkMultipleEnable;
 
     public HiveTableSink(
@@ -143,6 +145,8 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
             @Nullable DirtySink<Object> dirtySink,
             SchemaUpdateExceptionPolicy schemaUpdatePolicy,
             PartitionPolicy partitionPolicy,
+            String partitionField,
+            String timePattern,
             boolean sinkMultipleEnable) {
         this.flinkConf = flinkConf;
         this.jobConf = jobConf;
@@ -161,6 +165,8 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
         this.dirtySink = dirtySink;
         this.schemaUpdatePolicy = schemaUpdatePolicy;
         this.partitionPolicy = partitionPolicy;
+        this.partitionField = partitionField;
+        this.timePattern = timePattern;
         this.sinkMultipleEnable = sinkMultipleEnable;
     }
 
@@ -322,7 +328,9 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
                 tableSchema.getFieldNames(),
                 tableSchema.getFieldDataTypes(),
                 getPartitionKeyArray(),
-                partitionPolicy);
+                partitionPolicy,
+                partitionField,
+                timePattern);
 
         TableBucketAssigner assigner = new TableBucketAssigner(partComputer);
         HiveRollingPolicy rollingPolicy =
@@ -552,6 +560,8 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
                         dirtySink,
                         schemaUpdatePolicy,
                         partitionPolicy,
+                        partitionField,
+                        timePattern,
                         sinkMultipleEnable);
         sink.staticPartitionSpec = staticPartitionSpec;
         sink.overwrite = overwrite;

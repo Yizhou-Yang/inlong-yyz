@@ -73,6 +73,10 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
 
     private final PartitionPolicy partitionPolicy;
 
+    private final String partitionField;
+
+    private final String timePattern;
+
     public HiveRowDataPartitionComputer(
             JobConf jobConf,
             HiveShim hiveShim,
@@ -81,7 +85,9 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
             String[] columnNames,
             DataType[] columnTypes,
             String[] partitionColumns,
-            PartitionPolicy partitionPolicy) {
+            PartitionPolicy partitionPolicy,
+            String partitionField,
+            String timePattern) {
         super(defaultPartValue, columnNames, columnTypes, partitionColumns);
         this.hiveShim = hiveShim;
         this.hiveVersion = hiveVersion;
@@ -104,6 +110,8 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
         this.databasePattern = jobConf.get(SINK_MULTIPLE_DATABASE_PATTERN.key());
         this.tablePattern = jobConf.get(SINK_MULTIPLE_TABLE_PATTERN.key());
         this.partitionPolicy = partitionPolicy;
+        this.partitionField = partitionField;
+        this.timePattern = timePattern;
     }
 
     @Override
@@ -156,7 +164,8 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
                             type.getLogicalType(), hiveShim);
                     String partitionValue = field != null ? String.valueOf(hiveConversion.toHiveObject(field)) : null;
                     if (partitionValue == null) {
-                        field = HiveTableUtil.getDefaultPartitionValue(rawData, schema, partitionPolicy);
+                        field = HiveTableUtil.getDefaultPartitionValue(rawData, schema, partitionPolicy, partitionField,
+                                timePattern);
                         partitionValue = field != null ? String.valueOf(hiveConversion.toHiveObject(field)) : null;
                     }
                     if (StringUtils.isEmpty(partitionValue)) {
