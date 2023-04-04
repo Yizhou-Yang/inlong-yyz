@@ -21,6 +21,7 @@ package org.apache.inlong.sort.protocol.enums;
  * The class defines the support policy of schema change.
  */
 public enum SchemaChangePolicy {
+
     /**
      * Under this policy it supports the schema change.
      * That is to say, it will execute the schema change on the data source.
