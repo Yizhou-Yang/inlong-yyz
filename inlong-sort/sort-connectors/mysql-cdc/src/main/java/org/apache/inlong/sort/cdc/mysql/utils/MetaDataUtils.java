@@ -38,7 +38,6 @@ import org.apache.inlong.sort.formats.json.canal.CanalJson;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
-
 public class MetaDataUtils {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -55,7 +54,7 @@ public class MetaDataUtils {
         Map<String, Integer> sqlType = new LinkedHashMap<>();
         final Table table = tableSchema.getTable();
         table.columns().forEach(
-            column -> sqlType.put(column.name(), column.jdbcType()));
+                column -> sqlType.put(column.name(), column.jdbcType()));
         return sqlType;
     }
 
@@ -91,7 +90,7 @@ public class MetaDataUtils {
                 break;
             default:
                 throw new IllegalStateException("the record only have states in DELETE, "
-                    + "UPDATE_BEFORE, INSERT and UPDATE_AFTER");
+                        + "UPDATE_BEFORE, INSERT and UPDATE_AFTER");
         }
         return opType;
     }
@@ -109,7 +108,7 @@ public class MetaDataUtils {
                 break;
             default:
                 throw new IllegalStateException("the record only have states in DELETE, "
-                    + "UPDATE_BEFORE, INSERT and UPDATE_AFTER");
+                        + "UPDATE_BEFORE, INSERT and UPDATE_AFTER");
         }
         return opType;
     }
@@ -128,20 +127,20 @@ public class MetaDataUtils {
         Map<String, String> mysqlType = new LinkedHashMap<>();
         final Table table = tableSchema.getTable();
         table.columns()
-            .forEach(
-                column -> {
-                    mysqlType.put(
-                        column.name(),
-                        String.format(
-                            "%s(%d)",
-                            column.typeName(),
-                            column.length()));
-                });
+                .forEach(
+                        column -> {
+                            mysqlType.put(
+                                    column.name(),
+                                    String.format(
+                                            "%s(%d)",
+                                            column.typeName(),
+                                            column.length()));
+                        });
         return mysqlType;
     }
 
     public static StringData getCanalData(SourceRecord record, GenericRowData rowData,
-        TableChange tableSchema) {
+            TableChange tableSchema) {
         Struct messageStruct = (Struct) record.value();
         Struct sourceStruct = messageStruct.getStruct(FieldName.SOURCE);
         // tableName
@@ -155,10 +154,10 @@ public class MetaDataUtils {
         List<Map<String, Object>> dataList = new ArrayList<>();
 
         CanalJson canalJson = CanalJson.builder()
-            .database(databaseName)
-            .es(opTs).pkNames(getPkNames(tableSchema))
-            .mysqlType(getMysqlType(tableSchema)).table(tableName)
-            .type(getCanalOpType(rowData)).sqlType(getSqlType(tableSchema)).build();
+                .database(databaseName)
+                .es(opTs).pkNames(getPkNames(tableSchema))
+                .mysqlType(getMysqlType(tableSchema)).table(tableName)
+                .type(getCanalOpType(rowData)).sqlType(getSqlType(tableSchema)).build();
 
         try {
             if (RecordUtils.isDdlRecord(messageStruct)) {
@@ -178,6 +177,5 @@ public class MetaDataUtils {
             throw new IllegalStateException("exception occurs when get meta data", e);
         }
     }
-
 
 }
