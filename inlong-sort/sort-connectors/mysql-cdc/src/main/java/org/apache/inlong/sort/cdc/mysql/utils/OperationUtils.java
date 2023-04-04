@@ -120,11 +120,17 @@ public class OperationUtils {
                         null, Column.builder().
                         name(removeContinuousBackQuotes(alterExpression.getColumnName())).build()));
                     break;
-                    case ADD:
-                        alterColumns.add(new AlterColumn(AlterType.ADD_COLUMN,
-                            parseColumnWithPosition(isFirst, sqlType,
-                                alterExpression.getColDataTypeList().get(0)), null));
-                        break;
+                case ADD:
+                    alterColumns.add(new AlterColumn(AlterType.ADD_COLUMN,
+                        parseColumnWithPosition(isFirst, sqlType,
+                            alterExpression.getColDataTypeList().get(0)), null));
+                    break;
+                case MODIFY:
+                    alterColumns.add(new AlterColumn(AlterType.MODIFY_COLUMN));
+                case RENAME:
+                    alterColumns.add(new AlterColumn(AlterType.RENAME_COLUMN));
+                case CHANGE:
+                    alterColumns.add(new AlterColumn(AlterType.CHANGE_COLUMN));
             }
 
         });

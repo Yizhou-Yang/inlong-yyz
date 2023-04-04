@@ -22,5 +22,6 @@ public enum AlterType {
     RENAME_COLUMN,
     ADD_COLUMN,
     DROP_COLUMN,
-    MODIFY_COLUMN
+    MODIFY_COLUMN,
+    CHANGE_COLUMN
 }
