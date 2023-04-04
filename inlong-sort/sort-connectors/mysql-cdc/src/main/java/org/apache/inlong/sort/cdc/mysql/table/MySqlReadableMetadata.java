@@ -26,15 +26,11 @@ import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getPkNames;
 import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getSqlType;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.isSnapshotRecord;
 
-import static org.apache.inlong.sort.base.Constants.DDL_FIELD_NAME;
-
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
 import io.debezium.data.Envelope.FieldName;
 import io.debezium.relational.Table;
 import io.debezium.relational.history.TableChanges;
-import io.debezium.relational.history.TableChanges.TableChange;
-import java.util.LinkedHashMap;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.GenericArrayData;

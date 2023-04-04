@@ -28,7 +28,6 @@ import io.debezium.relational.history.TableChanges.TableChange;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.alter.Alter;
@@ -51,7 +50,6 @@ import org.apache.inlong.sort.ddl.operations.RenameTableOperation;
 import org.apache.inlong.sort.ddl.operations.TruncateTableOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Utils for generate operation from statement from sqlParser.
@@ -80,18 +78,17 @@ public class OperationUtils {
             Statement statement = CCJSqlParserUtil.parse(sql);
             if (statement instanceof Alter) {
                 return parseAlterOperation(
-                    (Alter) statement, tableSchema, endsWithFirst);
+                        (Alter) statement, tableSchema, endsWithFirst);
             } else if (statement instanceof CreateTable) {
                 return parseCreateTableOperation(
-                    (CreateTable) statement, tableSchema);
+                        (CreateTable) statement, tableSchema);
             } else if (statement instanceof Drop) {
                 return new DropTableOperation();
             } else if (statement instanceof Truncate) {
                 return new TruncateTableOperation();
             } else if (statement instanceof RenameTableStatement) {
                 return new RenameTableOperation();
-            }
-            else {
+            } else {
                 LOG.warn("doesn't support sql {}, statement {}", sql, statement);
             }
         } catch (Exception e) {
@@ -108,7 +105,7 @@ public class OperationUtils {
      * @return AlterOperation
      */
     private static AlterOperation parseAlterOperation(Alter statement,
-        TableChange tableSchema, boolean isFirst) {
+            TableChange tableSchema, boolean isFirst) {
 
         Map<String, Integer> sqlType = getSqlType(tableSchema);
         List<AlterColumn> alterColumns = new ArrayList<>();
@@ -117,13 +114,14 @@ public class OperationUtils {
             switch (alterExpression.getOperation()) {
                 case DROP:
                     alterColumns.add(new AlterColumn(AlterType.DROP_COLUMN,
-                        null, Column.builder().
-                        name(removeContinuousBackQuotes(alterExpression.getColumnName())).build()));
+                            null, Column.builder().name(removeContinuousBackQuotes(alterExpression.getColumnName()))
+                                    .build()));
                     break;
                 case ADD:
                     alterColumns.add(new AlterColumn(AlterType.ADD_COLUMN,
-                        parseColumnWithPosition(isFirst, sqlType,
-                            alterExpression.getColDataTypeList().get(0)), null));
+                            parseColumnWithPosition(isFirst, sqlType,
+                                    alterExpression.getColDataTypeList().get(0)),
+                            null));
                     break;
                 case MODIFY:
                     alterColumns.add(new AlterColumn(AlterType.MODIFY_COLUMN));
@@ -138,7 +136,6 @@ public class OperationUtils {
         return new AlterOperation(alterColumns);
     }
 
-
     /**
      * parse create table operation from CreateTable from sqlParser.
      * @param statement create table statement
@@ -146,7 +143,7 @@ public class OperationUtils {
      * @return CreateTableOperation
      */
     private static CreateTableOperation parseCreateTableOperation(
-        CreateTable statement, TableChange tableSchema) {
+            CreateTable statement, TableChange tableSchema) {
 
         Map<String, Integer> sqlType = getSqlType(tableSchema);
         CreateTableOperation createTableOperation = new CreateTableOperation();
@@ -190,8 +187,7 @@ public class OperationUtils {
                     break;
             }
             List<String> columns = new ArrayList<>();
-            perIndex.getColumnsNames().forEach(columnName ->
-                columns.add(removeContinuousBackQuotes(columnName)));
+            perIndex.getColumnsNames().forEach(columnName -> columns.add(removeContinuousBackQuotes(columnName)));
             index.setIndexName(removeContinuousBackQuotes(perIndex.getName()));
             index.setIndexColumns(columns);
             indexList.add(index);
