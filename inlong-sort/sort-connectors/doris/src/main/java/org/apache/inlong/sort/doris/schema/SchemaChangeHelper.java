@@ -95,7 +95,6 @@ public class SchemaChangeHelper {
      * Process schema change for Doris
      *
      * @param data The origin data
-     * @throws Exception The exception may throws when executing
      */
     public void process(JsonNode data) {
         if (!schemaChange) {
@@ -157,7 +156,7 @@ public class SchemaChangeHelper {
             LOGGER.warn("Unsupported for {}: {}", type, originSchema);
             return;
         }
-        doSchemaChangeBase(policy, originSchema);
+        doSchemaChangeBase(type, policy, originSchema);
     }
 
     private void doRenameColumn(SchemaChangeType type, String originSchema) {
@@ -166,7 +165,7 @@ public class SchemaChangeHelper {
             LOGGER.warn("Unsupported for {}: {}", type, originSchema);
             return;
         }
-        doSchemaChangeBase(policy, originSchema);
+        doSchemaChangeBase(type, policy, originSchema);
     }
 
     private void doDropColumn(SchemaChangeType type, String originSchema, JsonNode data, AlterOperation operation) {
@@ -177,7 +176,7 @@ public class SchemaChangeHelper {
                 String table = dynamicSchemaFormat.parse(data, tablePattern);
                 String stmt = operationHelper.buildDropColumnStatement(database, table, operation);
                 if (checkLightSchemaChange(database, table,
-                        operation.getAlterColumns().get(0).getNewColumn().getName(), true)) {
+                        operation.getAlterColumns().get(0).getOldColumn().getName(), true)) {
                     boolean result = executeStatement(database, stmt);
                     if (!result) {
                         LOGGER.error("Drop column failed,statement: {}", stmt);
@@ -195,7 +194,7 @@ public class SchemaChangeHelper {
                 return;
             }
         }
-        doSchemaChangeBase(policy, originSchema);
+        doSchemaChangeBase(type, policy, originSchema);
     }
 
     private void doAddColumn(SchemaChangeType type, String originSchema, JsonNode data, AlterOperation operation) {
@@ -224,7 +223,7 @@ public class SchemaChangeHelper {
                 return;
             }
         }
-        doSchemaChangeBase(policy, originSchema);
+        doSchemaChangeBase(type, policy, originSchema);
     }
 
     private void doTruncateTable(SchemaChangeType type, String originSchema) {
@@ -233,7 +232,7 @@ public class SchemaChangeHelper {
             LOGGER.warn("Unsupported for {}: {}", type, originSchema);
             return;
         }
-        doSchemaChangeBase(policy, originSchema);
+        doSchemaChangeBase(type, policy, originSchema);
     }
 
     private void doRenameTable(SchemaChangeType type, String originSchema) {
@@ -242,7 +241,7 @@ public class SchemaChangeHelper {
             LOGGER.warn("Unsupported for {}: {}", type, originSchema);
             return;
         }
-        doSchemaChangeBase(policy, originSchema);
+        doSchemaChangeBase(type, policy, originSchema);
     }
 
     private void doDropTable(SchemaChangeType type, String originSchema) {
@@ -251,7 +250,7 @@ public class SchemaChangeHelper {
             LOGGER.warn("Unsupported for {}: {}", type, originSchema);
             return;
         }
-        doSchemaChangeBase(policy, originSchema);
+        doSchemaChangeBase(type, policy, originSchema);
     }
 
     private void doCreateTable(SchemaChangeType type, String originSchema, JsonNode data,
@@ -281,19 +280,20 @@ public class SchemaChangeHelper {
                 return;
             }
         }
-        doSchemaChangeBase(policy, originSchema);
+        doSchemaChangeBase(type, policy, originSchema);
     }
 
-    private void doSchemaChangeBase(SchemaChangePolicy policy, String schema) {
+    private void doSchemaChangeBase(SchemaChangeType type, SchemaChangePolicy policy, String schema) {
         if (policy == null) {
+            LOGGER.warn("Unsupported for {}: {}", type, schema);
             return;
         }
         switch (policy) {
             case LOG:
-                LOGGER.warn("Unsupported for {}: {}", policy, schema);
+                LOGGER.warn("Unsupported for {}: {}", type, schema);
                 break;
             case ERROR:
-                throw new SchemaChangeHandleException(String.format("Unsupported for %s: %s", policy, schema));
+                throw new SchemaChangeHandleException(String.format("Unsupported for %s: %s", type, schema));
             default:
         }
     }

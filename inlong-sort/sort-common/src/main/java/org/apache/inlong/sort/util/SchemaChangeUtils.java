@@ -104,7 +104,7 @@ public final class SchemaChangeUtils {
                 AlterOperation alterOperation = (AlterOperation) operation;
                 // Get alter type from the first item
                 Preconditions.checkState(alterOperation.getAlterColumns() != null
-                        && !alterOperation.getAlterColumns().isEmpty(), "alter expressions is empty");
+                        && !alterOperation.getAlterColumns().isEmpty(), "alter columns is empty");
                 AlterType alterType = alterOperation.getAlterColumns().get(0).getAlterType();
                 switch (alterType) {
                     case ADD_COLUMN:
