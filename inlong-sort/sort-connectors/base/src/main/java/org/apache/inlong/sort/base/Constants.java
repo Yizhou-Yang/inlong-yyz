@@ -112,6 +112,17 @@ public final class Constants {
      */
     public static final String SEMICOLON = ".";
     /**
+     * The caret symbol (^) at the start of a regular expression to indicate
+     * that a match must occur at the beginning of the searched text.
+     */
+    public static final String CARET = "^";
+
+    /**
+     * The dollar symbol ($) at the end of a regular expression to indicate
+     * that a match must occur at the ending of the searched text.
+     */
+    public static final String DOLLAR = "$";
+    /**
      * It is used for metric data to spilt schema identify
      */
     public static final String SPILT_SEMICOLON = "\\.";
@@ -139,6 +150,8 @@ public final class Constants {
     public static final String AUTO_DESERIALIZE_FALSE = "autoDeserialize=false";
 
     public static final String DDL_FIELD_NAME = "ddl";
+
+    public static final String DDL_OP_ALTER = "ALTER";
 
     public static final ConfigOption<String> AUDIT_KEYS =
             ConfigOptions.key("metrics.audit.key")
@@ -373,4 +386,16 @@ public final class Constants {
                     .noDefaultValue()
                     .withDescription("The policies of schema-change, format is 'key1=value1&key2=value2', "
                             + "the key is the type of schema-change and the value is the support policy of schema-change");
+    public static final ConfigOption<Boolean> GH_OST_DDL_CHANGE = ConfigOptions
+            .key("gh-ost.ddl.change")
+            .booleanType()
+            .defaultValue(false)
+            .withDescription(
+                    "Whether parse ddl changes of gh-ost, default value is 'false'.");
+    public static final ConfigOption<String> GH_OST_TABLE_REGEX = ConfigOptions
+            .key("gh-ost.table.regex")
+            .stringType()
+            .defaultValue("^_(.*)_(gho|ghc|del|new|old)$")
+            .withDescription(
+                    "Matcher the original table name from the ddl of gh-ost.");
 }
