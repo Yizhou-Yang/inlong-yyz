@@ -39,6 +39,9 @@ import org.apache.flink.table.types.utils.DataTypeUtils;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
 import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.apache.inlong.sort.kafka.DynamicKafkaSerializationSchema.MetadataConverter;
+import org.apache.inlong.sort.protocol.enums.SchemaChangePolicy;
+import org.apache.inlong.sort.protocol.enums.SchemaChangeType;
+import org.apache.inlong.sort.util.SchemaChangeUtils;
 import org.apache.kafka.common.header.Header;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -159,6 +162,10 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
 
     private boolean multipleSink;
 
+    private Map<SchemaChangeType, SchemaChangePolicy> policyMap;
+
+    private String schemaChangePolicies;
+
     /**
      * Constructor of KafkaDynamicSink.
      */
@@ -184,7 +191,8 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
             @Nullable String topicPattern,
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
-            boolean multipleSink) {
+            boolean multipleSink,
+            String schemaChangePolicies) {
         // Format attributes
         this.consumedDataType =
                 checkNotNull(consumedDataType, "Consumed data type must not be null.");
@@ -218,6 +226,8 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
         this.dirtyOptions = dirtyOptions;
         this.dirtySink = dirtySink;
         this.multipleSink = multipleSink;
+        this.schemaChangePolicies = schemaChangePolicies;
+        this.policyMap = SchemaChangeUtils.deserialize(schemaChangePolicies);
     }
 
     @Override
@@ -324,7 +334,8 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
                         topicPattern,
                         dirtyOptions,
                         dirtySink,
-                        multipleSink);
+                        multipleSink,
+                        schemaChangePolicies);
         copy.metadataKeys = metadataKeys;
         return copy;
     }
@@ -438,7 +449,8 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
                         sinkMultipleFormat,
                         topicPattern,
                         dirtyOptions,
-                        dirtySink);
+                        dirtySink,
+                        policyMap);
 
         return new FlinkKafkaProducer<>(
                 topic,

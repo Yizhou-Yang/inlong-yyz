@@ -102,6 +102,7 @@ import static org.apache.inlong.sort.base.Constants.DIRTY_PREFIX;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
+import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_POLICIES;
 import static org.apache.inlong.sort.kafka.table.KafkaOptions.KAFKA_IGNORE_ALL_CHANGELOG;
 
 /**
@@ -423,6 +424,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
         final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(tableOptions);
         final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
         final boolean multipleSink = tableOptions.getOptional(SINK_MULTIPLE_FORMAT).isPresent();
+        final String schemaChangePolicies = tableOptions.getOptional(SINK_SCHEMA_CHANGE_POLICIES).orElse(null);
+
         return createKafkaTableSink(
                 physicalDataType,
                 keyEncodingFormat.orElse(null),
@@ -442,7 +445,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
                 tableOptions.getOptional(TOPIC_PATTERN).orElse(null),
                 dirtyOptions,
                 dirtySink,
-                multipleSink);
+                multipleSink,
+                schemaChangePolicies);
     }
 
     private void validateSinkMultipleFormatAndPhysicalDataType(DataType physicalDataType,
@@ -528,7 +532,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
             @Nullable String topicPattern,
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
-            boolean multipleSink) {
+            boolean multipleSink,
+            String schemaChangePolicies) {
         return new KafkaDynamicSink(
                 physicalDataType,
                 physicalDataType,
@@ -551,6 +556,7 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
                 topicPattern,
                 dirtyOptions,
                 dirtySink,
-                multipleSink);
+                multipleSink,
+                schemaChangePolicies);
     }
 }
