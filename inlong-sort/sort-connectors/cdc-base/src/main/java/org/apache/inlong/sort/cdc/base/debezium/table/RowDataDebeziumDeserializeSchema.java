@@ -18,10 +18,7 @@
 package org.apache.inlong.sort.cdc.base.debezium.table;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.inlong.sort.base.Constants.CARET;
 import static org.apache.inlong.sort.base.Constants.DDL_FIELD_NAME;
-import static org.apache.inlong.sort.base.Constants.DDL_OP_ALTER;
-import static org.apache.inlong.sort.base.Constants.DOLLAR;
 import static org.apache.inlong.sort.cdc.base.relational.JdbcSourceEventDispatcher.HISTORY_RECORD_FIELD;
 
 import io.debezium.data.Envelope;
@@ -47,8 +44,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.table.data.DecimalData;
@@ -61,7 +56,6 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Collector;
-import org.apache.inlong.sort.base.Constants;
 import org.apache.inlong.sort.base.filter.RowValidator;
 import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
 import org.apache.inlong.sort.cdc.base.util.RecordUtils;
