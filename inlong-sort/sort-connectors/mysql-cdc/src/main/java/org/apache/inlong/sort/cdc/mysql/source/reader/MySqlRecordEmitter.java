@@ -209,16 +209,18 @@ public final class MySqlRecordEmitter<T>
         Matcher matcher = compile.matcher(tableName);
         if (matcher.find()) {
             tableName = matcher.group(1);
-            TableId tableId = RecordUtils.getTableId(element);
+            String dbName = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getDbName(element);
+            TableId tableId = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableId(
+                    dbName,
+                    tableName);
             MySqlBinlogSplitState mySqlBinlogSplitState = splitState.asBinlogSplitState();
-            if (mySqlBinlogSplitState.getTableSchemas().containsKey(tableId)) {
-                if (ddl.toUpperCase().startsWith(DDL_OP_ALTER)) {
+            if (ddl.toUpperCase().startsWith(DDL_OP_ALTER)
+                    && mySqlBinlogSplitState.getTableSchemas().containsKey(tableId)) {
                     String matchTableInSqlRegex = ghostTableRegex;
                     if (matchTableInSqlRegex.startsWith(CARET) && matchTableInSqlRegex.endsWith(DOLLAR)) {
                         matchTableInSqlRegex = matchTableInSqlRegex.substring(1, matchTableInSqlRegex.length() - 1);
                     }
                     mySqlBinlogSplitState.recordTableDdl(tableId, ddl.replaceAll(matchTableInSqlRegex, tableName));
-                }
             }
         }
     }
@@ -230,7 +232,10 @@ public final class MySqlRecordEmitter<T>
             Matcher matcher = compile.matcher(tableName);
             if (matcher.find()) {
                 tableName = matcher.group(1);
-                TableId tableId = RecordUtils.getTableId(element);
+                String dbName = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getDbName(element);
+                TableId tableId = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableId(
+                        dbName,
+                        tableName);
                 String ddl = splitState.asBinlogSplitState().getTableDdls().get(tableId);
                 Struct value = (Struct) element.value();
                 // Update source.table and historyRecord
