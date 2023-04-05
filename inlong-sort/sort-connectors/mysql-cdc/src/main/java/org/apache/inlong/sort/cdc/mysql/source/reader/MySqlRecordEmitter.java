@@ -38,6 +38,7 @@ import org.apache.inlong.sort.cdc.base.debezium.history.FlinkJsonTableChangeSeri
 import org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceConfig;
 import org.apache.inlong.sort.cdc.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffset;
+import org.apache.inlong.sort.cdc.mysql.source.split.MySqlBinlogSplitState;
 import org.apache.inlong.sort.cdc.mysql.source.split.MySqlSplitState;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
@@ -139,11 +140,7 @@ public final class MySqlRecordEmitter<T>
             if (tableChanges.isEmpty()) {
                 String ddl = historyRecord.document().getString(Fields.DDL_STATEMENTS);
                 if (ddl.toUpperCase().startsWith(DDL_OP_DROP)) {
-                    String tableName = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableName(element);
-                    String dbName = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getDbName(element);
-                    TableId tableId = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTabelId(
-                            dbName,
-                            tableName);
+                    TableId tableId = RecordUtils.getTableId(element);
                     // If this table is one of the captured tables, output the ddl element.
                     if (splitState.getMySQLSplit().getTableSchemas().containsKey(tableId)) {
                         outputDdlElement(element, output, splitState, null);
@@ -212,19 +209,15 @@ public final class MySqlRecordEmitter<T>
         Matcher matcher = compile.matcher(tableName);
         if (matcher.find()) {
             tableName = matcher.group(1);
-            String dbName = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getDbName(element);
-            TableId tableId = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTabelId(dbName,
-                    tableName);
-            TableChange tableChange = splitState.getMySQLSplit().getTableSchemas().getOrDefault(
-                    tableId,
-                    null);
-            if (null != tableChange) {
+            TableId tableId = RecordUtils.getTableId(element);
+            MySqlBinlogSplitState mySqlBinlogSplitState = splitState.asBinlogSplitState();
+            if (mySqlBinlogSplitState.getTableSchemas().containsKey(tableId)) {
                 if (ddl.toUpperCase().startsWith(DDL_OP_ALTER)) {
                     String matchTableInSqlRegex = ghostTableRegex;
                     if (matchTableInSqlRegex.startsWith(CARET) && matchTableInSqlRegex.endsWith(DOLLAR)) {
                         matchTableInSqlRegex = matchTableInSqlRegex.substring(1, matchTableInSqlRegex.length() - 1);
                     }
-                    tableDdls.put(tableId, ddl.replaceAll(matchTableInSqlRegex, tableName));
+                    mySqlBinlogSplitState.recordTableDdl(tableId, ddl.replaceAll(matchTableInSqlRegex, tableName));
                 }
             }
         }
@@ -237,9 +230,8 @@ public final class MySqlRecordEmitter<T>
             Matcher matcher = compile.matcher(tableName);
             if (matcher.find()) {
                 tableName = matcher.group(1);
-                String dbName = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getDbName(element);
-                TableId tableId = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTabelId(dbName, tableName);
-                String ddl = tableDdls.get(tableId);
+                TableId tableId = RecordUtils.getTableId(element);
+                String ddl = splitState.asBinlogSplitState().getTableDdls().get(tableId);
                 Struct value = (Struct) element.value();
                 // Update source.table and historyRecord
                 value.getStruct(Fields.SOURCE).put(TABLE_NAME, tableName);
