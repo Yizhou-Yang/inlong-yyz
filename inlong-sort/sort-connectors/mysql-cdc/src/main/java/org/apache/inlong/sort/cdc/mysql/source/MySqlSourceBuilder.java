@@ -285,4 +285,9 @@ public class MySqlSourceBuilder<T> {
         this.configFactory.ghostTableRegex(ghostTableRegex);
         return this;
     }
+
+    public MySqlSourceBuilder<T> dataSourceName(String dataSourceName) {
+        this.configFactory.dataSourceName(dataSourceName);
+        return this;
+    }
 }

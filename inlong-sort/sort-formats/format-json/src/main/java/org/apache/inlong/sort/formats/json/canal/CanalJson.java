@@ -65,6 +65,8 @@ public class CanalJson {
     private Operation operation;
     @JsonProperty("incremental")
     private Boolean incremental;
+    @JsonProperty("dataSourceName")
+    private String dataSourceName;
 
     @JsonCreator
     public CanalJson(@Nullable @JsonProperty("data") List<Map<String, Object>> data,
@@ -81,7 +83,8 @@ public class CanalJson {
             @JsonProperty("schema") String schema,
             @Nullable @JsonProperty("oracleType") Map<String, String> oracleType,
             @JsonProperty("operation") Operation operation,
-            @JsonProperty("incremental") Boolean incremental) {
+            @JsonProperty("incremental") Boolean incremental,
+            @JsonProperty("dataSourceName") String dataSourceName) {
         this.data = data;
         this.es = es;
         this.table = table;
@@ -97,6 +100,7 @@ public class CanalJson {
         this.oracleType = oracleType;
         this.operation = operation;
         this.incremental = incremental;
+        this.dataSourceName = dataSourceName;
     }
 
 }

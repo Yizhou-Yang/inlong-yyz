@@ -72,6 +72,7 @@ public class MySqlSourceConfig implements Serializable {
     private final boolean includeIncremental;
     private final boolean ghostDdlChange;
     private final String ghostTableRegex;
+    private final String dataSourceName;
 
     MySqlSourceConfig(
             String hostname,
@@ -99,7 +100,8 @@ public class MySqlSourceConfig implements Serializable {
             String inlongAudit,
             boolean includeIncremental,
             boolean ghostDdlChange,
-            String ghostTableRegex) {
+            String ghostTableRegex,
+        String dataSourceName) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -128,6 +130,7 @@ public class MySqlSourceConfig implements Serializable {
         this.includeIncremental = includeIncremental;
         this.ghostDdlChange = ghostDdlChange;
         this.ghostTableRegex = ghostTableRegex;
+        this.dataSourceName = dataSourceName;
     }
 
     public String getHostname() {
@@ -245,5 +248,9 @@ public class MySqlSourceConfig implements Serializable {
 
     public String getGhostTableRegex() {
         return ghostTableRegex;
+    }
+
+    public String getDataSourceName() {
+        return dataSourceName;
     }
 }
