@@ -226,7 +226,7 @@ public class OperationHelperTest {
     public void testBuildCreateTableStatement() {
         List<String> primaryKeys = Arrays.asList("a", "b");
         List<Column> columns = Arrays.asList(new Column("a", Collections.singletonList("32"), Types.VARCHAR,
-                        new Position(PositionType.FIRST, null), false, "InLong", "a column"),
+                new Position(PositionType.FIRST, null), false, "InLong", "a column"),
                 new Column("b", Collections.singletonList("32"), Types.VARCHAR,
                         new Position(PositionType.FIRST, null), false, "InLong", "a column"),
                 new Column("c", Collections.singletonList("32"), Types.VARCHAR,
@@ -239,14 +239,14 @@ public class OperationHelperTest {
         String database = "inlong_database";
         String table = "inlong_table";
         Assert.assertEquals("CREATE TABLE IF NOT EXISTS `inlong_database`.`inlong_table`(\n"
-                        + "\t`a` VARCHAR(32) NOT NULL DEFAULT 'InLong' COMMENT 'a column',\n"
-                        + "\t`b` VARCHAR(32) NOT NULL DEFAULT 'InLong' COMMENT 'a column',\n"
-                        + "\t`c` VARCHAR(32) DEFAULT 'InLong' COMMENT 'a column',\n"
-                        + "\t`d` VARCHAR(32) DEFAULT 'InLong' COMMENT 'a column'\n"
-                        + ")\n"
-                        + "UNIQUE KEY(`a`,`b`)\n"
-                        + "COMMENT 'create table auto'\n"
-                        + "DISTRIBUTED BY HASH(`a`,`b`)\n"
+                + "\t`a` VARCHAR(32) NOT NULL DEFAULT 'InLong' COMMENT 'a column',\n"
+                + "\t`b` VARCHAR(32) NOT NULL DEFAULT 'InLong' COMMENT 'a column',\n"
+                + "\t`c` VARCHAR(32) DEFAULT 'InLong' COMMENT 'a column',\n"
+                + "\t`d` VARCHAR(32) DEFAULT 'InLong' COMMENT 'a column'\n"
+                + ")\n"
+                + "UNIQUE KEY(`a`,`b`)\n"
+                + "COMMENT 'create table auto'\n"
+                + "DISTRIBUTED BY HASH(`a`,`b`)\n"
                         + "PROPERTIES (\n"
                         + "\t\"light_schema_change\" = \"true\"\n"
                         + ")",

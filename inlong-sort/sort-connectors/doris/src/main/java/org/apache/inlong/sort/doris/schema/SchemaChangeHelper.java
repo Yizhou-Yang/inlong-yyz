@@ -336,16 +336,16 @@ public class SchemaChangeHelper {
 
     private boolean checkLightSchemaChange(String database, String table, String column, boolean dropColumn)
             throws IOException {
-        String url = String.format(CHECK_LIGHT_SCHEMA_CHANGE_API, options.getFenodes(), database, table);
-        Map<String, Object> param = buildRequestParam(column, dropColumn);
-        HttpGetEntity httpGet = new HttpGetEntity(url);
-        httpGet.setHeader(HttpHeaders.AUTHORIZATION, authHeader());
-        httpGet.setEntity(new StringEntity(dynamicSchemaFormat.objectMapper.writeValueAsString(param)));
-        boolean success = sendRequest(httpGet);
-        if (!success) {
-            LOGGER.warn("schema change can not do table {}.{}", database, table);
-        }
-        return success;
+         String url = String.format(CHECK_LIGHT_SCHEMA_CHANGE_API, options.getFenodes(), database, table);
+         Map<String, Object> param = buildRequestParam(column, dropColumn);
+         HttpGetEntity httpGet = new HttpGetEntity(url);
+         httpGet.setHeader(HttpHeaders.AUTHORIZATION, authHeader());
+         httpGet.setEntity(new StringEntity(dynamicSchemaFormat.objectMapper.writeValueAsString(param)));
+         boolean success = sendRequest(httpGet);
+         if (!success) {
+         LOGGER.warn("schema change can not do table {}.{}", database, table);
+         }
+         return success;
     }
 
     @SuppressWarnings("unchecked")

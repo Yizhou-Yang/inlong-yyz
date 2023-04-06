@@ -18,13 +18,9 @@
 package org.apache.inlong.sort.cdc.mysql.table;
 
 import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getCanalData;
-import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getDebeziumOpType;
+import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getDebeziumData;
 import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getMetaData;
-import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getMysqlType;
 import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getOpType;
-import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getPkNames;
-import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getSqlType;
-import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.isSnapshotRecord;
 
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
@@ -41,8 +37,6 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
 import org.apache.inlong.sort.cdc.base.debezium.table.MetadataConverter;
-import org.apache.inlong.sort.formats.json.debezium.DebeziumJson;
-import org.apache.inlong.sort.formats.json.debezium.DebeziumJson.Source;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
@@ -162,28 +156,7 @@ public enum MySqlReadableMetadata {
                 @Override
                 public Object read(SourceRecord record,
                         @Nullable TableChanges.TableChange tableSchema, RowData rowData) {
-                    // construct debezium json
-                    Struct messageStruct = (Struct) record.value();
-                    Struct sourceStruct = messageStruct.getStruct(FieldName.SOURCE);
-                    GenericRowData data = (GenericRowData) rowData;
-                    Map<String, Object> field = (Map<String, Object>) data.getField(0);
-
-                    Source source = Source.builder().db(getMetaData(record, AbstractSourceInfo.DATABASE_NAME_KEY))
-                            .table(getMetaData(record, AbstractSourceInfo.TABLE_NAME_KEY))
-                            .name(sourceStruct.getString(AbstractSourceInfo.SERVER_NAME_KEY))
-                            .sqlType(getSqlType(tableSchema))
-                            .pkNames(getPkNames(tableSchema))
-                            .mysqlType(getMysqlType(tableSchema))
-                            .build();
-                    DebeziumJson debeziumJson = DebeziumJson.builder().after(field).source(source)
-                            .tsMs(sourceStruct.getInt64(AbstractSourceInfo.TIMESTAMP_KEY)).op(getDebeziumOpType(data))
-                            .tableChange(tableSchema).incremental(isSnapshotRecord(sourceStruct)).build();
-
-                    try {
-                        return StringData.fromString(OBJECT_MAPPER.writeValueAsString(debeziumJson));
-                    } catch (Exception e) {
-                        throw new IllegalStateException("exception occurs when get meta data", e);
-                    }
+                    return getDebeziumData(record, tableSchema, (GenericRowData) rowData);
                 }
             }),
 

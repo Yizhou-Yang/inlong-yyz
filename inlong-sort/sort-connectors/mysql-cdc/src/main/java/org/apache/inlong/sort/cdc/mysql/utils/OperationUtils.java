@@ -113,7 +113,7 @@ public class OperationUtils {
                 case DROP:
                     alterColumns.add(new AlterColumn(AlterType.DROP_COLUMN,
                             null,
-                        Column.builder().name(reformatName(alterExpression.getColumnName()))
+                            Column.builder().name(reformatName(alterExpression.getColumnName()))
                                     .build()));
                     break;
                 case ADD:
@@ -124,19 +124,19 @@ public class OperationUtils {
                     break;
                 case RENAME:
                     alterColumns.add(new AlterColumn(AlterType.CHANGE_COLUMN,
-                        new Column(reformatName(alterExpression.getColumnName())),
-                        new Column(reformatName(alterExpression.getColumnOldName()))));
+                            new Column(reformatName(alterExpression.getColumnName())),
+                            new Column(reformatName(alterExpression.getColumnOldName()))));
                     break;
                 case MODIFY:
                 case CHANGE:
                     alterColumns.add(new AlterColumn(AlterType.CHANGE_COLUMN,
-                        parseColumnWithPosition(isFirst, sqlType,
-                            alterExpression.getColDataTypeList().get(0)),
-                        new Column(reformatName(alterExpression.getColumnOldName()))));
+                            parseColumnWithPosition(isFirst, sqlType,
+                                    alterExpression.getColDataTypeList().get(0)),
+                            new Column(reformatName(alterExpression.getColumnOldName()))));
                     break;
                 default:
                     LOG.warn("doesn't support alter operation {}, statement {}",
-                        alterExpression.getOperation(), statement);
+                            alterExpression.getOperation(), statement);
             }
 
         });

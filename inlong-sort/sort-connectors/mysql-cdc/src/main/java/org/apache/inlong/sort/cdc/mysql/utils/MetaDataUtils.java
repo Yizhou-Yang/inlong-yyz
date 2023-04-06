@@ -18,6 +18,7 @@
 package org.apache.inlong.sort.cdc.mysql.utils;
 
 import static org.apache.inlong.sort.base.Constants.DDL_FIELD_NAME;
+import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.isSnapshotRecord;
 import static org.apache.inlong.sort.cdc.mysql.utils.OperationUtils.generateOperation;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
@@ -26,6 +27,7 @@ import io.debezium.relational.Table;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,8 @@ import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.inlong.sort.cdc.base.util.RecordUtils;
 import org.apache.inlong.sort.formats.json.canal.CanalJson;
+import org.apache.inlong.sort.formats.json.debezium.DebeziumJson;
+import org.apache.inlong.sort.formats.json.debezium.DebeziumJson.Source;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
@@ -157,8 +161,11 @@ public class MetaDataUtils {
                 .database(databaseName)
                 .es(opTs).pkNames(getPkNames(tableSchema))
                 .mysqlType(getMysqlType(tableSchema)).table(tableName)
+                .incremental(!isSnapshotRecord(sourceStruct))
                 .dataSourceName(sourceStruct.getString(AbstractSourceInfo.SERVER_NAME_KEY))
-                .type(getCanalOpType(rowData)).sqlType(getSqlType(tableSchema)).build();
+                .type(getCanalOpType(rowData))
+                .sqlType(getSqlType(tableSchema))
+                .build();
 
         try {
             if (RecordUtils.isDdlRecord(messageStruct)) {
@@ -177,6 +184,42 @@ public class MetaDataUtils {
         } catch (Exception e) {
             throw new IllegalStateException("exception occurs when get meta data", e);
         }
+    }
+
+    public static StringData getDebeziumData(SourceRecord record, TableChange tableSchema,
+            GenericRowData rowData) {
+        // construct debezium json
+        Struct messageStruct = (Struct) record.value();
+        Struct sourceStruct = messageStruct.getStruct(FieldName.SOURCE);
+        GenericRowData data = rowData;
+        Map<String, Object> field = (Map<String, Object>) data.getField(0);
+
+        Source source = Source.builder().db(getMetaData(record, AbstractSourceInfo.DATABASE_NAME_KEY))
+                .table(getMetaData(record, AbstractSourceInfo.TABLE_NAME_KEY))
+                .name(sourceStruct.getString(AbstractSourceInfo.SERVER_NAME_KEY))
+                .sqlType(getSqlType(tableSchema))
+                .pkNames(getPkNames(tableSchema))
+                .mysqlType(getMysqlType(tableSchema))
+                .build();
+        DebeziumJson debeziumJson = DebeziumJson.builder().source(source)
+                .tsMs(sourceStruct.getInt64(AbstractSourceInfo.TIMESTAMP_KEY)).op(getDebeziumOpType(data))
+                .dataSourceName(sourceStruct.getString(AbstractSourceInfo.SERVER_NAME_KEY))
+                .tableChange(tableSchema).incremental(!isSnapshotRecord(sourceStruct)).build();
+
+        try {
+            if (RecordUtils.isDdlRecord(messageStruct)) {
+                String sql = (String) field.get(DDL_FIELD_NAME);
+                debeziumJson.setDdl(sql);
+                debeziumJson.setOperation(generateOperation(sql, tableSchema));
+                debeziumJson.setAfter(new HashMap<>());
+            } else {
+                debeziumJson.setAfter(field);
+            }
+            return StringData.fromString(OBJECT_MAPPER.writeValueAsString(debeziumJson));
+        } catch (Exception e) {
+            throw new IllegalStateException("exception occurs when get meta data {}", e);
+        }
+
     }
 
 }
