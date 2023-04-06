@@ -15,19 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl.indexes;
+package org.apache.inlong.sort.protocol.ddl.enums;
 
-import java.util.List;
-import lombok.Data;
-import org.apache.inlong.sort.ddl.enums.IndexType;
-
-@Data
-public class Index {
-
-    private IndexType indexType;
-
-    private String indexName;
-
-    private List<String> indexColumns;
-
+/**
+ * @Author pengzirui
+ * @Date 2023/3/21 2:54 PM
+ * @Version 1.0
+ */
+public enum PositionType {
+    FIRST,
+    AFTER
 }

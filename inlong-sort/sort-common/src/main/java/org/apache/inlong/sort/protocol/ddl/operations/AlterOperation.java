@@ -15,47 +15,32 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl;
+package org.apache.inlong.sort.protocol.ddl.operations;
 
 import java.util.List;
-import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude.Include;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonTypeName;
+import org.apache.inlong.sort.protocol.ddl.enums.OperationType;
+import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
 
-@Data
-@Builder
+@EqualsAndHashCode(callSuper = true)
+@JsonTypeName("alterOperation")
 @JsonInclude(Include.NON_NULL)
-public class Column {
+@Data
+public class AlterOperation extends Operation {
 
-    @JsonProperty("name")
-    private String name;
-    @JsonProperty("definition")
-    private List<String> definition;
-    @JsonProperty("jdbcType")
-    private int jdbcType;
-    @JsonProperty("position")
-    private Position position;
-    @JsonProperty("isNullable")
-    private boolean isNullable;
-    @JsonProperty("defaultValue")
-    private String defaultValue;
-    @JsonProperty("comment")
-    private String comment;
+    @JsonProperty("alterColumns")
+    private List<AlterColumn> alterColumns;
 
     @JsonCreator
-    public Column(@JsonProperty("name") String name, @JsonProperty("definition") List<String> definition,
-            @JsonProperty("jdbcType") int jdbcType, @JsonProperty("position") Position position,
-            @JsonProperty("isNullable") boolean isNullable, @JsonProperty("defaultValue") String defaultValue,
-            @JsonProperty("comment") String comment) {
-        this.name = name;
-        this.definition = definition;
-        this.jdbcType = jdbcType;
-        this.position = position;
-        this.defaultValue = defaultValue;
-        this.comment = comment;
-        this.isNullable = isNullable;
+    public AlterOperation(@JsonProperty("alterColumns") List<AlterColumn> alterColumns) {
+        super(OperationType.ALTER);
+        this.alterColumns = alterColumns;
     }
+
 }

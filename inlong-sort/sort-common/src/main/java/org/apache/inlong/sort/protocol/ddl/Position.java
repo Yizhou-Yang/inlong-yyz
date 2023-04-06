@@ -15,25 +15,29 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl.operations;
+package org.apache.inlong.sort.protocol.ddl;
 
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude.Include;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonTypeName;
-import org.apache.inlong.sort.ddl.enums.OperationType;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.inlong.sort.protocol.ddl.enums.PositionType;
 
-@EqualsAndHashCode(callSuper = true)
-@JsonTypeName("dropTableOperation")
 @JsonInclude(Include.NON_NULL)
 @Data
-public class DropTableOperation extends Operation {
+public class Position {
+
+    @JsonProperty("positionType")
+    private PositionType positionType;
+
+    @JsonProperty("columnName")
+    private String columnName;
 
     @JsonCreator
-    public DropTableOperation() {
-        super(OperationType.DROP);
+    public Position(@JsonProperty("positionType") PositionType positionType,
+            @JsonProperty("columnName") String columnName) {
+        this.positionType = positionType;
+        this.columnName = columnName;
     }
-
 }

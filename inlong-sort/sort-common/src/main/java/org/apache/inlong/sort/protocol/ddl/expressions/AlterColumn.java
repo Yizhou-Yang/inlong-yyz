@@ -15,29 +15,39 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl;
+package org.apache.inlong.sort.protocol.ddl.expressions;
 
 import lombok.Data;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude.Include;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.inlong.sort.ddl.enums.PositionType;
+import org.apache.inlong.sort.protocol.ddl.enums.AlterType;
+import org.apache.inlong.sort.protocol.ddl.Column;
 
 @JsonInclude(Include.NON_NULL)
 @Data
-public class Position {
+public class AlterColumn {
 
-    @JsonProperty("positionType")
-    private PositionType positionType;
+    @JsonProperty("alterType")
+    private AlterType alterType;
 
-    @JsonProperty("columnName")
-    private String columnName;
+    @JsonProperty("newColumn")
+    private Column newColumn;
+
+    @JsonProperty("oldColumn")
+    private Column oldColumn;
 
     @JsonCreator
-    public Position(@JsonProperty("positionType") PositionType positionType,
-            @JsonProperty("columnName") String columnName) {
-        this.positionType = positionType;
-        this.columnName = columnName;
+    public AlterColumn(@JsonProperty("alterType") AlterType alterType,
+            @JsonProperty("newColumn") Column newColumn,
+            @JsonProperty("oldColumn") Column oldColumn) {
+        this.alterType = alterType;
+        this.newColumn = newColumn;
+        this.oldColumn = oldColumn;
+    }
+
+    public AlterColumn(@JsonProperty("alterType") AlterType alterType) {
+        this.alterType = alterType;
     }
 }

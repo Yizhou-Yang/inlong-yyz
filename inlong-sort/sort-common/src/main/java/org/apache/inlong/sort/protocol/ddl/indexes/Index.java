@@ -15,8 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl;
+package org.apache.inlong.sort.protocol.ddl.indexes;
 
-public class DdlConstants {
+import java.util.List;
+import lombok.Data;
+import org.apache.inlong.sort.protocol.ddl.enums.IndexType;
+
+@Data
+public class Index {
+
+    private IndexType indexType;
+
+    private String indexName;
+
+    private List<String> indexColumns;
 
 }

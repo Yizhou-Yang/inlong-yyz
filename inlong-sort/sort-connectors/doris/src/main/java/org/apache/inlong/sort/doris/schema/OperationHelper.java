@@ -24,11 +24,11 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.util.Preconditions;
 import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
-import org.apache.inlong.sort.ddl.Column;
-import org.apache.inlong.sort.ddl.enums.PositionType;
-import org.apache.inlong.sort.ddl.expressions.AlterColumn;
-import org.apache.inlong.sort.ddl.operations.AlterOperation;
-import org.apache.inlong.sort.ddl.operations.CreateTableOperation;
+import org.apache.inlong.sort.protocol.ddl.Column;
+import org.apache.inlong.sort.protocol.ddl.enums.PositionType;
+import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
+import org.apache.inlong.sort.protocol.ddl.operations.AlterOperation;
+import org.apache.inlong.sort.protocol.ddl.operations.CreateTableOperation;
 
 import java.sql.Types;
 import java.util.Iterator;

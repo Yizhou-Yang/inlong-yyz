@@ -15,17 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl.Utils;
+package org.apache.inlong.sort.protocol.ddl.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import net.sf.jsqlparser.statement.create.table.ColDataType;
 import net.sf.jsqlparser.statement.create.table.ColumnDefinition;
-import org.apache.inlong.sort.ddl.Column;
-import org.apache.inlong.sort.ddl.Column.ColumnBuilder;
-import org.apache.inlong.sort.ddl.Position;
-import org.apache.inlong.sort.ddl.enums.PositionType;
+import org.apache.inlong.sort.protocol.ddl.Column;
+import org.apache.inlong.sort.protocol.ddl.Column.ColumnBuilder;
+import org.apache.inlong.sort.protocol.ddl.Position;
+import org.apache.inlong.sort.protocol.ddl.enums.PositionType;
 
 /**
  * Utils for parse from statement in sqlParser to a Column object.

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl.enums;
+package org.apache.inlong.sort.protocol.ddl.enums;
 
 /**
  * @Author pengzirui
