@@ -157,6 +157,7 @@ public class MetaDataUtils {
                 .database(databaseName)
                 .es(opTs).pkNames(getPkNames(tableSchema))
                 .mysqlType(getMysqlType(tableSchema)).table(tableName)
+                .dataSourceName(sourceStruct.getString(AbstractSourceInfo.SERVER_NAME_KEY))
                 .type(getCanalOpType(rowData)).sqlType(getSqlType(tableSchema)).build();
 
         try {

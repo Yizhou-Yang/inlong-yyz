@@ -79,6 +79,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean ghostDdlChange;
     private String ghostTableRegex;
 
+    private String dataSourceName;
+
     public MySqlSourceConfigFactory inlongMetric(String inlongMetric) {
         this.inlongMetric = inlongMetric;
         return this;
@@ -101,6 +103,11 @@ public class MySqlSourceConfigFactory implements Serializable {
 
     public MySqlSourceConfigFactory ghostTableRegex(String ghostTableRegex) {
         this.ghostTableRegex = ghostTableRegex;
+        return this;
+    }
+
+    public MySqlSourceConfigFactory dataSourceName(String dataSourceName) {
+        this.dataSourceName = dataSourceName;
         return this;
     }
 
@@ -390,6 +397,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 inlongAudit,
                 includeIncremental,
                 ghostDdlChange,
-                ghostTableRegex);
+                ghostTableRegex,
+                dataSourceName);
     }
 }

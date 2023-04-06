@@ -96,6 +96,9 @@ public final class MySqlRecordEmitter<T>
     private boolean includeIncremental;
     private boolean ghostDdlChange;
     private String ghostTableRegex;
+
+    private String dataSourceName;
+
     public final Map<TableId, String> tableDdls = new HashMap<>();
 
     public MySqlRecordEmitter(
@@ -109,6 +112,7 @@ public final class MySqlRecordEmitter<T>
         this.includeIncremental = sourceConfig.isIncludeIncremental();
         this.ghostDdlChange = sourceConfig.isGhostDdlChange();
         this.ghostTableRegex = sourceConfig.getGhostTableRegex();
+        this.dataSourceName = sourceConfig.getDataSourceName();
     }
 
     @Override
@@ -122,6 +126,8 @@ public final class MySqlRecordEmitter<T>
             }
         } else if (isSchemaChangeEvent(element) && splitState.isBinlogSplitState()) {
             updateSnapshotRecord(element, splitState);
+            parseDataSourceName(element);
+
             HistoryRecord historyRecord = getHistoryRecord(element);
             Array tableChanges =
                     historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
@@ -173,6 +179,8 @@ public final class MySqlRecordEmitter<T>
 
             updateSnapshotRecord(element, splitState);
 
+            parseDataSourceName(element);
+
             debeziumDeserializationSchema.deserialize(
                     element,
                     new Collector<T>() {
@@ -200,6 +208,12 @@ public final class MySqlRecordEmitter<T>
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);
         }
+    }
+
+    private void parseDataSourceName(SourceRecord element) {
+        Struct value = (Struct) element.value();
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+        source.put(AbstractSourceInfo.SERVER_NAME_KEY, dataSourceName);
     }
 
     private void collectGhostDdl(SourceRecord element, MySqlSplitState splitState, HistoryRecord historyRecord) {

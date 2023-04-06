@@ -243,6 +243,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .includeIncremental(includeIncremental)
                             .ghostDdlChange(ghostDdlChange)
                             .ghostTableRegex(ghostTableRegex)
+                            .dataSourceName(dataSourceName)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
