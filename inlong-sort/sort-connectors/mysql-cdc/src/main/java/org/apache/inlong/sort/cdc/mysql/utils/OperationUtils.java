@@ -21,7 +21,7 @@ import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getSqlType;
 import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.parseColumnWithPosition;
 import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.parseColumns;
 import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.parseComment;
-import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.removeContinuousBackQuotes;
+import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.reformatName;
 
 import io.debezium.relational.history.TableChanges.TableChange;
 import java.util.ArrayList;
@@ -113,7 +113,7 @@ public class OperationUtils {
                 case DROP:
                     alterColumns.add(new AlterColumn(AlterType.DROP_COLUMN,
                             null,
-                        Column.builder().name(removeContinuousBackQuotes(alterExpression.getColumnName()))
+                        Column.builder().name(reformatName(alterExpression.getColumnName()))
                                     .build()));
                     break;
                 case ADD:
@@ -122,13 +122,21 @@ public class OperationUtils {
                                     alterExpression.getColDataTypeList().get(0)),
                             null));
                     break;
-                case MODIFY:
                 case RENAME:
+                    alterColumns.add(new AlterColumn(AlterType.CHANGE_COLUMN,
+                        new Column(reformatName(alterExpression.getColumnName())),
+                        new Column(reformatName(alterExpression.getColumnOldName()))));
+                    break;
+                case MODIFY:
                 case CHANGE:
                     alterColumns.add(new AlterColumn(AlterType.CHANGE_COLUMN,
                         parseColumnWithPosition(isFirst, sqlType,
                             alterExpression.getColDataTypeList().get(0)),
-                        new Column(removeContinuousBackQuotes(alterExpression.getColumnOldName()))));
+                        new Column(reformatName(alterExpression.getColumnOldName()))));
+                    break;
+                default:
+                    LOG.warn("doesn't support alter operation {}, statement {}",
+                        alterExpression.getOperation(), statement);
             }
 
         });
@@ -187,8 +195,8 @@ public class OperationUtils {
                     break;
             }
             List<String> columns = new ArrayList<>();
-            perIndex.getColumnsNames().forEach(columnName -> columns.add(removeContinuousBackQuotes(columnName)));
-            index.setIndexName(removeContinuousBackQuotes(perIndex.getName()));
+            perIndex.getColumnsNames().forEach(columnName -> columns.add(reformatName(columnName)));
+            index.setIndexName(reformatName(perIndex.getName()));
             index.setIndexColumns(columns);
             indexList.add(index);
         }

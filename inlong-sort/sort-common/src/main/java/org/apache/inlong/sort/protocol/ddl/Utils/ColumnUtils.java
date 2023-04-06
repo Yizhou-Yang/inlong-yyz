@@ -57,7 +57,7 @@ public class ColumnUtils {
         List<String> columnSpecs = columnDefinition.getColumnSpecs();
 
         ColumnBuilder columnBuilder = Column.builder();
-        String columnName = removeContinuousBackQuotes(columnDefinition.getColumnName());
+        String columnName = reformatName(columnDefinition.getColumnName());
         columnBuilder.name(columnName)
                 .definition(definitions).isNullable(parseNullable(columnSpecs))
                 .defaultValue(parseDefaultValue(columnSpecs))
@@ -103,7 +103,7 @@ public class ColumnUtils {
     }
 
     public static Position parsePosition(List<String> specs) {
-        String afterColumn = removeContinuousBackQuotes(parseAdjacentString(specs, AFTER, false));
+        String afterColumn = reformatName(parseAdjacentString(specs, AFTER, false));
         if (!afterColumn.isEmpty()) {
             return new Position(PositionType.AFTER, afterColumn);
         }
@@ -161,7 +161,7 @@ public class ColumnUtils {
         return removeContinuousChar(str, '\'');
     }
 
-    public static String removeContinuousBackQuotes(String str) {
+    public static String reformatName(String str) {
         return removeContinuousChar(str, '`');
     }
 
