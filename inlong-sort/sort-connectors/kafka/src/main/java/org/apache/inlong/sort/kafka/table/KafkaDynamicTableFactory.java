@@ -58,6 +58,9 @@ import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
 import org.apache.inlong.sort.kafka.KafkaDynamicSink;
 import org.apache.inlong.sort.kafka.partitioner.InLongFixedPartitionPartitioner;
 import org.apache.inlong.sort.kafka.partitioner.RawDataHashPartitioner;
+import org.apache.inlong.sort.protocol.enums.SchemaChangePolicy;
+import org.apache.inlong.sort.protocol.enums.SchemaChangeType;
+import org.apache.inlong.sort.util.SchemaChangeUtils;
 
 import javax.annotation.Nullable;
 import java.time.Duration;
@@ -445,6 +448,9 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
         final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
         final boolean multipleSink = tableOptions.getOptional(SINK_MULTIPLE_FORMAT).isPresent();
         final String schemaChangePolicies = tableOptions.getOptional(SINK_SCHEMA_CHANGE_POLICIES).orElse(null);
+        final boolean enableSchemaChange = tableOptions.get(SINK_SCHEMA_CHANGE_ENABLE);
+        final Map<SchemaChangeType, SchemaChangePolicy> policyMap =
+                enableSchemaChange ? SchemaChangeUtils.deserialize(schemaChangePolicies) : Collections.emptyMap();
 
         return createKafkaTableSink(
                 physicalDataType,
@@ -466,7 +472,7 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
                 dirtyOptions,
                 dirtySink,
                 multipleSink,
-                schemaChangePolicies);
+                policyMap);
     }
 
     private void validateSinkMultipleFormatAndPhysicalDataType(DataType physicalDataType,
@@ -553,7 +559,7 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
             boolean multipleSink,
-            String schemaChangePolicies) {
+            Map<SchemaChangeType, SchemaChangePolicy> policyMap) {
         return new KafkaDynamicSink(
                 physicalDataType,
                 physicalDataType,
@@ -577,6 +583,6 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
                 dirtyOptions,
                 dirtySink,
                 multipleSink,
-                schemaChangePolicies);
+                policyMap);
     }
 }

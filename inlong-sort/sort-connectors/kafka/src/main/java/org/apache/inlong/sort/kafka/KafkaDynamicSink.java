@@ -41,7 +41,6 @@ import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.apache.inlong.sort.kafka.DynamicKafkaSerializationSchema.MetadataConverter;
 import org.apache.inlong.sort.protocol.enums.SchemaChangePolicy;
 import org.apache.inlong.sort.protocol.enums.SchemaChangeType;
-import org.apache.inlong.sort.util.SchemaChangeUtils;
 import org.apache.kafka.common.header.Header;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -164,8 +163,6 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
 
     private Map<SchemaChangeType, SchemaChangePolicy> policyMap;
 
-    private String schemaChangePolicies;
-
     /**
      * Constructor of KafkaDynamicSink.
      */
@@ -192,7 +189,7 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
             boolean multipleSink,
-            String schemaChangePolicies) {
+            Map<SchemaChangeType, SchemaChangePolicy> policyMap) {
         // Format attributes
         this.consumedDataType =
                 checkNotNull(consumedDataType, "Consumed data type must not be null.");
@@ -226,8 +223,7 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
         this.dirtyOptions = dirtyOptions;
         this.dirtySink = dirtySink;
         this.multipleSink = multipleSink;
-        this.schemaChangePolicies = schemaChangePolicies;
-        this.policyMap = SchemaChangeUtils.deserialize(schemaChangePolicies);
+        this.policyMap = policyMap;
     }
 
     @Override
@@ -335,7 +331,7 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
                         dirtyOptions,
                         dirtySink,
                         multipleSink,
-                        schemaChangePolicies);
+                        policyMap);
         copy.metadataKeys = metadataKeys;
         return copy;
     }
