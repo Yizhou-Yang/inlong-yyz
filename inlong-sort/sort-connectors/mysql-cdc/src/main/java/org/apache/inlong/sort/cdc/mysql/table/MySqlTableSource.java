@@ -207,8 +207,6 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         .setUserDefinedConverterFactory(
                                 MySqlDeserializationConverterFactory.instance())
                         .setMigrateAll(migrateAll)
-                        .setGhostDdlChange(ghostDdlChange)
-                        .setGhostTableRegex(ghostTableRegex)
                         .build();
         if (enableParallelRead) {
             MySqlSource<RowData> parallelSource =
@@ -239,6 +237,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .inlongMetric(inlongMetric)
                             .inlongAudit(inlongAudit)
                             .includeIncremental(includeIncremental)
+                            .ghostDdlChange(ghostDdlChange)
+                            .ghostTableRegex(ghostTableRegex)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {

@@ -61,6 +61,7 @@ import static org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOp
 import static org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions.HIVE_CONF_DIR;
 import static org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions.HIVE_VERSION;
 import static org.apache.flink.table.factories.FactoryUtil.PROPERTY_VERSION;
+import static org.apache.flink.table.filesystem.FileSystemOptions.PARTITION_TIME_EXTRACTOR_TIMESTAMP_PATTERN;
 import static org.apache.flink.table.filesystem.FileSystemOptions.STREAMING_SOURCE_ENABLE;
 import static org.apache.flink.table.filesystem.FileSystemOptions.STREAMING_SOURCE_PARTITION_INCLUDE;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
@@ -153,6 +154,8 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
             SchemaUpdateExceptionPolicy schemaUpdatePolicy = helper.getOptions()
                     .get(SINK_MULTIPLE_SCHEMA_UPDATE_POLICY);
             PartitionPolicy partitionPolicy = helper.getOptions().get(SINK_PARTITION_POLICY);
+            String partitionField = helper.getOptions().get(SOURCE_PARTITION_FIELD_NAME);
+            String timestampPattern = helper.getOptions().get(PARTITION_TIME_EXTRACTOR_TIMESTAMP_PATTERN);
             boolean sinkMultipleEnable = helper.getOptions().get(SINK_MULTIPLE_ENABLE);
             return new HiveTableSink(
                     context.getConfiguration(),
@@ -166,6 +169,8 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
                     dirtySink,
                     schemaUpdatePolicy,
                     partitionPolicy,
+                    partitionField,
+                    timestampPattern,
                     sinkMultipleEnable);
         } else {
             return FactoryUtil.createTableSink(

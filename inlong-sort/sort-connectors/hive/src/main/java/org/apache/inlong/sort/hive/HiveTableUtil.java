@@ -17,12 +17,10 @@
 
 package org.apache.inlong.sort.hive;
 
-import static org.apache.flink.table.filesystem.FileSystemOptions.PARTITION_TIME_EXTRACTOR_TIMESTAMP_PATTERN;
 import static org.apache.flink.table.types.logical.LogicalTypeRoot.DATE;
 import static org.apache.flink.table.types.logical.LogicalTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE;
 import static org.apache.flink.table.types.logical.LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE;
 import static org.apache.flink.table.types.logical.LogicalTypeRoot.TIMESTAMP_WITH_TIME_ZONE;
-import static org.apache.inlong.sort.base.Constants.SOURCE_PARTITION_FIELD_NAME;
 import static org.apache.inlong.sort.hive.HiveOptions.SINK_PARTITION_NAME;
 
 import java.lang.reflect.Field;
@@ -38,6 +36,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.apache.commons.collections.map.CaseInsensitiveMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.connectors.hive.FlinkHiveException;
@@ -82,7 +81,7 @@ import org.slf4j.LoggerFactory;
 public class HiveTableUtil {
 
     private static final Logger LOG = LoggerFactory.getLogger(HiveTableUtil.class);
-
+    private static final String DEFAULT_PARTITION_DATE_FIELD = "[(create)(update)].*[(date)(time)]";
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static boolean changeSchema(RowType schema,
@@ -324,30 +323,31 @@ public class HiveTableUtil {
      *
      * @param rawData row data
      * @param schema flink field types
+     * @param partitionPolicy partition policy
+     * @param partitionField partition field
+     * @param timestampPattern timestamp pattern
      * @return default partition value
      */
     public static Object getDefaultPartitionValue(Map<String, Object> rawData, RowType schema,
-            PartitionPolicy partitionPolicy) {
+            PartitionPolicy partitionPolicy, String partitionField, String timestampPattern) {
         if (PartitionPolicy.NONE == partitionPolicy) {
             return null;
         }
 
-        String timestampPattern = HiveTableInlongFactory.getHiveConf()
-                .get(PARTITION_TIME_EXTRACTOR_TIMESTAMP_PATTERN.key(), "yyyy-MM-dd");
         if (PartitionPolicy.PROC_TIME == partitionPolicy) {
             return DateTimeFormatter.ofPattern(timestampPattern).format(LocalDateTime.now());
         }
 
-        String partitionFieldName = HiveTableInlongFactory.getHiveConf().get(SOURCE_PARTITION_FIELD_NAME.key());
-        String defaultPartitionFieldName = "[(create)(update)].*[(date)(time)]";
+        String defaultPartitionFieldName = DEFAULT_PARTITION_DATE_FIELD;
         if (PartitionPolicy.ASSIGN_FIELD == partitionPolicy) {
-            defaultPartitionFieldName = partitionFieldName;
+            defaultPartitionFieldName = partitionField;
         }
+        Pattern pattern = Pattern.compile(Pattern.quote(defaultPartitionFieldName), Pattern.CASE_INSENSITIVE);
         for (RowField field : schema.getFields()) {
             LogicalTypeRoot type = field.getType().getTypeRoot();
             if (type == TIMESTAMP_WITH_LOCAL_TIME_ZONE || type == TIMESTAMP_WITH_TIME_ZONE
                     || type == TIMESTAMP_WITHOUT_TIME_ZONE || type == DATE) {
-                if (field.getName().matches(defaultPartitionFieldName)) {
+                if (pattern.matcher(field.getName()).matches()) {
                     String value = (String) rawData.get(field.getName());
                     return formatDate(value, timestampPattern);
                 }

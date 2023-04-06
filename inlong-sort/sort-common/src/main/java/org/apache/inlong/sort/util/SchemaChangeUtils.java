@@ -18,9 +18,9 @@
 package org.apache.inlong.sort.util;
 
 import com.google.common.base.Preconditions;
-import org.apache.inlong.sort.ddl.enums.AlterType;
-import org.apache.inlong.sort.ddl.operations.AlterOperation;
-import org.apache.inlong.sort.ddl.operations.Operation;
+import org.apache.inlong.sort.protocol.ddl.enums.AlterType;
+import org.apache.inlong.sort.protocol.ddl.operations.AlterOperation;
+import org.apache.inlong.sort.protocol.ddl.operations.Operation;
 import org.apache.inlong.sort.protocol.enums.SchemaChangePolicy;
 import org.apache.inlong.sort.protocol.enums.SchemaChangeType;
 

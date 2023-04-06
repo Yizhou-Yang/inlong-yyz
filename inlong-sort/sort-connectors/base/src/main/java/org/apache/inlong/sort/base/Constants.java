@@ -111,6 +111,7 @@ public final class Constants {
      * It is used for metric data to build schema identify
      */
     public static final String SEMICOLON = ".";
+
     /**
      * The caret symbol (^) at the start of a regular expression to indicate
      * that a match must occur at the beginning of the searched text.
@@ -153,11 +154,7 @@ public final class Constants {
 
     public static final String DDL_OP_ALTER = "ALTER";
 
-    public static final ConfigOption<String> AUDIT_KEYS =
-            ConfigOptions.key("metrics.audit.key")
-                    .stringType()
-                    .defaultValue("")
-                    .withDescription("Audit keys for metrics collecting");
+    public static final String DDL_OP_DROP = "DROP";
 
     public static final ConfigOption<String> INLONG_METRIC =
             ConfigOptions.key("inlong.metric.labels")
@@ -172,6 +169,12 @@ public final class Constants {
                     .noDefaultValue()
                     .withDescription("Audit proxy host address for reporting audit metrics. \n"
                             + "e.g. 127.0.0.1:10081,0.0.0.1:10081");
+
+    public static final ConfigOption<String> AUDIT_KEYS =
+            ConfigOptions.key("metrics.audit.key")
+                    .stringType()
+                    .defaultValue("")
+                    .withDescription("Audit keys for metrics collecting");
 
     public static final ConfigOption<Boolean> IGNORE_ALL_CHANGELOG =
             ConfigOptions.key("sink.ignore.changelog")

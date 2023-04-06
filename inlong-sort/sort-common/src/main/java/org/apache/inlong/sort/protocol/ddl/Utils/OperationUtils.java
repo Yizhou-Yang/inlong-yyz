@@ -15,10 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl.enums;
+package org.apache.inlong.sort.protocol.ddl.Utils;
 
-public enum IndexType {
+public class OperationUtils {
 
-    NORMAL_INDEX,
-    PRIMARY_KEY
 }

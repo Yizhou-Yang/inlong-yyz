@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl.operations;
+package org.apache.inlong.sort.protocol.ddl.operations;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonSubTypes;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonTypeInfo;
-import org.apache.inlong.sort.ddl.enums.OperationType;
+import org.apache.inlong.sort.protocol.ddl.enums.OperationType;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes({

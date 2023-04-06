@@ -15,13 +15,25 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl.enums;
+package org.apache.inlong.sort.protocol.ddl.operations;
 
-public enum AlterType {
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude.Include;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonTypeName;
+import org.apache.inlong.sort.protocol.ddl.enums.OperationType;
 
-    RENAME_COLUMN,
-    ADD_COLUMN,
-    DROP_COLUMN,
-    MODIFY_COLUMN,
-    CHANGE_COLUMN
+@EqualsAndHashCode(callSuper = true)
+@JsonTypeName("dropTableOperation")
+@JsonInclude(Include.NON_NULL)
+@Data
+public class DropTableOperation extends Operation {
+
+    @JsonCreator
+    public DropTableOperation() {
+        super(OperationType.DROP);
+    }
+
 }

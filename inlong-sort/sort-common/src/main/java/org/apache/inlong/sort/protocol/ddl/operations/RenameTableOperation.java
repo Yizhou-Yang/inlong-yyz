@@ -15,52 +15,24 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl.operations;
+package org.apache.inlong.sort.protocol.ddl.operations;
 
-import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude.Include;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonTypeName;
-import org.apache.inlong.sort.ddl.Column;
-import org.apache.inlong.sort.ddl.enums.OperationType;
-import org.apache.inlong.sort.ddl.indexes.Index;
+import org.apache.inlong.sort.protocol.ddl.enums.OperationType;
 
 @EqualsAndHashCode(callSuper = true)
-@JsonTypeName("createTableOperation")
+@JsonTypeName("renameTableOperation")
 @JsonInclude(Include.NON_NULL)
 @Data
-public class CreateTableOperation extends Operation {
-
-    @JsonProperty("columns")
-    private List<Column> columns;
-
-    @JsonProperty("indexes")
-    private List<Index> indexes;
-
-    @JsonProperty("likeTable")
-    private String likeTable;
-
-    @JsonProperty("comment")
-    private String comment;
+public class RenameTableOperation extends Operation {
 
     @JsonCreator
-    public CreateTableOperation(@JsonProperty("columns") List<Column> columns,
-            @JsonProperty("indexes") List<Index> indexes,
-            @JsonProperty("likeTable") String likeTable,
-            @JsonProperty("comment") String comment) {
-        super(OperationType.CREATE);
-        this.columns = columns;
-        this.indexes = indexes;
-        this.likeTable = likeTable;
-        this.comment = comment;
+    public RenameTableOperation() {
+        super(OperationType.RENAME);
     }
-
-    public CreateTableOperation() {
-        super(OperationType.CREATE);
-    }
-
 }

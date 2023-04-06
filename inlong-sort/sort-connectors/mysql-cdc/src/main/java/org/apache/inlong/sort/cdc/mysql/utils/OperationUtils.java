@@ -17,12 +17,11 @@
 
 package org.apache.inlong.sort.cdc.mysql.utils;
 
-import static net.sf.jsqlparser.statement.alter.AlterOperation.DROP;
 import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getSqlType;
-import static org.apache.inlong.sort.ddl.Utils.ColumnUtils.parseColumnWithPosition;
-import static org.apache.inlong.sort.ddl.Utils.ColumnUtils.parseColumns;
-import static org.apache.inlong.sort.ddl.Utils.ColumnUtils.parseComment;
-import static org.apache.inlong.sort.ddl.Utils.ColumnUtils.removeContinuousBackQuotes;
+import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.parseColumnWithPosition;
+import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.parseColumns;
+import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.parseComment;
+import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.removeContinuousBackQuotes;
 
 import io.debezium.relational.history.TableChanges.TableChange;
 import java.util.ArrayList;
@@ -37,17 +36,17 @@ import net.sf.jsqlparser.statement.create.table.CreateTable;
 import net.sf.jsqlparser.statement.drop.Drop;
 import net.sf.jsqlparser.statement.truncate.Truncate;
 import org.apache.inlong.sort.cdc.base.debezium.table.RowDataDebeziumDeserializeSchema;
-import org.apache.inlong.sort.ddl.Column;
-import org.apache.inlong.sort.ddl.enums.AlterType;
-import org.apache.inlong.sort.ddl.enums.IndexType;
-import org.apache.inlong.sort.ddl.expressions.AlterColumn;
-import org.apache.inlong.sort.ddl.indexes.Index;
-import org.apache.inlong.sort.ddl.operations.AlterOperation;
-import org.apache.inlong.sort.ddl.operations.CreateTableOperation;
-import org.apache.inlong.sort.ddl.operations.DropTableOperation;
-import org.apache.inlong.sort.ddl.operations.Operation;
-import org.apache.inlong.sort.ddl.operations.RenameTableOperation;
-import org.apache.inlong.sort.ddl.operations.TruncateTableOperation;
+import org.apache.inlong.sort.protocol.ddl.Column;
+import org.apache.inlong.sort.protocol.ddl.enums.AlterType;
+import org.apache.inlong.sort.protocol.ddl.enums.IndexType;
+import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
+import org.apache.inlong.sort.protocol.ddl.indexes.Index;
+import org.apache.inlong.sort.protocol.ddl.operations.AlterOperation;
+import org.apache.inlong.sort.protocol.ddl.operations.CreateTableOperation;
+import org.apache.inlong.sort.protocol.ddl.operations.DropTableOperation;
+import org.apache.inlong.sort.protocol.ddl.operations.Operation;
+import org.apache.inlong.sort.protocol.ddl.operations.RenameTableOperation;
+import org.apache.inlong.sort.protocol.ddl.operations.TruncateTableOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

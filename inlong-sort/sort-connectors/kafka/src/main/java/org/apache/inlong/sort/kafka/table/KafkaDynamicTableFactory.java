@@ -106,6 +106,7 @@ import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_POLICIES;
+import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.PATTERN_PARTITION_MAP;
 import static org.apache.inlong.sort.kafka.table.KafkaOptions.KAFKA_IGNORE_ALL_CHANGELOG;
 
@@ -329,6 +330,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
         options.add(SINK_MULTIPLE_PARTITION_PATTERN);
         options.add(PATTERN_PARTITION_MAP);
         options.add(DATASOURCE_PARTITION_MAP);
+        options.add(SINK_SCHEMA_CHANGE_ENABLE);
+        options.add(SINK_SCHEMA_CHANGE_POLICIES);
         return options;
     }
 

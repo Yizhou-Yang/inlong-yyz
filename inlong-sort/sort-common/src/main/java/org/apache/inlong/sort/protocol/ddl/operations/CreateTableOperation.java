@@ -15,39 +15,52 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl.expressions;
+package org.apache.inlong.sort.protocol.ddl.operations;
 
+import java.util.List;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude.Include;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.inlong.sort.ddl.enums.AlterType;
-import org.apache.inlong.sort.ddl.Column;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonTypeName;
+import org.apache.inlong.sort.protocol.ddl.Column;
+import org.apache.inlong.sort.protocol.ddl.enums.OperationType;
+import org.apache.inlong.sort.protocol.ddl.indexes.Index;
 
+@EqualsAndHashCode(callSuper = true)
+@JsonTypeName("createTableOperation")
 @JsonInclude(Include.NON_NULL)
 @Data
-public class AlterColumn {
+public class CreateTableOperation extends Operation {
 
-    @JsonProperty("alterType")
-    private AlterType alterType;
+    @JsonProperty("columns")
+    private List<Column> columns;
 
-    @JsonProperty("newColumn")
-    private Column newColumn;
+    @JsonProperty("indexes")
+    private List<Index> indexes;
 
-    @JsonProperty("oldColumn")
-    private Column oldColumn;
+    @JsonProperty("likeTable")
+    private String likeTable;
+
+    @JsonProperty("comment")
+    private String comment;
 
     @JsonCreator
-    public AlterColumn(@JsonProperty("alterType") AlterType alterType,
-            @JsonProperty("newColumn") Column newColumn,
-            @JsonProperty("oldColumn") Column oldColumn) {
-        this.alterType = alterType;
-        this.newColumn = newColumn;
-        this.oldColumn = oldColumn;
+    public CreateTableOperation(@JsonProperty("columns") List<Column> columns,
+            @JsonProperty("indexes") List<Index> indexes,
+            @JsonProperty("likeTable") String likeTable,
+            @JsonProperty("comment") String comment) {
+        super(OperationType.CREATE);
+        this.columns = columns;
+        this.indexes = indexes;
+        this.likeTable = likeTable;
+        this.comment = comment;
     }
 
-    public AlterColumn(@JsonProperty("alterType") AlterType alterType) {
-        this.alterType = alterType;
+    public CreateTableOperation() {
+        super(OperationType.CREATE);
     }
+
 }

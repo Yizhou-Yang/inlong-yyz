@@ -15,14 +15,13 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.ddl.enums;
+package org.apache.inlong.sort.protocol.ddl.enums;
 
-/**
- * @Author pengzirui
- * @Date 2023/3/21 2:54 PM
- * @Version 1.0
- */
-public enum PositionType {
-    FIRST,
-    AFTER
+public enum AlterType {
+
+    RENAME_COLUMN,
+    ADD_COLUMN,
+    DROP_COLUMN,
+    MODIFY_COLUMN,
+    CHANGE_COLUMN
 }
