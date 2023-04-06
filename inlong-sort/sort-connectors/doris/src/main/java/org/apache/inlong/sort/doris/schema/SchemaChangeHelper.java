@@ -262,10 +262,6 @@ public class SchemaChangeHelper {
                 String table = dynamicSchemaFormat.parse(data, tablePattern);
                 List<String> primaryKeys = dynamicSchemaFormat.extractPrimaryKeyNames(data);
                 String stmt = operationHelper.buildCreateTableStatement(database, table, primaryKeys, operation);
-                // it is only used for test
-                stmt = stmt + " PROPERTIES (\n"
-                        + "\"replication_num\" = \"1\" \n"
-                        + ")";
                 boolean result = executeStatement(database, stmt);
                 if (!result) {
                     LOGGER.error("Create table failed,statement: {}", stmt);
@@ -351,6 +347,7 @@ public class SchemaChangeHelper {
                         if (DORIS_HTTP_CALL_SUCCESS.equals(code)) {
                             return true;
                         }
+                        LOGGER.error("send request error: {}", loadResult);
                     }
                 } catch (Exception e) {
                     if (i >= maxRetries) {

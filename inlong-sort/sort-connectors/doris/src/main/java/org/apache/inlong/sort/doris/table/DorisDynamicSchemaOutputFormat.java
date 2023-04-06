@@ -282,7 +282,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             jsonDynamicSchemaFormat =
                     (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(dynamicSchemaFormat);
             helper = SchemaChangeHelper.of(jsonDynamicSchemaFormat, options, enableSchemaChange,
-                    SchemaChangeUtils.deserialize(schemaChangePolicies), databasePattern,
+                    enableSchemaChange ? SchemaChangeUtils.deserialize(schemaChangePolicies) : null, databasePattern,
                     tablePattern, executionOptions.getMaxRetries(), schemaUpdatePolicy);
         }
         MetricOption metricOption = MetricOption.builder()
@@ -740,7 +740,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             if (SchemaUpdateExceptionPolicy.STOP_PARTIAL == schemaUpdatePolicy) {
                 errorTables.add(tableIdentifier);
                 LOG.warn("The tableIdentifier: {} load failed and the data will be throw away in the future "
-                        + "because the option 'sink.multiple.schema-update.policy' is 'STOP_PARTIAL'",
+                                + "because the option 'sink.multiple.schema-update.policy' is 'STOP_PARTIAL'",
                         tableIdentifier);
                 return;
             }
@@ -903,7 +903,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             this.metricStateListState = context.getOperatorStateStore().getUnionListState(
                     new ListStateDescriptor<>(
                             INLONG_METRIC_STATE_NAME, TypeInformation.of(new TypeHint<MetricState>() {
-                            })));
+                    })));
         }
         if (context.isRestored()) {
             metricState = MetricStateUtils.restoreMetricState(metricStateListState,
