@@ -18,7 +18,6 @@
 package org.apache.inlong.sort.doris.schema;
 
 import org.apache.flink.shaded.guava18.com.google.common.collect.ImmutableMap;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
 import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
 import org.apache.inlong.sort.protocol.ddl.Column;
@@ -26,9 +25,7 @@ import org.apache.inlong.sort.protocol.ddl.Position;
 import org.apache.inlong.sort.protocol.ddl.enums.AlterType;
 import org.apache.inlong.sort.protocol.ddl.enums.PositionType;
 import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
-import org.apache.inlong.sort.protocol.ddl.operations.AlterOperation;
 import org.apache.inlong.sort.protocol.ddl.operations.CreateTableOperation;
-import org.apache.inlong.sort.protocol.ddl.operations.Operation;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -131,66 +128,64 @@ public class OperationHelperTest {
     private final Map<Integer, String> addColumnStatements =
             ImmutableMap.<Integer, String>builder()
                     .put(Types.CHAR,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` CHAR(32) DEFAULT 'InLong' COMMENT 'a column' FIRST")
+                            "ADD COLUMN `c` CHAR(32) DEFAULT 'InLong' COMMENT 'a column' FIRST")
                     .put(Types.VARCHAR,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` VARCHAR(32) NOT NULL DEFAULT 'InLong' COMMENT 'a column' FIRST")
+                            "ADD COLUMN `c` VARCHAR(32) NOT NULL DEFAULT 'InLong' COMMENT 'a column' FIRST")
                     .put(Types.SMALLINT,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` SMALLINT(8) DEFAULT '2023' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` SMALLINT(8) DEFAULT '2023' COMMENT 'a column' AFTER `b`")
                     .put(Types.INTEGER,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` INT(11) DEFAULT '2023' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` INT(11) DEFAULT '2023' COMMENT 'a column' AFTER `b`")
                     .put(Types.BIGINT,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` BIGINT(16) DEFAULT '2023' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` BIGINT(16) DEFAULT '2023' COMMENT 'a column' AFTER `b`")
                     .put(Types.REAL,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` DECIMAL(11, 2) DEFAULT '99.99' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` DECIMAL(11, 2) DEFAULT '99.99' COMMENT 'a column' AFTER `b`")
                     .put(Types.DOUBLE,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` DOUBLE DEFAULT '99.99' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` DOUBLE DEFAULT '99.99' COMMENT 'a column' AFTER `b`")
                     .put(Types.FLOAT,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` FLOAT DEFAULT '99.99' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` FLOAT DEFAULT '99.99' COMMENT 'a column' AFTER `b`")
                     .put(Types.DECIMAL,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` DECIMAL(11, 2) DEFAULT '99.99' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` DECIMAL(11, 2) DEFAULT '99.99' COMMENT 'a column' AFTER `b`")
                     .put(Types.NUMERIC,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` DECIMAL(11, 2) DEFAULT '99.99' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` DECIMAL(11, 2) DEFAULT '99.99' COMMENT 'a column' AFTER `b`")
                     .put(Types.BIT,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` BOOLEAN  DEFAULT 'false' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` BOOLEAN  DEFAULT 'false' COMMENT 'a column' AFTER `b`")
                     .put(Types.TIME,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT '10:30' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT '10:30' COMMENT 'a column' AFTER `b`")
                     .put(Types.TIME_WITH_TIMEZONE,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT '10:30' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT '10:30' COMMENT 'a column' AFTER `b`")
                     .put(Types.TIMESTAMP_WITH_TIMEZONE,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` DATETIME DEFAULT '2023-01-01 10:30' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` DATETIME DEFAULT '2023-01-01 10:30' COMMENT 'a column' AFTER `b`")
                     .put(Types.TIMESTAMP,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` DATETIME DEFAULT '2023-01-01 10:30' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` DATETIME DEFAULT '2023-01-01 10:30' COMMENT 'a column' AFTER `b`")
                     .put(Types.BINARY,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT 'this is a BINARY' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT 'this is a BINARY' COMMENT 'a column' AFTER `b`")
                     .put(Types.VARBINARY,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT 'this is a VARBINARY' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT 'this is a VARBINARY' COMMENT 'a column' AFTER `b`")
                     .put(Types.BLOB,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT 'this is a BLOB' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT 'this is a BLOB' COMMENT 'a column' AFTER `b`")
                     .put(Types.CLOB,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT 'this is a CLOB' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT 'this is a CLOB' COMMENT 'a column' AFTER `b`")
                     .put(Types.DATE,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` DATE DEFAULT '2023-01-01' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` DATE DEFAULT '2023-01-01' COMMENT 'a column' AFTER `b`")
                     .put(Types.BOOLEAN,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` BOOLEAN DEFAULT 'true' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` BOOLEAN DEFAULT 'true' COMMENT 'a column' AFTER `b`")
                     .put(Types.LONGNVARCHAR,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT 'this is a LONGNVARCHAR' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT 'this is a LONGNVARCHAR' COMMENT 'a column' AFTER `b`")
                     .put(Types.LONGVARBINARY,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT 'this is a LONGVARBINARY' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT 'this is a LONGVARBINARY' COMMENT 'a column' AFTER `b`")
                     .put(Types.LONGVARCHAR,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT 'this is a LONGVARCHAR' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT 'this is a LONGVARCHAR' COMMENT 'a column' AFTER `b`")
                     .put(Types.ARRAY,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT 'this is a ARRAY' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT 'this is a ARRAY' COMMENT 'a column' AFTER `b`")
                     .put(Types.NCHAR,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT 'this is a NCHAR' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT 'this is a NCHAR' COMMENT 'a column' AFTER `b`")
                     .put(Types.NCLOB,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT 'this is a NCLOB' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT 'this is a NCLOB' COMMENT 'a column' AFTER `b`")
                     .put(Types.TINYINT,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` TINYINT(1) DEFAULT '1' COMMENT 'a column' FIRST")
+                            "ADD COLUMN `c` TINYINT(1) DEFAULT '1' COMMENT 'a column' FIRST")
                     .put(Types.OTHER,
-                            "ALTER TABLE `inlong_database`.`inlong_table` ADD COLUMN `c` STRING DEFAULT 'this is a OTHER' COMMENT 'a column' AFTER `b`")
+                            "ADD COLUMN `c` STRING DEFAULT 'this is a OTHER' COMMENT 'a column' AFTER `b`")
                     .build();
-    private final String database = "inlong_database";
-    private final String table = "inlong_table";
     private OperationHelper helper;
 
     @Before
@@ -200,50 +195,26 @@ public class OperationHelperTest {
     }
 
     /**
-     * Test for {@link OperationHelper#buildAddColumnStatement(String, String, AlterOperation)}
+     * Test for {@link OperationHelper#buildAddColumnStatement(List)}
      */
     @Test
     public void testBuildAddColumnStatement() {
         for (Entry<Integer, Column> kv : allTypes2Columns.entrySet()) {
-            Assert.assertEquals(addColumnStatements.get(kv.getKey()), helper.buildAddColumnStatement(database, table,
-                    new AlterOperation(Collections.singletonList(new AlterColumn(
-                            AlterType.ADD_COLUMN, kv.getValue(), null)))));
+            Assert.assertEquals(addColumnStatements.get(kv.getKey()),
+                    helper.buildAddColumnStatement(Collections.singletonList(new AlterColumn(
+                            AlterType.ADD_COLUMN, kv.getValue(), null))));
         }
     }
 
     /**
-     * Test for {@link OperationHelper#buildDropColumnStatement(String, String, AlterOperation)}
+     * Test for {@link OperationHelper#buildDropColumnStatement(List)}
      */
     @Test
-    public void testBuildDropColumnStatement() throws JsonProcessingException {
-        JsonDynamicSchemaFormat format = (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat("canal-json");
-        String aaa = "{\n"
-                + "        \"type\":\"ALTER\",\n"
-                + "        \"alterColumns\":[\n"
-                + "            {\n"
-                + "                \"alterType\":\"ADD_COLUMN\",\n"
-                + "                \"newColumn\":{\n"
-                + "                    \"name\":\"c3\",\n"
-                + "                    \"definition\":[\n"
-                + "                        \"32\"\n"
-                + "                    ],\n"
-                + "                    \"jdbcType\":12,\n"
-                + "                    \"position\":{\n"
-                + "                        \"positionType\":\"FIRST\"\n"
-                + "                    },\n"
-                + "                    \"isNullable\":false,\n"
-                + "                    \"defaultValue\":\"InLong\",\n"
-                + "                    \"comment\":\"a column\",\n"
-                + "                    \"nullable\":false\n"
-                + "                }\n"
-                + "            }\n"
-                + "        ]\n"
-                + "    }";
-        format.objectMapper.readValue(aaa, Operation.class);
+    public void testBuildDropColumnStatement() {
         for (Entry<Integer, Column> kv : allTypes2Columns.entrySet()) {
-            Assert.assertEquals("ALTER TABLE `inlong_database`.`inlong_table` DROP COLUMN `c`",
-                    helper.buildDropColumnStatement(database, table, new AlterOperation(Collections.singletonList(
-                            new AlterColumn(AlterType.ADD_COLUMN, null, kv.getValue())))));
+            Assert.assertEquals("DROP COLUMN `c`",
+                    helper.buildDropColumnStatement(Collections.singletonList(
+                            new AlterColumn(AlterType.DROP_COLUMN, null, kv.getValue()))));
         }
 
     }
@@ -265,6 +236,8 @@ public class OperationHelperTest {
         CreateTableOperation operation = new CreateTableOperation();
         operation.setComment("create table auto");
         operation.setColumns(columns);
+        String database = "inlong_database";
+        String table = "inlong_table";
         Assert.assertEquals("CREATE TABLE IF NOT EXISTS `inlong_database`.`inlong_table`(\n"
                         + "\t`a` VARCHAR(32) NOT NULL DEFAULT 'InLong' COMMENT 'a column',\n"
                         + "\t`b` VARCHAR(32) NOT NULL DEFAULT 'InLong' COMMENT 'a column',\n"
@@ -273,7 +246,10 @@ public class OperationHelperTest {
                         + ")\n"
                         + "UNIQUE KEY(`a`,`b`)\n"
                         + "COMMENT 'create table auto'\n"
-                        + "DISTRIBUTED BY HASH(`a`,`b`)",
+                        + "DISTRIBUTED BY HASH(`a`,`b`)\n"
+                        + "PROPERTIES (\n"
+                        + "\t\"light_schema_change\" = \"true\"\n"
+                        + ")",
                 helper.buildCreateTableStatement(database, table, primaryKeys, operation));
     }
 }

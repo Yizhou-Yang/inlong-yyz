@@ -34,6 +34,8 @@ import org.apache.http.util.EntityUtils;
 import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
 import org.apache.inlong.sort.base.schema.SchemaChangeHandleException;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
+import org.apache.inlong.sort.doris.http.HttpGetEntity;
+import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
 import org.apache.inlong.sort.protocol.ddl.operations.AlterOperation;
 import org.apache.inlong.sort.protocol.ddl.operations.CreateTableOperation;
 import org.apache.inlong.sort.protocol.ddl.operations.Operation;
@@ -45,9 +47,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.StringJoiner;
 
 /**
  * Schema change helper
@@ -121,17 +128,8 @@ public class SchemaChangeHelper {
             return;
         }
         switch (type) {
-            case ADD_COLUMN:
-                doAddColumn(type, originSchema, data, (AlterOperation) operation);
-                break;
-            case DROP_COLUMN:
-                doDropColumn(type, originSchema, data, (AlterOperation) operation);
-                break;
-            case RENAME_COLUMN:
-                doRenameColumn(type, originSchema);
-                break;
-            case CHANGE_COLUMN_TYPE:
-                doChangeColumnType(type, originSchema);
+            case ALTER:
+                handleAlterOperation(originSchema, data, (AlterOperation) operation);
                 break;
             case CREATE_TABLE:
                 doCreateTable(type, originSchema, data, (CreateTableOperation) operation);
@@ -150,80 +148,99 @@ public class SchemaChangeHelper {
         }
     }
 
-    private void doChangeColumnType(SchemaChangeType type, String originSchema) {
-        SchemaChangePolicy policy = policyMap.get(type);
-        if (policy == SchemaChangePolicy.ENABLE) {
-            LOGGER.warn("Unsupported for {}: {}", type, originSchema);
-            return;
-        }
-        doSchemaChangeBase(type, policy, originSchema);
-    }
-
-    private void doRenameColumn(SchemaChangeType type, String originSchema) {
-        SchemaChangePolicy policy = policyMap.get(type);
-        if (policy == SchemaChangePolicy.ENABLE) {
-            LOGGER.warn("Unsupported for {}: {}", type, originSchema);
-            return;
-        }
-        doSchemaChangeBase(type, policy, originSchema);
-    }
-
-    private void doDropColumn(SchemaChangeType type, String originSchema, JsonNode data, AlterOperation operation) {
-        SchemaChangePolicy policy = policyMap.get(type);
-        if (policy == SchemaChangePolicy.ENABLE) {
-            try {
-                String database = dynamicSchemaFormat.parse(data, databasePattern);
-                String table = dynamicSchemaFormat.parse(data, tablePattern);
-                String stmt = operationHelper.buildDropColumnStatement(database, table, operation);
-                if (checkLightSchemaChange(database, table,
-                        operation.getAlterColumns().get(0).getOldColumn().getName(), true)) {
-                    boolean result = executeStatement(database, stmt);
-                    if (!result) {
-                        LOGGER.error("Drop column failed,statement: {}", stmt);
-                        throw new IOException(String.format("Drop column failed,statement: %s", stmt));
+    private void handleAlterOperation(String originSchema, JsonNode data, AlterOperation operation) {
+        Preconditions.checkState(operation.getAlterColumns() != null
+                && !operation.getAlterColumns().isEmpty(), "alter columns is empty");
+        Map<SchemaChangeType, List<AlterColumn>> typeMap = new LinkedHashMap<>();
+        for (AlterColumn alterColumn : operation.getAlterColumns()) {
+            Set<SchemaChangeType> types = SchemaChangeUtils.extractSchemaChangeType(alterColumn);
+            Preconditions.checkState(!types.isEmpty(), "Schema change types is empty");
+            if (types.size() == 1) {
+                SchemaChangeType type = types.stream().findFirst().get();
+                typeMap.computeIfAbsent(type, k -> new ArrayList<>()).add(alterColumn);
+            } else {
+                // Handle change column, it only exists change column type and rename column in this scenario for now.
+                for (SchemaChangeType type : types) {
+                    SchemaChangePolicy policy = policyMap.get(type);
+                    if (policy == SchemaChangePolicy.ENABLE) {
+                        LOGGER.warn("Unsupported for {}: {}", type, originSchema);
+                    } else {
+                        doSchemaChangeBase(type, policy, originSchema);
                     }
-                    return;
                 }
-                LOGGER.warn("Only support drop column when enable light-schema-change for Doris");
-                return;
-            } catch (Exception e) {
-                if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
-                    throw new SchemaChangeHandleException(
-                            String.format("Drop column failed, origin schema: %s", originSchema), e);
-                }
-                return;
             }
         }
-        doSchemaChangeBase(type, policy, originSchema);
+        if (!typeMap.isEmpty()) {
+            doAlterOperation(originSchema, data, typeMap);
+        }
     }
 
-    private void doAddColumn(SchemaChangeType type, String originSchema, JsonNode data, AlterOperation operation) {
-        SchemaChangePolicy policy = policyMap.get(type);
-        if (policy == SchemaChangePolicy.ENABLE) {
+    private void doAlterOperation(String originSchema, JsonNode data,
+            Map<SchemaChangeType, List<AlterColumn>> typeMap) {
+        StringJoiner joiner = new StringJoiner(",");
+        for (Entry<SchemaChangeType, List<AlterColumn>> kv : typeMap.entrySet()) {
+            SchemaChangePolicy policy = policyMap.get(kv.getKey());
+            doSchemaChangeBase(kv.getKey(), policy, originSchema);
+            if (policy == SchemaChangePolicy.ENABLE) {
+                String alterStatement = null;
+                switch (kv.getKey()) {
+                    case ADD_COLUMN:
+                        alterStatement = doAddColumn(kv.getValue());
+                        break;
+                    case DROP_COLUMN:
+                        alterStatement = doDropColumn(kv.getValue());
+                        break;
+                    case RENAME_COLUMN:
+                        alterStatement = doRenameColumn(kv.getKey(), originSchema);
+                        break;
+                    case CHANGE_COLUMN_TYPE:
+                        alterStatement = doChangeColumnType(kv.getKey(), originSchema);
+                        break;
+                    default:
+                }
+                if (alterStatement != null) {
+                    joiner.add(alterStatement);
+                }
+            }
+        }
+        String statement = joiner.toString();
+        if (statement.length() != 0) {
             try {
                 String database = dynamicSchemaFormat.parse(data, databasePattern);
                 String table = dynamicSchemaFormat.parse(data, tablePattern);
-                String stmt = operationHelper.buildAddColumnStatement(database, table, operation);
-                if (checkLightSchemaChange(database, table,
-                        operation.getAlterColumns().get(0).getNewColumn().getName(), false)) {
-                    boolean result = executeStatement(database, stmt);
-                    if (!result) {
-                        LOGGER.error("Add column failed,statement: {}", stmt);
-                        throw new SchemaChangeHandleException(String.format("Add column failed,statement: %s", stmt));
-                    }
-                    return;
+                String alterStatementCommon = operationHelper.buildAlterStatementCommon(database, table);
+                statement = alterStatementCommon + statement;
+                // The checkLightSchemaChange is removed because most scenarios support it
+                boolean result = executeStatement(database, statement);
+                if (!result) {
+                    LOGGER.error("Add column failed,statement: {}", statement);
+                    throw new SchemaChangeHandleException(String.format("Add column failed,statement: %s", statement));
                 }
-                LOGGER.warn("Only support add column when enable light-schema-change for Doris");
-                return;
             } catch (Exception e) {
                 if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
                     throw new SchemaChangeHandleException(
                             String.format("Add column failed, origin schema: %s", originSchema), e);
                 }
-                return;
             }
         }
-        doSchemaChangeBase(type, policy, originSchema);
+    }
+
+    private String doChangeColumnType(SchemaChangeType type, String originSchema) {
+        LOGGER.warn("Unsupported for {}: {}", type, originSchema);
+        return null;
+    }
+
+    private String doRenameColumn(SchemaChangeType type, String originSchema) {
+        LOGGER.warn("Unsupported for {}: {}", type, originSchema);
+        return null;
+    }
+
+    private String doDropColumn(List<AlterColumn> alterColumns) {
+        return operationHelper.buildDropColumnStatement(alterColumns);
+    }
+
+    private String doAddColumn(List<AlterColumn> alterColumns) {
+        return operationHelper.buildAddColumnStatement(alterColumns);
     }
 
     private void doTruncateTable(SchemaChangeType type, String originSchema) {
@@ -319,17 +336,16 @@ public class SchemaChangeHelper {
 
     private boolean checkLightSchemaChange(String database, String table, String column, boolean dropColumn)
             throws IOException {
-        return true;
-//        String url = String.format(CHECK_LIGHT_SCHEMA_CHANGE_API, options.getFenodes(), database, table);
-//        Map<String, Object> param = buildRequestParam(column, dropColumn);
-//        HttpGetEntity httpGet = new HttpGetEntity(url);
-//        httpGet.setHeader(HttpHeaders.AUTHORIZATION, authHeader());
-//        httpGet.setEntity(new StringEntity(dynamicSchemaFormat.objectMapper.writeValueAsString(param)));
-//        boolean success = sendRequest(httpGet);
-//        if (!success) {
-//            LOGGER.warn("schema change can not do table {}.{}", database, table);
-//        }
-//        return success;
+        String url = String.format(CHECK_LIGHT_SCHEMA_CHANGE_API, options.getFenodes(), database, table);
+        Map<String, Object> param = buildRequestParam(column, dropColumn);
+        HttpGetEntity httpGet = new HttpGetEntity(url);
+        httpGet.setHeader(HttpHeaders.AUTHORIZATION, authHeader());
+        httpGet.setEntity(new StringEntity(dynamicSchemaFormat.objectMapper.writeValueAsString(param)));
+        boolean success = sendRequest(httpGet);
+        if (!success) {
+            LOGGER.warn("schema change can not do table {}.{}", database, table);
+        }
+        return success;
     }
 
     @SuppressWarnings("unchecked")

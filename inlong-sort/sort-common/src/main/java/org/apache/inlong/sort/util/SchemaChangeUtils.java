@@ -213,7 +213,7 @@ public final class SchemaChangeUtils {
         if (!newColumn.getName().equals(oldColumn.getName())) {
             types.add(SchemaChangeType.RENAME_COLUMN);
         } else {
-            types.add(SchemaChangeType.RENAME_COLUMN);
+            types.add(SchemaChangeType.CHANGE_COLUMN_TYPE);
         }
     }
 }

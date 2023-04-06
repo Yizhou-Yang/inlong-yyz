@@ -27,7 +27,6 @@ import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
 import org.apache.inlong.sort.protocol.ddl.Column;
 import org.apache.inlong.sort.protocol.ddl.enums.PositionType;
 import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
-import org.apache.inlong.sort.protocol.ddl.operations.AlterOperation;
 import org.apache.inlong.sort.protocol.ddl.operations.CreateTableOperation;
 
 import java.sql.Types;
@@ -155,25 +154,21 @@ public class OperationHelper {
     /**
      * Build the statement of AddColumn
      *
-     * @param database The database of Doris
-     * @param table The table of Doris
-     * @param operation The Operation
+     * @param alterColumns The list of AlterColumn
      * @return A statement of AddColumn
      */
-    public String buildAddColumnStatement(String database, String table, AlterOperation operation) {
+    public String buildAddColumnStatement(List<AlterColumn> alterColumns) {
+        Preconditions.checkState(alterColumns != null
+                && !alterColumns.isEmpty(), "Alter columns is empty");
+        Iterator<AlterColumn> iterator = alterColumns.iterator();
         StringBuilder sb = new StringBuilder();
-        sb.append("ALTER TABLE ");
-        sb.append("`").append(database).append("`.`").append(table).append("`");
-        Preconditions.checkState(operation.getAlterColumns() != null
-                && !operation.getAlterColumns().isEmpty(), "Alter expressions is empty");
-        Iterator<AlterColumn> iterator = operation.getAlterColumns().iterator();
         while (iterator.hasNext()) {
             AlterColumn expression = iterator.next();
             Preconditions.checkNotNull(expression.getNewColumn(), "New column is null");
             Column column = expression.getNewColumn();
             Preconditions.checkState(column.getName() != null && !column.getName().trim().isEmpty(),
                     "The column name is blank");
-            sb.append(" ADD COLUMN `").append(column.getName()).append("` ")
+            sb.append("ADD COLUMN `").append(column.getName()).append("` ")
                     .append(convert2DorisType(expression.getNewColumn().getJdbcType(),
                             column.isNullable(), column.getDefinition()));
             if (validDefaultValue(column.getDefaultValue())) {
@@ -212,30 +207,37 @@ public class OperationHelper {
     /**
      * Build the statement of DropColumn
      *
-     * @param database The database of Doris
-     * @param table The table of Doris
-     * @param operation The Operation
+     * @param alterColumns The list of AlterColumn
      * @return A statement of DropColumn
      */
-    public String buildDropColumnStatement(String database, String table, AlterOperation operation) {
+    public String buildDropColumnStatement(List<AlterColumn> alterColumns) {
+        Preconditions.checkState(alterColumns != null
+                && !alterColumns.isEmpty(), "Alter columns is empty");
+        Iterator<AlterColumn> iterator = alterColumns.iterator();
         StringBuilder sb = new StringBuilder();
-        sb.append("ALTER TABLE ");
-        sb.append("`").append(database).append("`.`").append(table).append("`");
-        Preconditions.checkState(operation.getAlterColumns() != null
-                && !operation.getAlterColumns().isEmpty(), "Alter expressions is empty");
-        Iterator<AlterColumn> iterator = operation.getAlterColumns().iterator();
         while (iterator.hasNext()) {
             AlterColumn expression = iterator.next();
             Preconditions.checkNotNull(expression.getOldColumn(), "Old column is null");
             Column column = expression.getOldColumn();
             Preconditions.checkState(column.getName() != null && !column.getName().trim().isEmpty(),
                     "The column name is blank");
-            sb.append(" DROP COLUMN `").append(column.getName()).append("`");
+            sb.append("DROP COLUMN `").append(column.getName()).append("`");
             if (iterator.hasNext()) {
                 sb.append(",");
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * Build common statement of alter
+     *
+     * @param database The database of Doris
+     * @param table The table of Doris
+     * @return A statement of Alter table
+     */
+    public String buildAlterStatementCommon(String database, String table) {
+        return "ALTER TABLE `" + database + "`.`" + table + "` ";
     }
 
     private boolean validDefaultValue(String defaultValue) {
@@ -293,6 +295,8 @@ public class OperationHelper {
             sb.append("\nCOMMENT ").append(quote(operation.getComment()));
         }
         sb.append("\nDISTRIBUTED BY HASH(").append(keys).append(")");
+        // Add light schema change support for it if the version of doris is greater than 1.2.0 or equals 1.2.0
+        sb.append("\nPROPERTIES (\n\t\"light_schema_change\" = \"true\"\n)");
         return sb.toString();
     }
 }
