@@ -108,12 +108,12 @@ public class OperationUtils {
 
         Map<String, Integer> sqlType = getSqlType(tableSchema);
         List<AlterColumn> alterColumns = new ArrayList<>();
-
         statement.getAlterExpressions().forEach(alterExpression -> {
             switch (alterExpression.getOperation()) {
                 case DROP:
                     alterColumns.add(new AlterColumn(AlterType.DROP_COLUMN,
-                            null, Column.builder().name(removeContinuousBackQuotes(alterExpression.getColumnName()))
+                            null,
+                        Column.builder().name(removeContinuousBackQuotes(alterExpression.getColumnName()))
                                     .build()));
                     break;
                 case ADD:
@@ -123,11 +123,12 @@ public class OperationUtils {
                             null));
                     break;
                 case MODIFY:
-                    alterColumns.add(new AlterColumn(AlterType.MODIFY_COLUMN));
                 case RENAME:
-                    alterColumns.add(new AlterColumn(AlterType.RENAME_COLUMN));
                 case CHANGE:
-                    alterColumns.add(new AlterColumn(AlterType.CHANGE_COLUMN));
+                    alterColumns.add(new AlterColumn(AlterType.CHANGE_COLUMN,
+                        parseColumnWithPosition(isFirst, sqlType,
+                            alterExpression.getColDataTypeList().get(0)),
+                        new Column(removeContinuousBackQuotes(alterExpression.getColumnOldName()))));
             }
 
         });

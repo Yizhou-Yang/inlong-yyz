@@ -37,6 +37,7 @@ import java.util.regex.Pattern;
 
 import static org.apache.flink.util.Preconditions.checkState;
 import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
+import static org.apache.inlong.sort.base.Constants.DATASOURCE_NAME;
 import static org.apache.inlong.sort.base.Constants.GH_OST_DDL_CHANGE;
 import static org.apache.inlong.sort.base.Constants.GH_OST_TABLE_REGEX;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
@@ -161,6 +162,8 @@ public class MySqlTableInlongSourceFactory implements DynamicTableSourceFactory 
         final boolean includeSchemaChange = config.get(INCLUDE_SCHEMA_CHANGE);
         final boolean ghostDdlChange = config.get(GH_OST_DDL_CHANGE);
         final String ghostTableRegex = config.get(GH_OST_TABLE_REGEX);
+        final String dataSourceName = config.get(DATASOURCE_NAME);
+
         if (enableParallelRead) {
             validateStartupOptionIfEnableParallel(startupOptions);
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -204,7 +207,8 @@ public class MySqlTableInlongSourceFactory implements DynamicTableSourceFactory 
                 includeSchemaChange,
                 includeIncremental,
                 ghostDdlChange,
-                ghostTableRegex);
+                ghostTableRegex,
+                dataSourceName);
     }
 
     @Override
@@ -254,6 +258,7 @@ public class MySqlTableInlongSourceFactory implements DynamicTableSourceFactory 
         options.add(INCLUDE_SCHEMA_CHANGE);
         options.add(GH_OST_DDL_CHANGE);
         options.add(GH_OST_TABLE_REGEX);
+        options.add(DATASOURCE_NAME);
         return options;
     }
 

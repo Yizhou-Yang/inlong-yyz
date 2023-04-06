@@ -58,4 +58,8 @@ public class Column {
         this.comment = comment;
         this.isNullable = isNullable;
     }
+
+    public Column(@JsonProperty("name") String name) {
+        this.name = name;
+    }
 }

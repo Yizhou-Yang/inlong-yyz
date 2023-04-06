@@ -401,4 +401,12 @@ public final class Constants {
             .defaultValue("^_(.*)_(gho|ghc|del|new|old)$")
             .withDescription(
                     "Matcher the original table name from the ddl of gh-ost.");
+
+    public static final ConfigOption<String> DATASOURCE_NAME = ConfigOptions
+        .key("datasource.name")
+        .stringType()
+        .defaultValue("")
+        .withDescription(
+            "The name of datasource, it is used to distinguish different datasource in the same job.");
+
 }
