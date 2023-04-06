@@ -27,12 +27,12 @@ import org.apache.iceberg.StructLike;
 import org.apache.iceberg.flink.FlinkSchemaUtil;
 import org.apache.iceberg.flink.RowDataWrapper;
 import org.apache.iceberg.flink.data.RowDataProjection;
-import org.apache.iceberg.io.BaseTaskWriter;
 import org.apache.iceberg.io.FileAppenderFactory;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.OutputFileFactory;
 import org.apache.iceberg.relocated.com.google.common.collect.Sets;
 import org.apache.iceberg.types.TypeUtil;
+import org.apache.inlong.sort.iceberg.io.InLongBaseTaskWriter;
 
 import java.io.IOException;
 import java.util.List;
@@ -40,7 +40,7 @@ import java.util.List;
 /**
  * Copy from iceberg-flink:iceberg-flink-1.13:0.13.2
  */
-abstract class BaseDeltaTaskWriter extends BaseTaskWriter<RowData> {
+abstract class BaseDeltaTaskWriter extends InLongBaseTaskWriter<RowData> {
 
     private final Schema schema;
     private final Schema deleteSchema;
