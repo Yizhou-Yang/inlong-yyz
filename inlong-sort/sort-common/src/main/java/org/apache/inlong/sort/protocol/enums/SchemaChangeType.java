@@ -53,7 +53,12 @@ public enum SchemaChangeType {
     /**
      * Change column type
      */
-    CHANGE_COLUMN_TYPE(8);
+    CHANGE_COLUMN_TYPE(8),
+    /**
+     * Alter table, it is a unified description of modified table, which may contain multiple operations, it is not
+     * exposed to the outside world in most scenarios.
+     */
+    ALTER(-1);
 
     /**
      * The code represents this schama change type
