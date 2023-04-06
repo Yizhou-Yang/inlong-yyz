@@ -56,6 +56,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A specific {@link KafkaSerializationSchema} for {@link KafkaDynamicSink}.
@@ -293,7 +295,7 @@ class DynamicKafkaSerializationSchema implements KafkaSerializationSchema<RowDat
         }
     }
 
-    public SchemaChangeType extractSchemaChangeType(JsonNode rootNode) {
+    public Set<SchemaChangeType> extractSchemaChangeType(JsonNode rootNode) {
         Operation operation;
         try {
             JsonNode operationNode = Preconditions.checkNotNull(rootNode.get("operation"),
@@ -306,11 +308,11 @@ class DynamicKafkaSerializationSchema implements KafkaSerializationSchema<RowDat
             return null;
         }
         String originSchema = jsonDynamicSchemaFormat.extractDDL(rootNode);
-        SchemaChangeType type = SchemaChangeUtils.extractSchemaChangeType(operation);
-        if (type == null) {
+        Set<SchemaChangeType> types = SchemaChangeUtils.extractSchemaChangeTypes(operation);
+        if (types == null) {
             LOG.warn("Unsupported for schema-change: {}", originSchema);
         }
-        return type;
+        return types;
     }
 
     /**
@@ -334,12 +336,16 @@ class DynamicKafkaSerializationSchema implements KafkaSerializationSchema<RowDat
             JsonNode rootNode = jsonDynamicSchemaFormat.deserialize(consumedRow.getBinary(0));
             boolean isDDL = jsonDynamicSchemaFormat.extractDDLFlag(rootNode);
             if (isDDL) {
-                SchemaChangeType type = extractSchemaChangeType(rootNode);
-                if (type == null) {
+                Set<SchemaChangeType> types = extractSchemaChangeType(rootNode);
+                if (types == null) {
                     return values;
                 }
-                SchemaChangePolicy changePolicy = policyMap.get(type);
-                if (SchemaChangePolicy.IGNORE.equals(changePolicy)) {
+
+                Set<SchemaChangeType> enableTypes = types.stream()
+                        .filter((type) -> SchemaChangePolicy.ENABLE.equals(policyMap.get(type)))
+                        .collect(Collectors.toSet());
+
+                if (enableTypes.isEmpty()) {
                     return values;
                 }
 
