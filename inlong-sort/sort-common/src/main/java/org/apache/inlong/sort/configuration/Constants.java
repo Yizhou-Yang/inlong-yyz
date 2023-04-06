@@ -96,6 +96,20 @@ public class Constants {
     public static final String PIPELINE_NAME = "pipeline.name";
 
     /**
+     * https://nightlies.apache.org/flink/flink-docs-master/docs/dev/table/config/
+     * default AUTO
+     */
+    public static final String TABLE_EXEC_SINK_UPSERT_MATERIALIZE = "table.exec.sink.upsert-materialize";
+
+    public static final ConfigOption<String> UPSERT_MATERIALIZE =
+            key("table.exec.sink.upsert-materialize").defaultValue("AUTO").withDescription("Because of the disorder "
+                    + "of ChangeLog data caused by Shuffle in distributed system, the data received by Sink may not "
+                    + "be the order of global upsert. So add upsert materialize operator before upsert sink. It "
+                    + "receives the upstream changelog records and generate an upsert view for the downstream.\n"
+                    + "By default, the materialize operator will be added when a distributed disorder occurs on "
+                    + "unique keys. You can also choose no materialization(NONE) or force materialization(FORCE).");
+
+    /**
      * The ID of the cluster, used to separate multiple clusters.
      */
     public static final ConfigOption<String> CLUSTER_ID = key("cluster-id").noDefaultValue()

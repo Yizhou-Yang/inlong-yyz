@@ -54,6 +54,8 @@ public class Entrance {
         StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env, settings);
         tableEnv.getConfig().getConfiguration().setString(Constants.PIPELINE_NAME,
                 config.getString(Constants.JOB_NAME));
+        tableEnv.getConfig().getConfiguration().setString(Constants.TABLE_EXEC_SINK_UPSERT_MATERIALIZE,
+                config.getString(Constants.UPSERT_MATERIALIZE));
         String sqlFile = config.getString(Constants.SQL_SCRIPT_FILE);
         Parser parser;
         if (StringUtils.isEmpty(sqlFile)) {
