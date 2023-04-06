@@ -103,6 +103,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
      */
     protected List<String> metadataKeys;
 
+    private String dataSourceName;
+
     /**
      * Constructor of MySqlTableSource.
      */
@@ -138,7 +140,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             boolean includeSchemaChange,
             boolean includeIncremental,
             boolean ghostDdlChange,
-            String ghostTableRegex) {
+            String ghostTableRegex,
+            String dataSourceName) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -174,6 +177,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.includeSchemaChange = includeSchemaChange;
         this.ghostDdlChange = ghostDdlChange;
         this.ghostTableRegex = ghostTableRegex;
+        this.dataSourceName = dataSourceName;
     }
 
     @Override
@@ -332,7 +336,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         includeSchemaChange,
                         includeIncremental,
                         ghostDdlChange,
-                        ghostTableRegex);
+                        ghostTableRegex,
+                        dataSourceName);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
