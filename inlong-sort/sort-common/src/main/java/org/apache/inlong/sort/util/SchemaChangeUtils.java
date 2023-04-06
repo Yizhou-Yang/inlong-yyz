@@ -18,15 +18,18 @@
 package org.apache.inlong.sort.util;
 
 import com.google.common.base.Preconditions;
-import org.apache.inlong.sort.protocol.ddl.enums.AlterType;
+import org.apache.inlong.sort.protocol.ddl.Column;
+import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
 import org.apache.inlong.sort.protocol.ddl.operations.AlterOperation;
 import org.apache.inlong.sort.protocol.ddl.operations.Operation;
 import org.apache.inlong.sort.protocol.enums.SchemaChangePolicy;
 import org.apache.inlong.sort.protocol.enums.SchemaChangeType;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.StringJoiner;
 
 /**
@@ -92,6 +95,39 @@ public final class SchemaChangeUtils {
     }
 
     /**
+     * Extract the schema change types from {@link Operation}
+     *
+     * @param operation The operation
+     * @return Set of {@link SchemaChangeType}
+     */
+    public static Set<SchemaChangeType> extractSchemaChangeTypes(Operation operation) {
+        Set<SchemaChangeType> types = new HashSet<>();
+        switch (operation.getOperationType()) {
+            case ALTER:
+                AlterOperation alterOperation = (AlterOperation) operation;
+                Preconditions.checkState(alterOperation.getAlterColumns() != null
+                        && !alterOperation.getAlterColumns().isEmpty(), "alter columns is empty");
+                for (AlterColumn alterColumn : alterOperation.getAlterColumns()) {
+                    extractSchemaChangeType(alterColumn, types);
+                }
+                break;
+            case CREATE:
+                types.add(SchemaChangeType.CREATE_TABLE);
+                break;
+            case TRUNCATE:
+                types.add(SchemaChangeType.TRUNCATE_TABLE);
+                break;
+            case RENAME:
+                types.add(SchemaChangeType.RENAME_TABLE);
+                break;
+            case DROP:
+                types.add(SchemaChangeType.DROP_TABLE);
+            default:
+        }
+        return types;
+    }
+
+    /**
      * Extract the schema change type from {@link Operation}
      *
      * @param operation The operation
@@ -101,24 +137,7 @@ public final class SchemaChangeUtils {
         SchemaChangeType type = null;
         switch (operation.getOperationType()) {
             case ALTER:
-                AlterOperation alterOperation = (AlterOperation) operation;
-                // Get alter type from the first item
-                Preconditions.checkState(alterOperation.getAlterColumns() != null
-                        && !alterOperation.getAlterColumns().isEmpty(), "alter columns is empty");
-                AlterType alterType = alterOperation.getAlterColumns().get(0).getAlterType();
-                switch (alterType) {
-                    case ADD_COLUMN:
-                        type = SchemaChangeType.ADD_COLUMN;
-                        break;
-                    case DROP_COLUMN:
-                        type = SchemaChangeType.DROP_COLUMN;
-                        break;
-                    case RENAME_COLUMN:
-                        type = SchemaChangeType.RENAME_COLUMN;
-                        break;
-                    default:
-                }
-                break;
+                return SchemaChangeType.ALTER;
             case CREATE:
                 type = SchemaChangeType.CREATE_TABLE;
                 break;
@@ -133,5 +152,68 @@ public final class SchemaChangeUtils {
             default:
         }
         return type;
+    }
+
+    /**
+     * Extract the schema change types from {@link AlterColumn}
+     *
+     * @param alterColumn The alterColumn
+     * @return Set of {@link SchemaChangeType}
+     */
+    public static Set<SchemaChangeType> extractSchemaChangeType(AlterColumn alterColumn) {
+        return extractSchemaChangeType(alterColumn, new HashSet<>());
+    }
+
+    /**
+     * Extract the schema change types from {@link AlterColumn}
+     *
+     * @param alterColumn The alterColumn
+     * @param types The types
+     * @return Set of {@link SchemaChangeType}
+     */
+    public static Set<SchemaChangeType> extractSchemaChangeType(AlterColumn alterColumn, Set<SchemaChangeType> types) {
+        if (types == null) {
+            types = new HashSet<>();
+        }
+        switch (alterColumn.getAlterType()) {
+            case ADD_COLUMN:
+                types.add(SchemaChangeType.ADD_COLUMN);
+                break;
+            case DROP_COLUMN:
+                types.add(SchemaChangeType.DROP_COLUMN);
+                break;
+            case RENAME_COLUMN:
+                types.add(SchemaChangeType.RENAME_COLUMN);
+                break;
+            case CHANGE_COLUMN:
+                parseTypeOfChangeColumn(alterColumn, types);
+                break;
+            default:
+        }
+        return types;
+    }
+
+    /**
+     * Parse the schema change type from {@link AlterColumn}
+     * It is used in the scenario of modifying the column, there is a modified column ddl to
+     * implement multiple column change scenarios, such as modifying the column name and column type at the same time,
+     * we need to parse the specific type.
+     *
+     * @param alterColumn The AlterColumn
+     */
+    private static void parseTypeOfChangeColumn(AlterColumn alterColumn, Set<SchemaChangeType> types) {
+        Preconditions.checkNotNull(alterColumn.getNewColumn(), "The new column is null");
+        Preconditions.checkNotNull(alterColumn.getOldColumn(), "The old column is null");
+        Column newColumn = alterColumn.getNewColumn();
+        Column oldColumn = alterColumn.getOldColumn();
+        Preconditions.checkState(newColumn.getName() != null && !newColumn.getName().trim().isEmpty(),
+                "The new column name is blank");
+        Preconditions.checkState(oldColumn.getName() != null && !oldColumn.getName().trim().isEmpty(),
+                "The old column name is blank");
+        if (!newColumn.getName().equals(oldColumn.getName())) {
+            types.add(SchemaChangeType.RENAME_COLUMN);
+        } else {
+            types.add(SchemaChangeType.RENAME_COLUMN);
+        }
     }
 }
