@@ -196,7 +196,7 @@ public class MetricOption implements Serializable {
             return this;
         }
 
-        public MetricOption.Builder withAuditAddress(String inlongAudit) {
+        public MetricOption.Builder withInlongAudit(String inlongAudit) {
             this.inlongAudit = inlongAudit;
             return this;
         }
