@@ -230,11 +230,11 @@ public final class MySqlRecordEmitter<T>
             MySqlBinlogSplitState mySqlBinlogSplitState = splitState.asBinlogSplitState();
             if (ddl.toUpperCase().startsWith(DDL_OP_ALTER)
                     && mySqlBinlogSplitState.getTableSchemas().containsKey(tableId)) {
-                    String matchTableInSqlRegex = ghostTableRegex;
-                    if (matchTableInSqlRegex.startsWith(CARET) && matchTableInSqlRegex.endsWith(DOLLAR)) {
-                        matchTableInSqlRegex = matchTableInSqlRegex.substring(1, matchTableInSqlRegex.length() - 1);
-                    }
-                    mySqlBinlogSplitState.recordTableDdl(tableId, ddl.replaceAll(matchTableInSqlRegex, tableName));
+                String matchTableInSqlRegex = ghostTableRegex;
+                if (matchTableInSqlRegex.startsWith(CARET) && matchTableInSqlRegex.endsWith(DOLLAR)) {
+                    matchTableInSqlRegex = matchTableInSqlRegex.substring(1, matchTableInSqlRegex.length() - 1);
+                }
+                mySqlBinlogSplitState.recordTableDdl(tableId, ddl.replaceAll(matchTableInSqlRegex, tableName));
             }
         }
     }

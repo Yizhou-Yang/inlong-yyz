@@ -101,7 +101,7 @@ public class MySqlSourceConfig implements Serializable {
             boolean includeIncremental,
             boolean ghostDdlChange,
             String ghostTableRegex,
-        String dataSourceName) {
+            String dataSourceName) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);

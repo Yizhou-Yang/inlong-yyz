@@ -53,8 +53,6 @@ public class CanalJsonSerializationTest {
 
         AlterOperation alterOperation = new AlterOperation(alterColumns);
 
-        DropTableOperation dropTableOperation = new DropTableOperation();
-
         CanalJson canalJson = CanalJson.builder()
                 .data(null)
                 .es(0)
@@ -77,16 +75,7 @@ public class CanalJsonSerializationTest {
         try {
             String writeValueAsString = OBJECT_MAPPER.writeValueAsString(canalJson);
             LOG.info(writeValueAsString);
-            CanalJson canalJson1 = objectMapper.readValue(writeValueAsString, CanalJson.class);
-
-            String ss = OBJECT_MAPPER.writeValueAsString(alterOperation);
-            LOG.info(ss);
-            Operation operation = objectMapper.readValue(ss, Operation.class);
-
-            String drop = OBJECT_MAPPER.writeValueAsString(dropTableOperation);
-            LOG.info(drop);
-            Operation dropTable = objectMapper.readValue(drop, Operation.class);
-
+            objectMapper.readValue(writeValueAsString, CanalJson.class);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }

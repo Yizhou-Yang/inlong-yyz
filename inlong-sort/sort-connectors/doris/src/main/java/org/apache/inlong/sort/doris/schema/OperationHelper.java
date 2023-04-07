@@ -182,7 +182,7 @@ public class OperationHelper {
                     sb.append(" FIRST");
                 } else if (column.getPosition().getPositionType() == PositionType.AFTER) {
                     Preconditions.checkState(column.getPosition().getColumnName() != null
-                                    && !column.getPosition().getColumnName().trim().isEmpty(),
+                            && !column.getPosition().getColumnName().trim().isEmpty(),
                             "The column name of Position is empty");
                     sb.append(" AFTER `").append(column.getPosition().getColumnName()).append("`");
                 }

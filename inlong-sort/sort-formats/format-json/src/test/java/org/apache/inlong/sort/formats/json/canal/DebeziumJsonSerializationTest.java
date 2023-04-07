@@ -1,0 +1,66 @@
+package org.apache.inlong.sort.formats.json.canal;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.inlong.sort.formats.json.debezium.DebeziumJson;
+import org.apache.inlong.sort.protocol.ddl.Column;
+import org.apache.inlong.sort.protocol.ddl.Position;
+import org.apache.inlong.sort.protocol.ddl.enums.AlterType;
+import org.apache.inlong.sort.protocol.ddl.enums.PositionType;
+import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
+import org.apache.inlong.sort.protocol.ddl.operations.AlterOperation;
+import org.apache.inlong.sort.protocol.ddl.operations.DropTableOperation;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * @Author pengzirui
+ * @Date 2023/4/6 6:48 PM
+ * @Version 1.0
+ */
+public class DebeziumJsonSerializationTest {
+
+
+    private static final Logger LOG = LoggerFactory.getLogger(CanalJsonSerializationTest.class);
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    public void testDebeziumJsonSerialization() {
+
+        List<AlterColumn> alterColumns = new ArrayList<>();
+
+        Column column = new Column("columnDataType.getColumnName()", new ArrayList<>(),
+            1,
+            new Position(PositionType.FIRST, null), true, "23",
+            "23");
+
+        alterColumns.add(new AlterColumn(AlterType.ADD_COLUMN, column, null));
+
+        AlterOperation alterOperation = new AlterOperation(alterColumns);
+
+        DebeziumJson debeziumJson = DebeziumJson.builder().source(null)
+            .dataSourceName("dataSourceName")
+            .tableChange(null).incremental(false).build();
+
+        debeziumJson.setDdl("");
+        debeziumJson.setOperation(alterOperation);
+        debeziumJson.setAfter(new HashMap<>());
+
+        ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+        try {
+            String writeValueAsString = OBJECT_MAPPER.writeValueAsString(debeziumJson);
+            LOG.info(writeValueAsString);
+            objectMapper.readValue(writeValueAsString, DebeziumJson.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+}
