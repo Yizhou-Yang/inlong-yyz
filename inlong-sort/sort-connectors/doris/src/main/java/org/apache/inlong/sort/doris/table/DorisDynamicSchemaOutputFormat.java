@@ -152,6 +152,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
     private final boolean enableSchemaChange;
     @Nullable
     private final String schemaChangePolicies;
+    private final DirtySinkHelper<Object> dirtySinkHelper;
     private SchemaChangeHelper helper;
     private long batchBytes = 0L;
     private int size;
@@ -169,7 +170,6 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
     private String fieldDelimiter;
     private String lineDelimiter;
     private String columns;
-    private DirtySinkHelper<Object> dirtySinkHelper;
     private transient Schema schema;
 
     public DorisDynamicSchemaOutputFormat(DorisOptions option,
@@ -278,13 +278,6 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                 throw new RuntimeException(e);
             }
         }
-        if (multipleSink) {
-            jsonDynamicSchemaFormat =
-                    (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(dynamicSchemaFormat);
-            helper = SchemaChangeHelper.of(jsonDynamicSchemaFormat, options, enableSchemaChange,
-                    enableSchemaChange ? SchemaChangeUtils.deserialize(schemaChangePolicies) : null, databasePattern,
-                    tablePattern, executionOptions.getMaxRetries(), schemaUpdatePolicy);
-        }
         MetricOption metricOption = MetricOption.builder()
                 .withInlongLabels(inlongMetric)
                 .withInlongAudit(auditHostAndPorts)
@@ -301,6 +294,13 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             }
         }
         dirtySinkHelper.open(new Configuration());
+        if (multipleSink) {
+            jsonDynamicSchemaFormat =
+                    (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(dynamicSchemaFormat);
+            helper = SchemaChangeHelper.of(jsonDynamicSchemaFormat, options, enableSchemaChange,
+                    enableSchemaChange ? SchemaChangeUtils.deserialize(schemaChangePolicies) : null, databasePattern,
+                    tablePattern, executionOptions.getMaxRetries(), schemaUpdatePolicy, metricData, dirtySinkHelper);
+        }
         if (executionOptions.getBatchIntervalMs() != 0 && executionOptions.getBatchSize() != 1) {
             this.scheduler = new ScheduledThreadPoolExecutor(1,
                     new ExecutorThreadFactory("doris-streamload-output-format"));
@@ -408,7 +408,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             boolean isDDL = jsonDynamicSchemaFormat.extractDDLFlag(rootNode);
             if (isDDL) {
                 ddlNum.incrementAndGet();
-                helper.process(rootNode);
+                helper.process(rowData.getBinary(0), rootNode);
                 return;
             }
             String tableIdentifier;

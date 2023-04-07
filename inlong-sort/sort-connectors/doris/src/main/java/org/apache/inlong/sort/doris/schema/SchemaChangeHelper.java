@@ -31,7 +31,10 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.apache.inlong.sort.base.dirty.DirtySinkHelper;
+import org.apache.inlong.sort.base.dirty.DirtyType;
 import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
+import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
 import org.apache.inlong.sort.base.schema.SchemaChangeHandleException;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.doris.http.HttpGetEntity;
@@ -76,10 +79,13 @@ public class SchemaChangeHelper {
     private final int maxRetries;
     private final OperationHelper operationHelper;
     private final SchemaUpdateExceptionPolicy exceptionPolicy;
+    private final SinkTableMetricData metricData;
+    private final DirtySinkHelper<Object> dirtySinkHelper;
 
     private SchemaChangeHelper(JsonDynamicSchemaFormat dynamicSchemaFormat, DorisOptions options, boolean schemaChange,
             Map<SchemaChangeType, SchemaChangePolicy> policyMap, String databasePattern, String tablePattern,
-            int maxRetries, SchemaUpdateExceptionPolicy exceptionPolicy) {
+            int maxRetries, SchemaUpdateExceptionPolicy exceptionPolicy,
+            SinkTableMetricData metricData, DirtySinkHelper<Object> dirtySinkHelper) {
         this.dynamicSchemaFormat = Preconditions.checkNotNull(dynamicSchemaFormat, "dynamicSchemaFormat is null");
         this.options = Preconditions.checkNotNull(options, "doris options is null");
         this.schemaChange = schemaChange;
@@ -88,14 +94,17 @@ public class SchemaChangeHelper {
         this.tablePattern = tablePattern;
         this.maxRetries = maxRetries;
         this.exceptionPolicy = exceptionPolicy;
+        this.metricData = metricData;
+        this.dirtySinkHelper = dirtySinkHelper;
         operationHelper = OperationHelper.of(dynamicSchemaFormat);
     }
 
     public static SchemaChangeHelper of(JsonDynamicSchemaFormat dynamicSchemaFormat, DorisOptions options,
             boolean schemaChange, Map<SchemaChangeType, SchemaChangePolicy> policyMap, String databasePattern,
-            String tablePattern, int maxRetries, SchemaUpdateExceptionPolicy exceptionPolicy) {
+            String tablePattern, int maxRetries, SchemaUpdateExceptionPolicy exceptionPolicy,
+            SinkTableMetricData metricData, DirtySinkHelper<Object> dirtySinkHelper) {
         return new SchemaChangeHelper(dynamicSchemaFormat, options, schemaChange, policyMap, databasePattern,
-                tablePattern, maxRetries, exceptionPolicy);
+                tablePattern, maxRetries, exceptionPolicy, metricData, dirtySinkHelper);
     }
 
     /**
@@ -103,8 +112,27 @@ public class SchemaChangeHelper {
      *
      * @param data The origin data
      */
-    public void process(JsonNode data) {
+    public void process(byte[] originData, JsonNode data) {
+        String database;
+        String table;
+        try {
+            database = dynamicSchemaFormat.parse(data, databasePattern);
+            table = dynamicSchemaFormat.parse(data, tablePattern);
+        } catch (Exception e) {
+            if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
+                throw new SchemaChangeHandleException(
+                        String.format("Parse database, table from origin data failed, origin data: %s",
+                                new String(originData)), e);
+            }
+            LOGGER.warn("Parse database, table from origin data failed, origin data: {}", new String(originData), e);
+            dirtySinkHelper.invoke(new String(originData), DirtyType.JSON_PROCESS_ERROR, e);
+            if (metricData != null) {
+                metricData.invokeDirty(1, originData.length);
+            }
+            return;
+        }
         if (!schemaChange) {
+            reportMetric(database, table, originData.length);
             return;
         }
         Operation operation;
@@ -116,45 +144,95 @@ public class SchemaChangeHelper {
                     }), "Operation is null");
         } catch (Exception e) {
             if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
-                throw new SchemaChangeHandleException("Extract Operation from origin data failed", e);
+                throw new SchemaChangeHandleException(
+                        String.format("Extract Operation from origin data failed,origin data: %s", data), e);
             }
-            LOGGER.warn("Extract Operation from origin data failed", e);
+            LOGGER.warn("Extract Operation from origin data failed,origin data: {}", data, e);
+            handleDirtyData(data, originData, database, table, DirtyType.JSON_PROCESS_ERROR, e);
             return;
         }
         String originSchema = dynamicSchemaFormat.extractDDL(data);
         SchemaChangeType type = SchemaChangeUtils.extractSchemaChangeType(operation);
         if (type == null) {
+            reportMetric(database, table, originData.length);
             LOGGER.warn("Unsupported for schema-change: {}", originSchema);
             return;
         }
         switch (type) {
             case ALTER:
-                handleAlterOperation(originSchema, data, (AlterOperation) operation);
+                handleAlterOperation(database, table, originData, originSchema, data, (AlterOperation) operation);
                 break;
             case CREATE_TABLE:
-                doCreateTable(type, originSchema, data, (CreateTableOperation) operation);
+                doCreateTable(originData, database, table, type, originSchema, data, (CreateTableOperation) operation);
                 break;
             case DROP_TABLE:
-                doDropTable(type, originSchema);
+                doDropTable(originData, database, table, type, originSchema);
                 break;
             case RENAME_TABLE:
-                doRenameTable(type, originSchema);
+                doRenameTable(originData, database, table, type, originSchema);
                 break;
             case TRUNCATE_TABLE:
-                doTruncateTable(type, originSchema);
+                doTruncateTable(originData, database, table, type, originSchema);
                 break;
             default:
+                reportMetric(database, table, originData.length);
                 LOGGER.warn("Unsupported for {}: {}", type, originSchema);
         }
     }
 
-    private void handleAlterOperation(String originSchema, JsonNode data, AlterOperation operation) {
-        Preconditions.checkState(operation.getAlterColumns() != null
-                && !operation.getAlterColumns().isEmpty(), "alter columns is empty");
+    private void handleDirtyData(JsonNode data, byte[] originData, String database,
+            String table, DirtyType dirtyType, Throwable e) {
+        String label = parseValue(data, dirtySinkHelper.getDirtyOptions().getLabels());
+        String logTag = parseValue(data, dirtySinkHelper.getDirtyOptions().getLogTag());
+        String identifier = parseValue(data, dirtySinkHelper.getDirtyOptions().getIdentifier());
+        dirtySinkHelper.invoke(new String(originData), dirtyType, label, logTag, identifier, e);
+        if (metricData != null) {
+            metricData.outputDirtyMetricsWithEstimate(database, table, 1, originData.length);
+        }
+    }
+
+    private void reportMetric(String database, String table, int len) {
+        if (metricData != null) {
+            metricData.outputMetrics(database, table, 1, len);
+        }
+    }
+
+    private String parseValue(JsonNode data, String pattern) {
+        try {
+            return dynamicSchemaFormat.parse(data, pattern);
+        } catch (Exception e) {
+            LOGGER.warn("Parse value from pattern failed,the pattern: {}, data: {}", pattern, data);
+        }
+        return pattern;
+    }
+
+    private void handleAlterOperation(String database, String table, byte[] originData,
+            String originSchema, JsonNode data, AlterOperation operation) {
+        if (operation.getAlterColumns() == null || operation.getAlterColumns().isEmpty()) {
+            if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
+                throw new SchemaChangeHandleException(
+                        String.format("Alter columns is empty, origin schema: %s", originSchema));
+            }
+            LOGGER.warn("Alter columns is empty, origin schema: {}", originSchema);
+            reportMetric(database, table, originData.length);
+            return;
+        }
         Map<SchemaChangeType, List<AlterColumn>> typeMap = new LinkedHashMap<>();
         for (AlterColumn alterColumn : operation.getAlterColumns()) {
-            Set<SchemaChangeType> types = SchemaChangeUtils.extractSchemaChangeType(alterColumn);
-            Preconditions.checkState(!types.isEmpty(), "Schema change types is empty");
+            Set<SchemaChangeType> types = null;
+            try {
+                types = SchemaChangeUtils.extractSchemaChangeType(alterColumn);
+                Preconditions.checkState(!types.isEmpty(), "Schema change types is empty");
+            } catch (Exception e) {
+                if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
+                    throw new SchemaChangeHandleException(
+                            String.format("Extract schema change type failed, origin schema: %s", originSchema), e);
+                }
+                LOGGER.warn("Extract schema change type failed, origin schema: {}", originSchema, e);
+            }
+            if (types == null) {
+                continue;
+            }
             if (types.size() == 1) {
                 SchemaChangeType type = types.stream().findFirst().get();
                 typeMap.computeIfAbsent(type, k -> new ArrayList<>()).add(alterColumn);
@@ -165,38 +243,48 @@ public class SchemaChangeHelper {
                     if (policy == SchemaChangePolicy.ENABLE) {
                         LOGGER.warn("Unsupported for {}: {}", type, originSchema);
                     } else {
-                        doSchemaChangeBase(type, policy, originSchema);
+                        doSchemaChangeBase(database, table, originData, type, policy, originSchema, false);
                     }
                 }
             }
         }
         if (!typeMap.isEmpty()) {
-            doAlterOperation(originSchema, data, typeMap);
+            doAlterOperation(database, table, originData, originSchema, data, typeMap);
+        } else {
+            reportMetric(database, table, originData.length);
         }
     }
 
-    private void doAlterOperation(String originSchema, JsonNode data,
+    private void doAlterOperation(String database, String table, byte[] originData, String originSchema, JsonNode data,
             Map<SchemaChangeType, List<AlterColumn>> typeMap) {
         StringJoiner joiner = new StringJoiner(",");
         for (Entry<SchemaChangeType, List<AlterColumn>> kv : typeMap.entrySet()) {
             SchemaChangePolicy policy = policyMap.get(kv.getKey());
-            doSchemaChangeBase(kv.getKey(), policy, originSchema);
+            doSchemaChangeBase(database, table, originData, kv.getKey(), policy, originSchema, false);
             if (policy == SchemaChangePolicy.ENABLE) {
                 String alterStatement = null;
-                switch (kv.getKey()) {
-                    case ADD_COLUMN:
-                        alterStatement = doAddColumn(kv.getValue());
-                        break;
-                    case DROP_COLUMN:
-                        alterStatement = doDropColumn(kv.getValue());
-                        break;
-                    case RENAME_COLUMN:
-                        alterStatement = doRenameColumn(kv.getKey(), originSchema);
-                        break;
-                    case CHANGE_COLUMN_TYPE:
-                        alterStatement = doChangeColumnType(kv.getKey(), originSchema);
-                        break;
-                    default:
+                try {
+                    switch (kv.getKey()) {
+                        case ADD_COLUMN:
+                            alterStatement = doAddColumn(kv.getValue());
+                            break;
+                        case DROP_COLUMN:
+                            alterStatement = doDropColumn(kv.getValue());
+                            break;
+                        case RENAME_COLUMN:
+                            alterStatement = doRenameColumn(kv.getKey(), originSchema);
+                            break;
+                        case CHANGE_COLUMN_TYPE:
+                            alterStatement = doChangeColumnType(kv.getKey(), originSchema);
+                            break;
+                        default:
+                    }
+                } catch (Exception e) {
+                    if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
+                        throw new SchemaChangeHandleException(
+                                String.format("Build alter statement failed, origin schema: %s", originSchema), e);
+                    }
+                    LOGGER.warn("Build alter statement failed, origin schema: {}", originSchema, e);
                 }
                 if (alterStatement != null) {
                     joiner.add(alterStatement);
@@ -206,8 +294,6 @@ public class SchemaChangeHelper {
         String statement = joiner.toString();
         if (statement.length() != 0) {
             try {
-                String database = dynamicSchemaFormat.parse(data, databasePattern);
-                String table = dynamicSchemaFormat.parse(data, tablePattern);
                 String alterStatementCommon = operationHelper.buildAlterStatementCommon(database, table);
                 statement = alterStatementCommon + statement;
                 // The checkLightSchemaChange is removed because most scenarios support it
@@ -216,12 +302,16 @@ public class SchemaChangeHelper {
                     LOGGER.error("Add column failed,statement: {}", statement);
                     throw new SchemaChangeHandleException(String.format("Add column failed,statement: %s", statement));
                 }
+                reportMetric(database, table, originData.length);
             } catch (Exception e) {
                 if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
                     throw new SchemaChangeHandleException(
                             String.format("Add column failed, origin schema: %s", originSchema), e);
                 }
+                handleDirtyData(data, originData, database, table, DirtyType.HANDLE_ALTER_TABLE_ERROR, e);
             }
+        } else {
+            reportMetric(database, table, originData.length);
         }
     }
 
@@ -243,40 +333,44 @@ public class SchemaChangeHelper {
         return operationHelper.buildAddColumnStatement(alterColumns);
     }
 
-    private void doTruncateTable(SchemaChangeType type, String originSchema) {
+    private void doTruncateTable(byte[] originData, String database, String table,
+            SchemaChangeType type, String originSchema) {
         SchemaChangePolicy policy = policyMap.get(SchemaChangeType.TRUNCATE_TABLE);
         if (policy == SchemaChangePolicy.ENABLE) {
             LOGGER.warn("Unsupported for {}: {}", type, originSchema);
+            reportMetric(database, table, originData.length);
             return;
         }
-        doSchemaChangeBase(type, policy, originSchema);
+        doSchemaChangeBase(database, table, originData, type, policy, originSchema);
     }
 
-    private void doRenameTable(SchemaChangeType type, String originSchema) {
+    private void doRenameTable(byte[] originData, String database, String table,
+            SchemaChangeType type, String originSchema) {
         SchemaChangePolicy policy = policyMap.get(SchemaChangeType.RENAME_TABLE);
         if (policy == SchemaChangePolicy.ENABLE) {
             LOGGER.warn("Unsupported for {}: {}", type, originSchema);
+            reportMetric(database, table, originData.length);
             return;
         }
-        doSchemaChangeBase(type, policy, originSchema);
+        doSchemaChangeBase(database, table, originData, type, policy, originSchema);
     }
 
-    private void doDropTable(SchemaChangeType type, String originSchema) {
+    private void doDropTable(byte[] originData, String database, String table,
+            SchemaChangeType type, String originSchema) {
         SchemaChangePolicy policy = policyMap.get(SchemaChangeType.DROP_TABLE);
         if (policy == SchemaChangePolicy.ENABLE) {
             LOGGER.warn("Unsupported for {}: {}", type, originSchema);
+            reportMetric(database, table, originData.length);
             return;
         }
-        doSchemaChangeBase(type, policy, originSchema);
+        doSchemaChangeBase(database, table, originData, type, policy, originSchema);
     }
 
-    private void doCreateTable(SchemaChangeType type, String originSchema, JsonNode data,
-            CreateTableOperation operation) {
+    private void doCreateTable(byte[] originData, String database, String table, SchemaChangeType type,
+            String originSchema, JsonNode data, CreateTableOperation operation) {
         SchemaChangePolicy policy = policyMap.get(type);
         if (policy == SchemaChangePolicy.ENABLE) {
             try {
-                String database = dynamicSchemaFormat.parse(data, databasePattern);
-                String table = dynamicSchemaFormat.parse(data, tablePattern);
                 List<String> primaryKeys = dynamicSchemaFormat.extractPrimaryKeyNames(data);
                 String stmt = operationHelper.buildCreateTableStatement(database, table, primaryKeys, operation);
                 boolean result = executeStatement(database, stmt);
@@ -284,21 +378,32 @@ public class SchemaChangeHelper {
                     LOGGER.error("Create table failed,statement: {}", stmt);
                     throw new IOException(String.format("Create table failed,statement: %s", stmt));
                 }
+                reportMetric(database, table, originData.length);
                 return;
             } catch (Exception e) {
                 if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
                     throw new SchemaChangeHandleException(
                             String.format("Drop column failed, origin schema: %s", originSchema), e);
                 }
+                handleDirtyData(data, originData, database, table, DirtyType.CREATE_TABLE_ERROR, e);
                 return;
             }
         }
-        doSchemaChangeBase(type, policy, originSchema);
+        doSchemaChangeBase(database, table, originData, type, policy, originSchema);
     }
 
-    private void doSchemaChangeBase(SchemaChangeType type, SchemaChangePolicy policy, String schema) {
+    private void doSchemaChangeBase(String database, String table, byte[] originData,
+            SchemaChangeType type, SchemaChangePolicy policy, String schema) {
+        doSchemaChangeBase(database, table, originData, type, policy, schema, true);
+    }
+
+    private void doSchemaChangeBase(String database, String table, byte[] originData,
+            SchemaChangeType type, SchemaChangePolicy policy, String schema, boolean reportMetric) {
         if (policy == null) {
             LOGGER.warn("Unsupported for {}: {}", type, schema);
+            if (reportMetric) {
+                reportMetric(database, table, originData.length);
+            }
             return;
         }
         switch (policy) {
@@ -309,7 +414,11 @@ public class SchemaChangeHelper {
                 throw new SchemaChangeHandleException(String.format("Unsupported for %s: %s", type, schema));
             default:
         }
+        if (reportMetric) {
+            reportMetric(database, table, originData.length);
+        }
     }
+
 
     private Map<String, Object> buildRequestParam(String column, boolean dropColumn) {
         Map<String, Object> params = new HashMap<>();
