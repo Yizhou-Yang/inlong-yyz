@@ -254,7 +254,9 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
                 .equals(tableOptions.getOptional(SINK_PARTITIONER).get())) {
             InLongFixedPartitionPartitioner<RowData> inLongFixedPartitionPartitioner =
                     new InLongFixedPartitionPartitioner<>(tableOptions
-                            .getOptional(PATTERN_PARTITION_MAP).orElse(Collections.emptyMap()));
+                            .getOptional(PATTERN_PARTITION_MAP).orElse(Collections.emptyMap()),
+                            tableOptions.getOptional(SINK_MULTIPLE_PARTITION_PATTERN)
+                                    .orElse(null));
             inLongFixedPartitionPartitioner.setSinkMultipleFormat(tableOptions.getOptional(SINK_MULTIPLE_FORMAT)
                     .orElse(null));
             return Optional.of(inLongFixedPartitionPartitioner);

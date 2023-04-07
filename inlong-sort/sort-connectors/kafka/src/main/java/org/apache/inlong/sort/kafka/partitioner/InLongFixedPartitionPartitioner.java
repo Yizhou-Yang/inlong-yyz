@@ -24,13 +24,18 @@ import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T> {
 
     private static final Logger LOG = LoggerFactory.getLogger(InLongFixedPartitionPartitioner.class);
 
     private final Map<String, String> patternPartitionMap;
+    private final Map<String, Pattern> regexPatternMap;
     private AbstractDynamicSchemaFormat dynamicSchemaFormat;
 
     /**
@@ -41,8 +46,17 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
 
     private final String DEFAULT_PARTITION = "DEFAULT_PARTITION";
 
-    public InLongFixedPartitionPartitioner(Map<String, String> patternPartitionMap) {
+    private String databasePattern;
+    private String tablePattern;
+
+    private final static String DELIMITER1 = "&";
+    private final static String DELIMITER2 = "_";
+
+    public InLongFixedPartitionPartitioner(Map<String, String> patternPartitionMap, String partitionPattern) {
         this.patternPartitionMap = patternPartitionMap;
+        this.regexPatternMap = new HashMap<>();
+        this.databasePattern = partitionPattern.split(DELIMITER2)[0];
+        this.tablePattern = partitionPattern.split(DELIMITER2)[1];
     }
 
     @Override
@@ -59,8 +73,13 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
                 if (DEFAULT_PARTITION.equals(entry.getKey())) {
                     continue;
                 }
-                String partitionKey = dynamicSchemaFormat.parse(value, entry.getKey());
-                if (partitionKey != null && !partitionKey.isEmpty()) {
+                String databaseName = dynamicSchemaFormat.parse(value, databasePattern);
+                String tableName = dynamicSchemaFormat.parse(value, tablePattern);
+                List<String> regexList = Arrays.asList(entry.getKey().split(DELIMITER1));
+                String databaseNameRegex = regexList.get(0);
+                String tableNameRegex = regexList.get(1);
+
+                if (match(databaseName, databaseNameRegex) && match(tableName, tableNameRegex)) {
                     return Integer.parseInt(entry.getValue());
                 }
             }
@@ -69,5 +88,11 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
             LOG.warn("Extract partition failed", e);
         }
         return partition;
+    }
+
+    private boolean match(String name, String nameRegex) {
+        return regexPatternMap.computeIfAbsent(nameRegex, regex -> Pattern.compile(regex))
+                .matcher(name)
+                .matches();
     }
 }
