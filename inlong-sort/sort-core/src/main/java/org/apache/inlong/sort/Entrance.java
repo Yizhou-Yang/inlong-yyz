@@ -56,6 +56,8 @@ public class Entrance {
                 config.getString(Constants.JOB_NAME));
         tableEnv.getConfig().getConfiguration().setString(Constants.TABLE_EXEC_SINK_UPSERT_MATERIALIZE,
                 config.getString(Constants.UPSERT_MATERIALIZE));
+        tableEnv.getConfig().getConfiguration().setString(Constants.TABLE_EXEC_SINK_NOT_NULL_ENFORCER,
+                config.getString(Constants.NOT_NULL_ENFORCER));
         String sqlFile = config.getString(Constants.SQL_SCRIPT_FILE);
         Parser parser;
         if (StringUtils.isEmpty(sqlFile)) {

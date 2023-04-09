@@ -44,13 +44,14 @@ import org.apache.iceberg.util.ThreadPools;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 public abstract class InLongBaseTaskWriter<T> implements TaskWriter<T> {
 
-    private final List<DataFile> completedDataFiles = Lists.newCopyOnWriteArrayList();
-    private final List<DeleteFile> completedDeleteFiles = Lists.newCopyOnWriteArrayList();
+    private final List<DataFile> completedDataFiles = Collections.synchronizedList(Lists.newArrayList());
+    private final List<DeleteFile> completedDeleteFiles = Collections.synchronizedList(Lists.newArrayList());
     private final CharSequenceSet referencedDataFiles = CharSequenceSet.empty();
 
     private final PartitionSpec spec;

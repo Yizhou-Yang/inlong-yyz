@@ -18,6 +18,7 @@
 package org.apache.inlong.sort.configuration;
 
 import java.time.Duration;
+
 import static org.apache.inlong.sort.configuration.ConfigOptions.key;
 
 /**
@@ -109,6 +110,16 @@ public class Constants {
                     + "By default, the materialize operator will be added when a distributed disorder occurs on "
                     + "unique keys. You can also choose no materialization(NONE) or force materialization(FORCE).");
 
+    public static final String TABLE_EXEC_SINK_NOT_NULL_ENFORCER = "table.exec.sink.not-null-enforcer";
+
+    public static final ConfigOption<String> NOT_NULL_ENFORCER =
+            key("table.exec.sink.not-null-enforcer").defaultValue("ERROR").withDescription("Determines how Flink "
+                    + "enforces NOT NULL column constraints when inserting null values.\n"
+                    + "\n"
+                    + "Possible values:\n"
+                    + "\"ERROR\": Throw a runtime exception when writing null values into NOT NULL column.\n"
+                    + "\"DROP\": Drop records silently if a null value would have to be inserted into a NOT NULL "
+                    + "column.");
     /**
      * The ID of the cluster, used to separate multiple clusters.
      */
