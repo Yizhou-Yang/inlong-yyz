@@ -283,6 +283,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .heartbeatInterval(heartbeatInterval)
                             .inlongMetric(inlongMetric)
                             .inlongAudit(inlongAudit)
+                            .migrateAll(migrateAll)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {

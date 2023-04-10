@@ -75,6 +75,7 @@ public class MySqlSourceConfigFactory implements Serializable {
 
     private String inlongMetric;
     private String inlongAudit;
+    private boolean migrateAll;
 
     public MySqlSourceConfigFactory inlongMetric(String inlongMetric) {
         this.inlongMetric = inlongMetric;
@@ -83,6 +84,11 @@ public class MySqlSourceConfigFactory implements Serializable {
 
     public MySqlSourceConfigFactory inlongAudit(String inlongAudit) {
         this.inlongAudit = inlongAudit;
+        return this;
+    }
+
+    public MySqlSourceConfigFactory migrateAll(boolean migrateAll) {
+        this.migrateAll = migrateAll;
         return this;
     }
 
@@ -369,6 +375,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 props,
                 jdbcProperties,
                 inlongMetric,
-                inlongAudit);
+                inlongAudit,
+                migrateAll);
     }
 }
