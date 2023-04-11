@@ -142,20 +142,17 @@ public final class MySqlRecordEmitter<T>
                 }
             }
 
-            // // For drop table ddl, there's no table change events.
             if (tableChanges.isEmpty()) {
-                String ddl = historyRecord.document().getString(Fields.DDL_STATEMENTS);
-                if (ddl.toUpperCase().startsWith(DDL_OP_DROP)) {
-                    TableId tableId = RecordUtils.getTableId(element);
-                    // If this table is one of the captured tables, output the ddl element.
-                    if (splitState.getMySQLSplit().getTableSchemas().containsKey(tableId)) {
-                        outputDdlElement(element, output, splitState, null);
-                    }
+                TableId tableId = RecordUtils.getTableId(element);
+                // if this table is one of the captured tables, output the ddl element.
+                if (splitState.getMySQLSplit().getTableSchemas().containsKey(tableId)) {
+                    outputDdlElement(element, output, splitState, null);
                 }
                 if (ghostDdlChange) {
                     collectGhostDdl(element, splitState, historyRecord);
                 }
             }
+
         } else if (isDataChangeRecord(element)) {
             if (splitState.isBinlogSplitState()) {
                 BinlogOffset position = getBinlogPosition(element);
