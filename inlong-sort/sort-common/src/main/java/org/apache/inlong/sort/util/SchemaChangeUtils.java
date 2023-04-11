@@ -203,14 +203,12 @@ public final class SchemaChangeUtils {
      */
     private static void parseTypeOfChangeColumn(AlterColumn alterColumn, Set<SchemaChangeType> types) {
         Preconditions.checkNotNull(alterColumn.getNewColumn(), "The new column is null");
-        Preconditions.checkNotNull(alterColumn.getOldColumn(), "The old column is null");
         Column newColumn = alterColumn.getNewColumn();
         Column oldColumn = alterColumn.getOldColumn();
         Preconditions.checkState(newColumn.getName() != null && !newColumn.getName().trim().isEmpty(),
                 "The new column name is blank");
-        Preconditions.checkState(oldColumn.getName() != null && !oldColumn.getName().trim().isEmpty(),
-                "The old column name is blank");
-        if (!newColumn.getName().equals(oldColumn.getName())) {
+        if (oldColumn != null && oldColumn.getName() != null && !oldColumn.getName().trim().isEmpty()
+                && !newColumn.getName().equals(oldColumn.getName())) {
             types.add(SchemaChangeType.RENAME_COLUMN);
         } else {
             types.add(SchemaChangeType.CHANGE_COLUMN_TYPE);

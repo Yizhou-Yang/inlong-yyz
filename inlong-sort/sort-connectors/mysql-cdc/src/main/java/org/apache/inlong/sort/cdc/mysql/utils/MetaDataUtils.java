@@ -41,10 +41,14 @@ import org.apache.inlong.sort.formats.json.debezium.DebeziumJson;
 import org.apache.inlong.sort.formats.json.debezium.DebeziumJson.Source;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MetaDataUtils {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    private static final Logger LOG = LoggerFactory.getLogger(MetaDataUtils.class);
 
     /**
      * get sql type from table schema, represents the jdbc data type
@@ -180,6 +184,7 @@ public class MetaDataUtils {
                 dataList.add(field);
                 canalJson.setData(dataList);
             }
+            LOG.debug("canal json: {}", canalJson);
             return StringData.fromString(OBJECT_MAPPER.writeValueAsString(canalJson));
         } catch (Exception e) {
             throw new IllegalStateException("exception occurs when get meta data", e);
