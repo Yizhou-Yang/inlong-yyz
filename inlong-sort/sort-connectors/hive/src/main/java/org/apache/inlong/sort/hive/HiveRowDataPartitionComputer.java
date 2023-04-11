@@ -21,8 +21,8 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_DATABASE_PATTE
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
-import static org.apache.inlong.sort.hive.HiveOptions.SINK_PARTITION_NAME;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -46,6 +46,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
 import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
 import org.apache.inlong.sort.base.sink.PartitionPolicy;
+import org.apache.inlong.sort.hive.table.HiveTableInlongFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,8 +69,6 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
     private final HiveShim hiveShim;
 
     private final String hiveVersion;
-
-    private final String sinkPartitionName;
 
     private final PartitionPolicy partitionPolicy;
 
@@ -104,7 +103,6 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
                     HiveInspectors.getConversion(
                             objectInspector, partColType.getLogicalType(), hiveShim);
         }
-        this.sinkPartitionName = jobConf.get(SINK_PARTITION_NAME.key(), SINK_PARTITION_NAME.defaultValue());
         this.sinkMultipleEnable = Boolean.parseBoolean(jobConf.get(SINK_MULTIPLE_ENABLE.key(), "false"));
         this.sinkMultipleFormat = jobConf.get(SINK_MULTIPLE_FORMAT.key());
         this.databasePattern = jobConf.get(SINK_MULTIPLE_DATABASE_PATTERN.key());
@@ -137,6 +135,14 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
 
                 Map<String, Object> rawData = physicalDataList.get(0);
                 ObjectIdentifier identifier = HiveTableUtil.createObjectIdentifier(databaseName, tableName);
+
+                HashMap<ObjectIdentifier, Long> ignoreWritingTableMap =
+                        HiveTableInlongFactory.getIgnoreWritingTableMap();
+                // ignore writing data into this table
+                if (ignoreWritingTableMap.containsKey(identifier)) {
+                    return partSpec;
+                }
+
                 HiveWriterFactory hiveWriterFactory = HiveTableUtil.getWriterFactory(hiveShim, hiveVersion, identifier);
                 if (hiveWriterFactory == null) {
                     HiveTableUtil.createTable(databaseName, tableName, schema, partitionPolicy, hiveVersion);
@@ -174,7 +180,8 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
                     partSpec.put(partitionColumns[i], partitionValue);
                 }
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                // do not throw exception, just log it. so HadoopPathBasedPartFileWriter will archive dirty data or not
+                LOG.error("Generate partition values error", e);
             }
         } else {
             for (int i = 0; i < partitionIndexes.length; i++) {

@@ -27,8 +27,6 @@ import org.apache.inlong.sort.protocol.ddl.enums.AlterType;
 import org.apache.inlong.sort.protocol.ddl.enums.PositionType;
 import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
 import org.apache.inlong.sort.protocol.ddl.operations.AlterOperation;
-import org.apache.inlong.sort.protocol.ddl.operations.DropTableOperation;
-import org.apache.inlong.sort.protocol.ddl.operations.Operation;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

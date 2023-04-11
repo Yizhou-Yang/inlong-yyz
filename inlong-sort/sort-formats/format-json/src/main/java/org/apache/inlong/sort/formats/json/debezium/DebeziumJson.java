@@ -21,7 +21,6 @@ import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 import java.util.List;
 import java.util.Map;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude;
@@ -58,14 +57,14 @@ public class DebeziumJson {
     private String dataSourceName;
 
     public DebeziumJson(@JsonProperty("before") Map<String, String> before,
-        @JsonProperty("after") Map<String, Object> after,
-        @JsonProperty("source") Source source,
-        @JsonProperty("tableChange") TableChange tableChange,
-        @JsonProperty("tsMs") long tsMs, @JsonProperty("op") String op,
-        @JsonProperty("incremental") boolean incremental,
-        @JsonProperty("ddl") String ddl,
-        @JsonProperty("operation") Operation operation,
-        @JsonProperty("dataSourceName") String dataSourceName) {
+            @JsonProperty("after") Map<String, Object> after,
+            @JsonProperty("source") Source source,
+            @JsonProperty("tableChange") TableChange tableChange,
+            @JsonProperty("tsMs") long tsMs, @JsonProperty("op") String op,
+            @JsonProperty("incremental") boolean incremental,
+            @JsonProperty("ddl") String ddl,
+            @JsonProperty("operation") Operation operation,
+            @JsonProperty("dataSourceName") String dataSourceName) {
         this.before = before;
         this.after = after;
         this.source = source;
@@ -81,6 +80,7 @@ public class DebeziumJson {
     @Builder
     @Data
     public static class Source {
+
         private String name;
         private String db;
         private String table;
