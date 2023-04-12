@@ -50,8 +50,8 @@ import java.util.Map;
 
 import static org.apache.inlong.sort.base.Constants.CARET;
 import static org.apache.inlong.sort.base.Constants.DDL_OP_ALTER;
-import static org.apache.inlong.sort.base.Constants.DDL_OP_DROP;
 import static org.apache.inlong.sort.base.Constants.DOLLAR;
+import static org.apache.inlong.sort.base.Constants.GHOST_TAG;
 import static org.apache.inlong.sort.base.Constants.TABLE_NAME;
 import static org.apache.inlong.sort.cdc.base.relational.JdbcSourceEventDispatcher.HISTORY_RECORD_FIELD;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getBinlogPosition;
@@ -227,11 +227,14 @@ public final class MySqlRecordEmitter<T>
             MySqlBinlogSplitState mySqlBinlogSplitState = splitState.asBinlogSplitState();
             if (ddl.toUpperCase().startsWith(DDL_OP_ALTER)
                     && mySqlBinlogSplitState.getTableSchemas().containsKey(tableId)) {
-                String matchTableInSqlRegex = ghostTableRegex;
-                if (matchTableInSqlRegex.startsWith(CARET) && matchTableInSqlRegex.endsWith(DOLLAR)) {
-                    matchTableInSqlRegex = matchTableInSqlRegex.substring(1, matchTableInSqlRegex.length() - 1);
-                }
-                mySqlBinlogSplitState.recordTableDdl(tableId, ddl.replaceAll(matchTableInSqlRegex, tableName));
+                    String matchTableInSqlRegex = ghostTableRegex;
+                    if (matchTableInSqlRegex.startsWith(CARET) && matchTableInSqlRegex.endsWith(DOLLAR)) {
+                        matchTableInSqlRegex = matchTableInSqlRegex.substring(1, matchTableInSqlRegex.length() - 1);
+                    }
+                    mySqlBinlogSplitState.recordTableDdl(
+                            tableId,
+                            ddl.replace(GHOST_TAG,"").replaceAll("\\s+", " ").
+                                    replaceAll(matchTableInSqlRegex, tableName));
             }
         }
     }
