@@ -50,6 +50,7 @@ import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.hive.client.HiveShim;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.data.binary.BinaryRowData;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -236,10 +237,14 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
                     writer.addElement(genericRowData);
                 }
                 if (metricData != null) {
-                    metricData.invoke(recordNum, recordSize);
+                    metricData.outputMetrics(databaseName, tableName, recordNum, recordSize);
                 }
             } else {
-                writer.addElement((RowData) element);
+                BinaryRowData data = (BinaryRowData) element;
+                writer.addElement(data);
+                if (metricData != null) {
+                    metricData.invoke(1, data.getSizeInBytes());
+                }
             }
         } catch (Exception e) {
             if (schemaUpdatePolicy == null || SchemaUpdateExceptionPolicy.THROW_WITH_STOP == schemaUpdatePolicy) {
