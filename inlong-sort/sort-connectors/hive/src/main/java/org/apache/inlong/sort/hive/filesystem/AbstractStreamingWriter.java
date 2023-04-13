@@ -150,6 +150,18 @@ public abstract class AbstractStreamingWriter<IN, OUT> extends AbstractStreamOpe
     public void initializeState(StateInitializationContext context) throws Exception {
         super.initializeState(context);
 
+        // init metric state
+        if (this.inlongMetric != null) {
+            this.metricStateListState = context.getOperatorStateStore().getUnionListState(
+                    new ListStateDescriptor<>(
+                            INLONG_METRIC_STATE_NAME, TypeInformation.of(new TypeHint<MetricState>() {
+                            })));
+        }
+        if (context.isRestored()) {
+            metricState = MetricStateUtils.restoreMetricState(metricStateListState,
+                    getRuntimeContext().getIndexOfThisSubtask(), getRuntimeContext().getNumberOfParallelSubtasks());
+        }
+
         MetricOption metricOption = MetricOption.builder().withInlongLabels(inlongMetric)
                 .withInlongAudit(auditHostAndPorts)
                 .withInitRecords(metricState != null ? metricState.getMetricValue(NUM_RECORDS_OUT) : 0L)
@@ -157,13 +169,17 @@ public abstract class AbstractStreamingWriter<IN, OUT> extends AbstractStreamOpe
                 .withInitDirtyRecords(metricState != null ? metricState.getMetricValue(DIRTY_RECORDS_OUT) : 0L)
                 .withInitDirtyBytes(metricState != null ? metricState.getMetricValue(DIRTY_BYTES_OUT) : 0L)
                 .withRegisterMetric(RegisteredMetric.ALL).build();
+
         if (metricOption != null) {
             metricData = new SinkTableMetricData(metricOption, getRuntimeContext().getMetricGroup());
+            metricData.registerSubMetricsGroup(metricState);
             if (this.bucketsBuilder instanceof HadoopPathBasedBulkFormatBuilder) {
                 ((HadoopPathBasedBulkFormatBuilder) this.bucketsBuilder).setMetricData(metricData);
             }
         }
 
+        // metricData must be initialized first, then HadoopPathBasedPartFileWriter can use this metricData to upload
+        // metric data.
         buckets = bucketsBuilder.createBuckets(getRuntimeContext().getIndexOfThisSubtask());
 
         // Set listener before the initialization of Buckets.
@@ -192,18 +208,6 @@ public abstract class AbstractStreamingWriter<IN, OUT> extends AbstractStreamOpe
                         bucketCheckInterval);
 
         currentWatermark = Long.MIN_VALUE;
-
-        // init metric state
-        if (this.inlongMetric != null) {
-            this.metricStateListState = context.getOperatorStateStore().getUnionListState(
-                    new ListStateDescriptor<>(
-                            INLONG_METRIC_STATE_NAME, TypeInformation.of(new TypeHint<MetricState>() {
-                            })));
-        }
-        if (context.isRestored()) {
-            metricState = MetricStateUtils.restoreMetricState(metricStateListState,
-                    getRuntimeContext().getIndexOfThisSubtask(), getRuntimeContext().getNumberOfParallelSubtasks());
-        }
     }
 
     @Override
