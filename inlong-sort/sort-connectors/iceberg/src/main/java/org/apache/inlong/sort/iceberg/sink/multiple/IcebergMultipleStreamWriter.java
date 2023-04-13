@@ -257,7 +257,7 @@ public class IcebergMultipleStreamWriter extends IcebergProcessFunction<RecordWi
                 for (RowData data : recordWithSchema.getData()) {
                     String dataBaseName = tableId.namespace().toString();
                     String tableName = tableId.name();
-                    long size = data == null ? 0 : data.toString().getBytes(StandardCharsets.UTF_8).length;
+                    long size = sinkMetricData.getDataSize(data);
 
                     try {
                         multipleWriters.get(tableId).processElement(data);
