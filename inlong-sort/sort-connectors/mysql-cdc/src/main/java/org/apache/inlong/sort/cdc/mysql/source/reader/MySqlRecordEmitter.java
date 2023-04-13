@@ -158,12 +158,8 @@ public final class MySqlRecordEmitter<T>
                 BinlogOffset position = getBinlogPosition(element);
                 splitState.asBinlogSplitState().setStartingOffset(position);
                 reportPos(position);
-                iSnapShot = false;
                 updateMessageTimestamp(element);
             } else {
-                if (splitState.isSnapshotSplitState()) {
-                    iSnapShot = true;
-                }
                 updateMessageTimestampSnap(element);
             }
             fetchDelay = System.currentTimeMillis() - messageTimestamp;
@@ -178,33 +174,38 @@ public final class MySqlRecordEmitter<T>
 
             parseDataSourceName(element);
 
-            debeziumDeserializationSchema.deserialize(
-                    element,
-                    new Collector<T>() {
-
-                        @Override
-                        public void collect(final T t) {
-                            Struct value = (Struct) element.value();
-                            Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                            String databaseName = source.getString(AbstractSourceInfo.DATABASE_NAME_KEY);
-                            String tableName = source.getString(AbstractSourceInfo.TABLE_NAME_KEY);
-
-                            sourceReaderMetrics.outputMetrics(databaseName, tableName, iSnapShot, t);
-                            output.collect(t);
-                        }
-
-                        @Override
-                        public void close() {
-                            // do nothing
-                        }
-                    },
-                    tableSchema);
+            outputElement(element, output, tableSchema);
         } else if (isHeartbeatEvent(element)) {
             updateStartingOffsetForSplit(splitState, element);
         } else {
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);
         }
+    }
+
+    private void outputElement(SourceRecord element, SourceOutput<T> output, TableChange tableSchema)
+        throws Exception {
+        debeziumDeserializationSchema.deserialize(
+            element,
+                new Collector<T>() {
+
+                    @Override
+                    public void collect(final T t) {
+                        Struct value = (Struct) element.value();
+                        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+                        String databaseName = source.getString(AbstractSourceInfo.DATABASE_NAME_KEY);
+                        String tableName = source.getString(AbstractSourceInfo.TABLE_NAME_KEY);
+
+                        sourceReaderMetrics.outputMetrics(databaseName, tableName, iSnapShot, t);
+                        output.collect(t);
+                    }
+
+                    @Override
+                    public void close() {
+                        // do nothing
+                    }
+                },
+            tableSchema);
     }
 
     private void parseDataSourceName(SourceRecord element) {
@@ -260,6 +261,7 @@ public final class MySqlRecordEmitter<T>
     }
 
     private void updateSnapshotRecord(SourceRecord element, MySqlSplitState splitState) {
+        iSnapShot = splitState.isSnapshotSplitState();
         if (splitState.isSnapshotSplitState() && includeIncremental) {
             toSnapshotRecord(element);
         }
@@ -269,7 +271,7 @@ public final class MySqlRecordEmitter<T>
             TableChange tableChange) throws Exception {
         BinlogOffset position = getBinlogPosition(element);
         splitState.asBinlogSplitState().setStartingOffset(position);
-        emitElement(element, output, tableChange);
+        outputElement(element, output, tableChange);
     }
 
     private void updateStartingOffsetForSplit(MySqlSplitState splitState, SourceRecord element) {
@@ -281,12 +283,6 @@ public final class MySqlRecordEmitter<T>
             BinlogOffset position = getBinlogPosition(element);
             splitState.asBinlogSplitState().setStartingOffset(position);
         }
-    }
-
-    private void emitElement(SourceRecord element, SourceOutput<T> output,
-            TableChange tableSchema) throws Exception {
-        outputCollector.output = output;
-        debeziumDeserializationSchema.deserialize(element, outputCollector, tableSchema);
     }
 
     private void reportMetrics(SourceRecord element) {
