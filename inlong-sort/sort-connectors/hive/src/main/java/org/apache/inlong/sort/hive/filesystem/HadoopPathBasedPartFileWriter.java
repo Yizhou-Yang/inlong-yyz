@@ -304,7 +304,11 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
         }
         // archive dirty data
         DirtySinkHelper<Object> dirtySinkHelper = new DirtySinkHelper<>(dirtyOptions, dirtySink);
-        dirtySinkHelper.invoke(data, DirtyType.BATCH_LOAD_ERROR, label, tag, identify, e);
+        List<Map<String, Object>> physicalDataList = HiveTableUtil.jsonNode2Map(jsonFormat.getPhysicalData(data));
+        for (Map<String, Object> record : physicalDataList) {
+            JsonNode jsonNode = HiveTableUtil.object2JsonNode(record);
+            dirtySinkHelper.invoke(jsonNode, DirtyType.BATCH_LOAD_ERROR, label, tag, identify, e);
+        }
     }
 
     /**
@@ -406,10 +410,7 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
      */
     private boolean checkSchema(ObjectIdentifier identifier, HiveWriterFactory writerFactory, RowType schema) {
         HashMap<ObjectIdentifier, Long> schemaCheckTimeMap = HiveTableInlongFactory.getSchemaCheckTimeMap();
-        if (!schemaCheckTimeMap.containsKey(identifier)) {
-            schemaCheckTimeMap.put(identifier, System.currentTimeMillis());
-        }
-        long lastUpdate = schemaCheckTimeMap.get(identifier);
+        long lastUpdate = schemaCheckTimeMap.getOrDefault(identifier, -1L);
         // handle the schema every `HIVE_SCHEMA_SCAN_INTERVAL` milliseconds
         int scanSchemaInterval = Integer.parseInt(writerFactory.getJobConf()
                 .get(HIVE_SCHEMA_SCAN_INTERVAL.key(), HIVE_SCHEMA_SCAN_INTERVAL.defaultValue() + ""));

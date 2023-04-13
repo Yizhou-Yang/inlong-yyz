@@ -150,6 +150,11 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
                 }
 
                 String[] partitionColumns = hiveWriterFactory.getPartitionColumns();
+                if (partitionColumns.length == 0) {
+                    // non partition table
+                    return partSpec;
+                }
+
                 String[] columnNames = hiveWriterFactory.getAllColumns();
                 DataType[] allTypes = hiveWriterFactory.getAllTypes();
                 List<String> columnList = Arrays.asList(columnNames);

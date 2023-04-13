@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.collections.map.CaseInsensitiveMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.connectors.hive.FlinkHiveException;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
@@ -537,11 +538,25 @@ public class HiveTableUtil {
      * @param data json object, such as JsonNode, JsonObject
      * @return Map data
      */
-    private static Map<String, Object> jsonObject2Map(Object data) {
+    public static Map<String, Object> jsonObject2Map(Object data) {
         CaseInsensitiveMap map = new CaseInsensitiveMap();
         map.putAll(objectMapper.convertValue(data, new TypeReference<Map<String, Object>>() {
         }));
         return map;
+    }
+
+    /**
+     * convert map to JsonNode
+     *
+     * @param data map data
+     * @return json node
+     */
+    public static JsonNode object2JsonNode(Map<String, Object> data) {
+        try {
+            return objectMapper.readTree(objectMapper.writeValueAsString(data));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
