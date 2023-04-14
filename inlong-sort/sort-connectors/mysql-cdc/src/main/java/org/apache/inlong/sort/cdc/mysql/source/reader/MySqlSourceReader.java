@@ -183,6 +183,7 @@ public class MySqlSourceReader<T>
             }
         }
         reportFinishedSnapshotSplitsIfNeed();
+        LOG.info("request for new split finished unacked splits:{}", finishedUnackedSplits);
         context.sendSplitRequest();
     }
 

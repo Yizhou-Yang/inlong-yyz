@@ -118,6 +118,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                                 backfillBinlogSplit
                                         .getEndingOffset()
                                         .isAfter(backfillBinlogSplit.getStartingOffset());
+                        LOG.info("binlogBackfillRequired: {}, binlog split {}", binlogBackfillRequired, backfillBinlogSplit);
+
                         if (!binlogBackfillRequired) {
                             dispatchBinlogEndEvent(backfillBinlogSplit);
                             currentTaskRunning = false;
