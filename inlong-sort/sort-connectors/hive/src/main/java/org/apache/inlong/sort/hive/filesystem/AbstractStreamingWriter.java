@@ -47,7 +47,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.IOException;
 
 import static org.apache.inlong.sort.base.Constants.DIRTY_BYTES_OUT;
 import static org.apache.inlong.sort.base.Constants.DIRTY_RECORDS_OUT;
@@ -228,17 +227,11 @@ public abstract class AbstractStreamingWriter<IN, OUT> extends AbstractStreamOpe
 
     @Override
     public void processElement(StreamRecord<IN> element) throws Exception {
-        try {
-            helper.onElement(
-                    element.getValue(),
-                    getProcessingTimeService().getCurrentProcessingTime(),
-                    element.hasTimestamp() ? element.getTimestamp() : null,
-                    currentWatermark);
-        } catch (IOException e) {
-            throw e;
-        } catch (Exception e) {
-            LOGGER.error("StreamingWriter write failed", e);
-        }
+        helper.onElement(
+                element.getValue(),
+                getProcessingTimeService().getCurrentProcessingTime(),
+                element.hasTimestamp() ? element.getTimestamp() : null,
+                currentWatermark);
     }
 
     @Override
