@@ -102,7 +102,8 @@ public class OracleRecordEmitter<T> extends IncrementalSourceRecordEmitter<T> {
                     String schemaName = source.getString(AbstractSourceInfo.SCHEMA_NAME_KEY);
                     String tableName = source.getString(AbstractSourceInfo.TABLE_NAME_KEY);
                     sourceReaderMetrics
-                            .outputMetrics(dbName, schemaName, tableName, splitState.isSnapshotSplitState(), value);
+                            .outputMetrics(dbName.toUpperCase(), schemaName, tableName,
+                                    splitState.isSnapshotSplitState(), value);
                     output.collect(record);
                 }
 
