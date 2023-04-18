@@ -17,6 +17,7 @@
 
 package org.apache.inlong.sort.cdc.mysql.source.config;
 
+import java.util.Random;
 import javax.annotation.Nullable;
 import java.io.Serializable;
 
@@ -52,16 +53,7 @@ public class ServerIdRange implements Serializable {
 
     public int getServerId(int subTaskId) {
         checkArgument(subTaskId >= 0, "Subtask ID %s shouldn't be a negative number.", subTaskId);
-        if (subTaskId > getNumberOfServerIds()) {
-            throw new IllegalArgumentException(
-                    String.format(
-                            "Subtask ID %s is out of server id range %s, "
-                                    + "please adjust the server id range to "
-                                    + "make the number of server id larger than "
-                                    + "the source parallelism.",
-                            subTaskId, this.toString()));
-        }
-        return startServerId + subTaskId;
+        return new Random().nextInt((endServerId - startServerId) + 1) + startServerId;
     }
 
     public int getNumberOfServerIds() {
