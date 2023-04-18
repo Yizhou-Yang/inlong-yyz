@@ -140,7 +140,7 @@ public class JsonToRowDataConverters implements Serializable {
                     return jsonNode -> {
                         try {
                             return convertToTimestampWithLocalZone(jsonNode);
-                        } catch (DateTimeParseException e) {
+                        } catch (Exception e) {
                             return convertToTimestamp(jsonNode);
                         }
                     };
