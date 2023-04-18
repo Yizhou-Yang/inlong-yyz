@@ -18,7 +18,7 @@
 package org.apache.inlong.sort.base.schema;
 
 /**
- * Schema change exception
+ * Schema change handle exception
  */
 public class SchemaChangeHandleException extends RuntimeException {
 

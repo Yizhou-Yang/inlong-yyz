@@ -39,6 +39,7 @@ public class OperationHelper {
     private static final String APOSTROPHE = "'";
     private static final String DOUBLE_QUOTES = "\"";
     private final JsonDynamicSchemaFormat dynamicSchemaFormat;
+    private final int VARCHAR_MAX_LENGTH = 65533;
 
     private OperationHelper(JsonDynamicSchemaFormat dynamicSchemaFormat) {
         this.dynamicSchemaFormat = dynamicSchemaFormat;
@@ -100,7 +101,11 @@ public class OperationHelper {
                 if (precisions != null && !precisions.isEmpty()) {
                     Preconditions.checkState(precisions.size() == 1,
                             "The length of precisions with VARCHAR must be 1");
-                    varcharType = new VarCharType(isNullable, Integer.parseInt(precisions.get(0)));
+                    // Because the precision definition of varchar by Doris is different from that of MySQL.
+                    // The precision in MySQL is the number of characters, while Doris is the number of bytes,
+                    // and Chinese characters occupy 3 bytes, so the precision multiplys by 3 here.
+                    int precision = Math.min(Integer.parseInt(precisions.get(0)) * 3, VARCHAR_MAX_LENGTH);
+                    varcharType = new VarCharType(isNullable, precision);
                 } else {
                     varcharType = varcharType.copy(isNullable);
                 }
@@ -182,7 +187,7 @@ public class OperationHelper {
                     sb.append(" FIRST");
                 } else if (column.getPosition().getPositionType() == PositionType.AFTER) {
                     Preconditions.checkState(column.getPosition().getColumnName() != null
-                            && !column.getPosition().getColumnName().trim().isEmpty(),
+                                    && !column.getPosition().getColumnName().trim().isEmpty(),
                             "The column name of Position is empty");
                     sb.append(" AFTER `").append(column.getPosition().getColumnName()).append("`");
                 }
