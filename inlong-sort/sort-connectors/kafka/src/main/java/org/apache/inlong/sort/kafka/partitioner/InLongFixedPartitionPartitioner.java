@@ -96,6 +96,9 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
     }
 
     private boolean match(String name, String nameRegex) {
+        if (nameRegex.equals("*")) {
+            return true;
+        }
         return regexPatternMap.computeIfAbsent(nameRegex, regex -> Pattern.compile(regex))
                 .matcher(name)
                 .matches();
