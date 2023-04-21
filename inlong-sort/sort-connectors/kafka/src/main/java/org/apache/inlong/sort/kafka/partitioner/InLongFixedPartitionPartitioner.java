@@ -67,7 +67,7 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
 
     @Override
     public int partition(T record, byte[] key, byte[] value, String targetTopic, int[] partitions) {
-        int partition = 0;
+        int partition = Integer.parseInt(patternPartitionMap.getOrDefault(DEFAULT_PARTITION, "0"));
         try {
             for (Map.Entry<String, String> entry : patternPartitionMap.entrySet()) {
                 if (DEFAULT_PARTITION.equals(entry.getKey())) {
@@ -83,7 +83,6 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
                     return Integer.parseInt(entry.getValue());
                 }
             }
-            return Integer.parseInt(patternPartitionMap.getOrDefault(DEFAULT_PARTITION, "0"));
         } catch (Exception e) {
             LOG.warn("Extract partition failed", e);
         }
