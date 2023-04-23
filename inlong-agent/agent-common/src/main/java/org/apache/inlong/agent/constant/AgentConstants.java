@@ -179,4 +179,6 @@ public class AgentConstants {
     public static final String PULSAR_SINK_SEND_QUEUE_SIZE = "agent.sink.pulsar.send.queue.size";
     public static final int DEFAULT_SEND_QUEUE_SIZE = 20000;
 
+    public static final String AGENT_JOB_STORE_TIME = "agent.job.store.time";
+    public static final long DEFAULT_JOB_STORE_TIME = 10 * 60 * 1000;
 }

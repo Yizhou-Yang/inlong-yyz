@@ -26,18 +26,15 @@ import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecord.Fields;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
-import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.alter.RenameTableStatement;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.util.Collector;
 import org.apache.inlong.sort.base.enums.ReadPhase;
 import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
@@ -45,7 +42,6 @@ import org.apache.inlong.sort.cdc.base.debezium.history.FlinkJsonTableChangeSeri
 import org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceConfig;
 import org.apache.inlong.sort.cdc.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffset;
-import org.apache.inlong.sort.cdc.mysql.source.split.MySqlBinlogSplitState;
 import org.apache.inlong.sort.cdc.mysql.source.split.MySqlSplitState;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
@@ -55,13 +51,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
-import static org.apache.inlong.sort.base.Constants.CARET;
-import static org.apache.inlong.sort.base.Constants.DDL_FIELD_NAME;
-import static org.apache.inlong.sort.base.Constants.DDL_OP_ALTER;
-import static org.apache.inlong.sort.base.Constants.DOLLAR;
-import static org.apache.inlong.sort.base.Constants.GHOST_TAG;
-import static org.apache.inlong.sort.base.Constants.TABLE_NAME;
-import static org.apache.inlong.sort.cdc.base.relational.JdbcSourceEventDispatcher.HISTORY_RECORD_FIELD;
+import static org.apache.inlong.sort.cdc.mysql.source.utils.GhostUtils.collectGhostDdl;
+import static org.apache.inlong.sort.cdc.mysql.source.utils.GhostUtils.updateGhostDdlElement;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getFetchTimestamp;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getHistoryRecord;
@@ -101,15 +92,13 @@ public final class MySqlRecordEmitter<T>
     private volatile Long snapDuration;
     private volatile long snapEarliestTime = 0L;
     private volatile long snapProcessTime = 0L;
+    private final boolean migrateAll;
 
     private boolean includeIncremental;
     private boolean ghostDdlChange;
     private String ghostTableRegex;
 
     private String dataSourceName;
-
-    public final Map<TableId, String> tableDdls = new HashMap<>();
-    public final ObjectMapper objectMapper = new ObjectMapper();
 
     public MySqlRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
@@ -123,6 +112,7 @@ public final class MySqlRecordEmitter<T>
         this.ghostDdlChange = sourceConfig.isGhostDdlChange();
         this.ghostTableRegex = sourceConfig.getGhostTableRegex();
         this.dataSourceName = sourceConfig.getDataSourceName();
+        this.migrateAll = sourceConfig.isMigrateAll();
     }
 
     @Override
@@ -146,7 +136,7 @@ public final class MySqlRecordEmitter<T>
                 splitState.asBinlogSplitState().recordSchema(tableChange.getId(), tableChange);
                 if (includeSchemaChanges) {
                     if (ghostDdlChange) {
-                        updateGhostDdlElement(element, splitState, historyRecord);
+                        updateGhostDdlElement(element, splitState, historyRecord, ghostTableRegex);
                     }
                     outputDdlElement(element, output, splitState, tableChange);
                 }
@@ -154,15 +144,13 @@ public final class MySqlRecordEmitter<T>
 
             if (tableChanges.isEmpty()) {
                 TableId tableId = RecordUtils.getTableId(element);
-
                 // if this table is one of the captured tables, output the ddl element.
                 if (splitState.getMySQLSplit().getTableSchemas().containsKey(tableId)
-                    || shouldOutputRenameDdl(element, tableId)) {
+                        || shouldOutputRenameDdl(historyRecord, tableId)) {
                     outputDdlElement(element, output, splitState, null);
                 }
-
                 if (ghostDdlChange) {
-                    collectGhostDdl(element, splitState, historyRecord);
+                    collectGhostDdl(element, splitState, historyRecord, ghostTableRegex);
                 }
             }
 
@@ -196,16 +184,17 @@ public final class MySqlRecordEmitter<T>
         }
     }
 
-
     /**
      * if rename operation is "rename a to b" where a is the captured table
      * this method extract table names a and b, if any of table name is the captured table
-     * we should output ddl element
+     * we should output ddl element.
      */
-    private boolean shouldOutputRenameDdl(SourceRecord element, TableId tableId) {
+    private boolean shouldOutputRenameDdl(HistoryRecord historyRecord, TableId tableId) {
+        String ddl = historyRecord.document().getString(Fields.DDL_STATEMENTS);
+        if (StringUtils.isBlank(ddl)) {
+            return false;
+        }
         try {
-            String ddl = objectMapper.readTree(((Struct) element.value()).
-                    get(HISTORY_RECORD_FIELD).toString()).get(DDL_FIELD_NAME).asText();
             Statement statement = CCJSqlParserUtil.parse(ddl);
             if (statement instanceof RenameTableStatement) {
                 RenameTableStatement renameTableStatement = (RenameTableStatement) statement;
@@ -214,31 +203,35 @@ public final class MySqlRecordEmitter<T>
                     Table oldTable = entry.getKey();
                     Table newTable = entry.getValue();
                     if (reformatName(oldTable.getName()).equals(tableId.table()) ||
-                        reformatName(newTable.getName()).equals(tableId.table())) {
+                            reformatName(newTable.getName()).equals(tableId.table())) {
                         return true;
                     }
                 }
             }
         } catch (Exception e) {
-            LOG.error("parse ddl error {}", element, e);
+            LOG.error("parse ddl error {}", historyRecord, e);
         }
         return false;
     }
 
     private void outputElement(SourceRecord element, SourceOutput<T> output, TableChange tableSchema)
-        throws Exception {
+            throws Exception {
         debeziumDeserializationSchema.deserialize(
-            element,
+                element,
                 new Collector<T>() {
 
                     @Override
                     public void collect(final T t) {
-                        Struct value = (Struct) element.value();
-                        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                        String databaseName = source.getString(AbstractSourceInfo.DATABASE_NAME_KEY);
-                        String tableName = source.getString(AbstractSourceInfo.TABLE_NAME_KEY);
+                        if (migrateAll) {
+                            Struct value = (Struct) element.value();
+                            Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+                            String databaseName = source.getString(AbstractSourceInfo.DATABASE_NAME_KEY);
+                            String tableName = source.getString(AbstractSourceInfo.TABLE_NAME_KEY);
 
-                        sourceReaderMetrics.outputMetrics(databaseName, tableName, iSnapShot, t);
+                            sourceReaderMetrics.outputMetrics(databaseName, tableName, iSnapShot, t);
+                        } else {
+                            sourceReaderMetrics.outputMetrics(null, null, iSnapShot, t);
+                        }
                         output.collect(t);
                     }
 
@@ -247,59 +240,13 @@ public final class MySqlRecordEmitter<T>
                         // do nothing
                     }
                 },
-            tableSchema);
+                tableSchema);
     }
 
     private void parseDataSourceName(SourceRecord element) {
         Struct value = (Struct) element.value();
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         source.put(AbstractSourceInfo.SERVER_NAME_KEY, dataSourceName);
-    }
-
-    private void collectGhostDdl(SourceRecord element, MySqlSplitState splitState, HistoryRecord historyRecord) {
-        String ddl = historyRecord.document().getString(Fields.DDL_STATEMENTS);
-        String tableName = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableName(element);
-        Pattern compile = Pattern.compile(this.ghostTableRegex);
-        Matcher matcher = compile.matcher(tableName);
-        if (matcher.find()) {
-            tableName = matcher.group(1);
-            String dbName = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getDbName(element);
-            TableId tableId = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableId(
-                    dbName,
-                    tableName);
-            MySqlBinlogSplitState mySqlBinlogSplitState = splitState.asBinlogSplitState();
-            if (ddl.toUpperCase().startsWith(DDL_OP_ALTER)
-                    && mySqlBinlogSplitState.getTableSchemas().containsKey(tableId)) {
-                    String matchTableInSqlRegex = ghostTableRegex;
-                    if (matchTableInSqlRegex.startsWith(CARET) && matchTableInSqlRegex.endsWith(DOLLAR)) {
-                        matchTableInSqlRegex = matchTableInSqlRegex.substring(1, matchTableInSqlRegex.length() - 1);
-                    }
-                    mySqlBinlogSplitState.recordTableDdl(
-                            tableId,
-                            ddl.replace(GHOST_TAG,"").replaceAll("\\s+", " ").
-                                    replaceAll(matchTableInSqlRegex, tableName));
-            }
-        }
-    }
-
-    private void updateGhostDdlElement(SourceRecord element, MySqlSplitState splitState, HistoryRecord historyRecord) {
-        String tableNames = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableName(element);
-        for (String tableName : tableNames.split(",")) {
-            Pattern compile = Pattern.compile(ghostTableRegex);
-            Matcher matcher = compile.matcher(tableName);
-            if (matcher.find()) {
-                tableName = matcher.group(1);
-                String dbName = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getDbName(element);
-                TableId tableId = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableId(
-                        dbName,
-                        tableName);
-                String ddl = splitState.asBinlogSplitState().getTableDdls().get(tableId);
-                Struct value = (Struct) element.value();
-                // Update source.table and historyRecord
-                value.getStruct(Fields.SOURCE).put(TABLE_NAME, tableName);
-                value.put(HISTORY_RECORD_FIELD, historyRecord.document().set(Fields.DDL_STATEMENTS, ddl).toString());
-            }
-        }
     }
 
     private void updateSnapshotRecord(SourceRecord element, MySqlSplitState splitState) {

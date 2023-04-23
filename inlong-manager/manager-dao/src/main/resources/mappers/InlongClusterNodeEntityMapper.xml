@@ -156,4 +156,26 @@
         from inlong_cluster_node
         where id = #{id,jdbcType=INTEGER}
     </delete>
+
+    <update id="logicDeleteNodeByAgentGroup"
+            parameterType="org.apache.inlong.manager.pojo.cluster.agent.DeleteAgentClusterNodeRequest">
+        update inlong_cluster_node
+        set is_deleted=1
+        where is_deleted=0
+        <if test="parentId != null and parentId != ''">
+            and parent_id=#{parentId,jdbcType=INTEGER}
+        </if>
+        <if test="type != null and type != ''">
+            and type  = #{type,jdbcType=VARCHAR}
+        </if>
+        <if test="status != null and status != ''">
+            and status = #{status,jdbcType=INTEGER}
+        </if>
+        <if test="ip != null and ip != ''">
+            and ip = #{ip,jdbcType=VARCHAR}
+        </if>
+        <if test="extParams != null and extParams != ''">
+            and ext_params like CONCAT("%", #{extParams}, "%")
+        </if>
+    </update>
 </mapper>

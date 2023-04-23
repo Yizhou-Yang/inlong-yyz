@@ -25,6 +25,7 @@ import org.apache.inlong.manager.pojo.cluster.ClusterInfo;
 import org.apache.inlong.manager.pojo.cluster.ClusterNodeResponse;
 import org.apache.inlong.manager.pojo.cluster.ClusterPageRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterRequest;
+import org.apache.inlong.manager.pojo.cluster.agent.AgentClusterNodeRequest;
 import org.apache.inlong.manager.pojo.common.PageResult;
 
 import java.util.List;
@@ -73,5 +74,11 @@ public class InlongClusterImpl implements InlongCluster {
     public ClusterInfo saveCluster(ClusterRequest clusterRequest) {
         int clusterIndex = clusterClient.saveCluster(clusterRequest);
         return clusterClient.get(clusterIndex);
+    }
+
+    @Override
+    public Boolean logicDeleteNodeByAgentGroup(AgentClusterNodeRequest agentClusterNodeRequest) {
+
+        return clusterClient.logicDeleteNodeByAgentGroup(agentClusterNodeRequest);
     }
 }

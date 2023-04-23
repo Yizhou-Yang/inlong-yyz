@@ -91,9 +91,9 @@ public class GreenplumLoadNode extends LoadNode implements InlongMetric, Seriali
     @Override
     public Map<String, String> tableOptions() {
         Map<String, String> options = super.tableOptions();
-        options.put(PostgresConstant.CONNECTOR, PostgresConstant.JDBC_INLONG);
+        options.put(PostgresConstant.CONNECTOR, PostgresConstant.JDBC_PG);
         options.put(PostgresConstant.URL, url);
-        options.put("dialect-impl", "org.apache.inlong.sort.jdbc.dialect.GreenplumDialect");
+        options.put("dialect-impl", "org.apache.inlong.sort.cdw.postgres.dialect.PostgresDialect");
         options.put(PostgresConstant.USERNAME, username);
         options.put(PostgresConstant.PASSWORD, password);
         options.put(PostgresConstant.TABLE_NAME, tableName);

@@ -19,6 +19,7 @@ package org.apache.inlong.agent.plugin.sources.reader.file;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.inlong.agent.common.AgentThreadFactory;
+import org.apache.inlong.agent.core.task.TaskPositionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,8 +151,12 @@ public final class MonitorTextFile {
                 path = currentPath;
             }
 
-            if (!fileReaderOperator.hasDataRemaining()) {
-                fileReaderOperator.fetchData();
+            try {
+                if (!fileReaderOperator.hasDataRemaining()) {
+                    fileReaderOperator.fetchData();
+                }
+            } catch (Exception e) {
+                LOGGER.error(String.format("fileReaderOperator file %s error,", file.getName()), e);
             }
         }
 
@@ -162,6 +167,12 @@ public final class MonitorTextFile {
             LOGGER.info("reset position {}", fileReaderOperator.file.toPath());
             fileReaderOperator.position = 0;
             fileReaderOperator.bytePosition = 0;
+
+            String jobInstanceId = fileReaderOperator.getJobInstanceId();
+            if (jobInstanceId != null) {
+                TaskPositionManager.getInstance().updateSinkPosition(
+                        jobInstanceId, fileReaderOperator.getReadSource(), 0, true);
+            }
         }
 
         /**

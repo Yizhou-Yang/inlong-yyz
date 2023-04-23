@@ -58,7 +58,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
     private static final int BINLOG_SPLIT_FLAG = 2;
     private static final int METRIC_SPLIT_FLAG = 3;
 
-    private static void writeTableSchemas(
+    public static void writeTableSchemas(
             Map<TableId, TableChange> tableSchemas, DataOutputSerializer out) throws IOException {
         FlinkJsonTableChangeSerializer jsonSerializer = new FlinkJsonTableChangeSerializer();
         DocumentWriter documentWriter = DocumentWriter.defaultWriter();
@@ -74,7 +74,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
         }
     }
 
-    private static Map<TableId, TableChange> readTableSchemas(int version, DataInputDeserializer in)
+    public static Map<TableId, TableChange> readTableSchemas(int version, DataInputDeserializer in)
             throws IOException {
         DocumentReader documentReader = DocumentReader.defaultReader();
         Map<TableId, TableChange> tableSchemas = new HashMap<>();
@@ -117,6 +117,9 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
     public static Map<TableId, String> readTableDdls(int version, DataInputDeserializer in)
             throws IOException {
         Map<TableId, String> tableDdls = new HashMap<>();
+        if (in.available() <= 0) {
+            return tableDdls;
+        }
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             TableId tableId = TableId.parse(in.readUTF());
@@ -258,9 +261,9 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             writeBinlogPosition(binlogSplit.getEndingOffset(), out);
             writeFinishedSplitsInfo(binlogSplit.getFinishedSnapshotSplitInfos(), out);
             writeTableSchemas(binlogSplit.getTableSchemas(), out);
-            writeTableDdls(binlogSplit.getTableDdls(), out);
             out.writeInt(binlogSplit.getTotalFinishedSplitSize());
             out.writeBoolean(binlogSplit.isSuspended());
+            writeTableDdls(binlogSplit.getTableDdls(), out);
             final byte[] result = out.getCopyOfBuffer();
             out.clear();
             // optimization: cache the serialized from, so we avoid the byte work during repeated
@@ -327,13 +330,14 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             List<FinishedSnapshotSplitInfo> finishedSplitsInfo =
                     readFinishedSplitsInfo(version, in);
             Map<TableId, TableChange> tableChangeMap = readTableSchemas(version, in);
-            Map<TableId, String> tableDdls = readTableDdls(version, in);
             int totalFinishedSplitSize = finishedSplitsInfo.size();
             boolean isSuspended = false;
+            Map<TableId, String> tableDdls = null;
             if (version >= 3) {
                 totalFinishedSplitSize = in.readInt();
                 if (version > 3) {
                     isSuspended = in.readBoolean();
+                    tableDdls = readTableDdls(version, in);
                 }
             }
             in.releaseArrays();

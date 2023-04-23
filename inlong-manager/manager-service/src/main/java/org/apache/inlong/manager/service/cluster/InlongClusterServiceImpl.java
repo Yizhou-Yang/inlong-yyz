@@ -61,6 +61,8 @@ import org.apache.inlong.manager.pojo.cluster.ClusterRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagPageRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagResponse;
+import org.apache.inlong.manager.pojo.cluster.agent.AgentClusterNodeRequest;
+import org.apache.inlong.manager.pojo.cluster.agent.DeleteAgentClusterNodeRequest;
 import org.apache.inlong.manager.pojo.cluster.pulsar.PulsarClusterDTO;
 import org.apache.inlong.manager.pojo.common.PageResult;
 import org.apache.inlong.manager.pojo.common.UpdateResult;
@@ -1648,4 +1650,29 @@ public class InlongClusterServiceImpl implements InlongClusterService {
                 errMsg);
     }
 
+    @Override
+    public Boolean logicDeleteNodeByAgentGroup(AgentClusterNodeRequest agentClusterNodeRequest) {
+        ClusterPageRequest clusterPageRequest = new ClusterPageRequest();
+        clusterPageRequest.setName(agentClusterNodeRequest.getName());
+        clusterPageRequest.setType(agentClusterNodeRequest.getType());
+        clusterPageRequest.setClusterTag(agentClusterNodeRequest.getClusterTags());
+        try {
+            List<InlongClusterEntity> inlongClusterEntities = clusterMapper.selectByCondition(clusterPageRequest);
+            LOGGER.info("inlongClusterEntities: {}", GSON.toJson(inlongClusterEntities));
+            if (CollectionUtils.isNotEmpty(inlongClusterEntities)) {
+                Integer clusterId = inlongClusterEntities.get(0).getId();
+                List<DeleteAgentClusterNodeRequest> deleteAgentClusterNodeRequests =
+                        agentClusterNodeRequest.getDeleteAgentClusterNodeRequests();
+                for (DeleteAgentClusterNodeRequest clusterNodeRequest : deleteAgentClusterNodeRequests) {
+                    clusterNodeRequest.setParentId(clusterId);
+                    LOGGER.info("clusterNodeRequest: {}", GSON.toJson(clusterNodeRequest));
+                    clusterNodeMapper
+                            .logicDeleteNodeByAgentGroup(clusterNodeRequest);
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.error("logicDeleteNodeByAgentGroup failed: ", e);
+        }
+        return true;
+    }
 }

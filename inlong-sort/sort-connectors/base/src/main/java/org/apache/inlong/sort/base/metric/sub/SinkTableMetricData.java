@@ -28,7 +28,6 @@ import org.apache.inlong.sort.base.metric.SinkMetricData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
@@ -164,7 +163,7 @@ public class SinkTableMetricData extends SinkMetricData implements SinkSubMetric
         long rowCountSize = 1L;
         long rowDataSize = 0L;
         if (data != null) {
-            rowDataSize = data.toString().getBytes(StandardCharsets.UTF_8).length;
+            rowDataSize = getDataSize(data);
         }
         outputMetrics(database, schema, table, rowCountSize, rowDataSize);
     }
@@ -279,7 +278,7 @@ public class SinkTableMetricData extends SinkMetricData implements SinkSubMetric
     }
 
     public void outputMetricsWithEstimate(Object data) {
-        long size = data.toString().getBytes(StandardCharsets.UTF_8).length;
+        long size = getDataSize(data);
         invoke(1, size);
     }
 
@@ -345,7 +344,7 @@ public class SinkTableMetricData extends SinkMetricData implements SinkSubMetric
      * @param data the dirty data
      */
     public void outputDirtyMetricsWithEstimate(String database, String schema, String table, Object data) {
-        long size = data == null ? 0L : data.toString().getBytes(StandardCharsets.UTF_8).length;
+        long size = getDataSize(data);
         outputDirtyMetrics(database, schema, table, 1, size);
     }
 
@@ -357,12 +356,12 @@ public class SinkTableMetricData extends SinkMetricData implements SinkSubMetric
      * @param data the dirty data
      */
     public void outputDirtyMetricsWithEstimate(String database, String table, Object data) {
-        long size = data == null ? 0L : data.toString().getBytes(StandardCharsets.UTF_8).length;
+        long size = getDataSize(data);
         outputDirtyMetrics(database, table, 1, size);
     }
 
     public void outputDirtyMetricsWithEstimate(Object data) {
-        long size = data.toString().getBytes(StandardCharsets.UTF_8).length;
+        long size = getDataSize(data);
         invokeDirty(1, size);
     }
 

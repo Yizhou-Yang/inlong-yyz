@@ -21,6 +21,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.inlong.manager.dao.entity.InlongClusterNodeEntity;
 import org.apache.inlong.manager.pojo.cluster.ClusterNodeRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterPageRequest;
+import org.apache.inlong.manager.pojo.cluster.agent.DeleteAgentClusterNodeRequest;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -44,5 +45,7 @@ public interface InlongClusterNodeEntityMapper {
     int updateById(InlongClusterNodeEntity record);
 
     int deleteById(Integer id);
+
+    int logicDeleteNodeByAgentGroup(DeleteAgentClusterNodeRequest clusterNodeRequest);
 
 }
