@@ -124,7 +124,7 @@ public final class MySqlRecordEmitter<T>
         this.ghostDdlChange = sourceConfig.isGhostDdlChange();
         this.ghostTableRegex = sourceConfig.getGhostTableRegex();
         this.dataSourceName = sourceConfig.getDataSourceName();
-        this.migrateAll = migrateAll;
+        this.migrateAll = sourceConfig.isMigrateAll();
     }
 
     @Override
@@ -159,7 +159,7 @@ public final class MySqlRecordEmitter<T>
 
                 // if this table is one of the captured tables, output the ddl element.
                 if (splitState.getMySQLSplit().getTableSchemas().containsKey(tableId)
-                    || shouldOutputRenameDdl(element, tableId)) {
+                        || shouldOutputRenameDdl(element, tableId)) {
                     outputDdlElement(element, output, splitState, null);
                 }
 
@@ -198,7 +198,6 @@ public final class MySqlRecordEmitter<T>
         }
     }
 
-
     /**
      * if rename operation is "rename a to b" where a is the captured table
      * this method extract table names a and b, if any of table name is the captured table
@@ -206,8 +205,8 @@ public final class MySqlRecordEmitter<T>
      */
     private boolean shouldOutputRenameDdl(SourceRecord element, TableId tableId) {
         try {
-            String ddl = objectMapper.readTree(((Struct) element.value()).
-                    get(HISTORY_RECORD_FIELD).toString()).get(DDL_FIELD_NAME).asText();
+            String ddl = objectMapper.readTree(((Struct) element.value()).get(HISTORY_RECORD_FIELD).toString())
+                    .get(DDL_FIELD_NAME).asText();
             Statement statement = CCJSqlParserUtil.parse(ddl);
             if (statement instanceof RenameTableStatement) {
                 RenameTableStatement renameTableStatement = (RenameTableStatement) statement;
@@ -216,7 +215,7 @@ public final class MySqlRecordEmitter<T>
                     Table oldTable = entry.getKey();
                     Table newTable = entry.getValue();
                     if (reformatName(oldTable.getName()).equals(tableId.table()) ||
-                        reformatName(newTable.getName()).equals(tableId.table())) {
+                            reformatName(newTable.getName()).equals(tableId.table())) {
                         return true;
                     }
                 }
@@ -228,32 +227,32 @@ public final class MySqlRecordEmitter<T>
     }
 
     private void outputElement(SourceRecord element, SourceOutput<T> output, TableChange tableSchema)
-        throws Exception {
+            throws Exception {
         debeziumDeserializationSchema.deserialize(
-            element,
+                element,
                 new Collector<T>() {
 
-                        @Override
-                        public void collect(final T t) {
-                            if (migrateAll) {
-                                Struct value = (Struct) element.value();
-                                Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                                String databaseName = source.getString(AbstractSourceInfo.DATABASE_NAME_KEY);
-                                String tableName = source.getString(AbstractSourceInfo.TABLE_NAME_KEY);
+                    @Override
+                    public void collect(final T t) {
+                        if (migrateAll) {
+                            Struct value = (Struct) element.value();
+                            Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+                            String databaseName = source.getString(AbstractSourceInfo.DATABASE_NAME_KEY);
+                            String tableName = source.getString(AbstractSourceInfo.TABLE_NAME_KEY);
 
-                                sourceReaderMetrics.outputMetrics(databaseName, tableName, iSnapShot, t);
-                            } else {
-                                sourceReaderMetrics.outputMetrics(null, null, iSnapShot, t);
-                            }
-                            output.collect(t);
+                            sourceReaderMetrics.outputMetrics(databaseName, tableName, iSnapShot, t);
+                        } else {
+                            sourceReaderMetrics.outputMetrics(null, null, iSnapShot, t);
                         }
+                        output.collect(t);
+                    }
 
                     @Override
                     public void close() {
                         // do nothing
                     }
                 },
-            tableSchema);
+                tableSchema);
     }
 
     private void parseDataSourceName(SourceRecord element) {
@@ -276,14 +275,13 @@ public final class MySqlRecordEmitter<T>
             MySqlBinlogSplitState mySqlBinlogSplitState = splitState.asBinlogSplitState();
             if (ddl.toUpperCase().startsWith(DDL_OP_ALTER)
                     && mySqlBinlogSplitState.getTableSchemas().containsKey(tableId)) {
-                    String matchTableInSqlRegex = ghostTableRegex;
-                    if (matchTableInSqlRegex.startsWith(CARET) && matchTableInSqlRegex.endsWith(DOLLAR)) {
-                        matchTableInSqlRegex = matchTableInSqlRegex.substring(1, matchTableInSqlRegex.length() - 1);
-                    }
-                    mySqlBinlogSplitState.recordTableDdl(
-                            tableId,
-                            ddl.replace(GHOST_TAG,"").replaceAll("\\s+", " ").
-                                    replaceAll(matchTableInSqlRegex, tableName));
+                String matchTableInSqlRegex = ghostTableRegex;
+                if (matchTableInSqlRegex.startsWith(CARET) && matchTableInSqlRegex.endsWith(DOLLAR)) {
+                    matchTableInSqlRegex = matchTableInSqlRegex.substring(1, matchTableInSqlRegex.length() - 1);
+                }
+                mySqlBinlogSplitState.recordTableDdl(
+                        tableId,
+                        ddl.replace(GHOST_TAG, "").replaceAll("\\s+", " ").replaceAll(matchTableInSqlRegex, tableName));
             }
         }
     }

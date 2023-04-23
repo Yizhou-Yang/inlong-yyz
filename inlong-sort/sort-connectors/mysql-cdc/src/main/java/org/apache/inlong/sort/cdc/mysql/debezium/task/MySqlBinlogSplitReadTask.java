@@ -30,6 +30,7 @@ import io.debezium.connector.mysql.MySqlTaskContext;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.relational.TableId;
 import io.debezium.util.Clock;
+import java.util.List;
 import org.apache.inlong.sort.cdc.mysql.debezium.dispatcher.EventDispatcherImpl;
 import org.apache.inlong.sort.cdc.mysql.debezium.dispatcher.SignalEventDispatcher;
 import org.apache.inlong.sort.cdc.mysql.debezium.reader.SnapshotSplitReader.SnapshotBinlogSplitChangeEventSourceContextImpl;
@@ -102,20 +103,20 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
         final BinaryLogClient client = taskContext.getBinaryLogClient();
         final List<EventListener> eventListeners = client.getEventListeners();
         final List<BinaryLogClient.LifecycleListener> lifecycleListeners =
-            client.getLifecycleListeners();
+                client.getLifecycleListeners();
 
         eventListeners.forEach(
-            listener -> {
-                if (eventListeners.indexOf(listener) != eventListeners.size() - 1) {
-                    client.unregisterEventListener(listener);
-                }
-            });
+                listener -> {
+                    if (eventListeners.indexOf(listener) != eventListeners.size() - 1) {
+                        client.unregisterEventListener(listener);
+                    }
+                });
         lifecycleListeners.forEach(
-            listener -> {
-                if (lifecycleListeners.indexOf(listener) != lifecycleListeners.size() - 1) {
-                    client.unregisterLifecycleListener(listener);
-                }
-            });
+                listener -> {
+                    if (lifecycleListeners.indexOf(listener) != lifecycleListeners.size() - 1) {
+                        client.unregisterLifecycleListener(listener);
+                    }
+                });
 
         super.execute(context);
     }

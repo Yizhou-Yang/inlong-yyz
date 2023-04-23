@@ -44,6 +44,7 @@ public class OracleSourceConfig extends JdbcSourceConfig {
     public OracleSourceConfig(
             StartupOptions startupOptions,
             List<String> databaseList,
+            List<String> schemaList,
             List<String> tableList,
             int splitSize,
             int splitMetaGroupSize,
@@ -69,6 +70,7 @@ public class OracleSourceConfig extends JdbcSourceConfig {
         super(
                 startupOptions,
                 databaseList,
+                schemaList,
                 tableList,
                 splitSize,
                 splitMetaGroupSize,
@@ -111,6 +113,7 @@ public class OracleSourceConfig extends JdbcSourceConfig {
         return url;
     }
 
+    @Override
     public List<String> getMetricLabelList() {
         return Arrays.asList(Constants.DATABASE_NAME, Constants.SCHEMA_NAME, Constants.TABLE_NAME);
     }

@@ -19,6 +19,7 @@ package org.apache.inlong.sort.cdc.mysql.source.config;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.inlong.sort.cdc.mysql.debezium.EmbeddedFlinkDatabaseHistory;
+import org.apache.inlong.sort.cdc.mysql.source.MySqlSource;
 import org.apache.inlong.sort.cdc.mysql.table.StartupOptions;
 
 import java.io.Serializable;
@@ -400,7 +401,6 @@ public class MySqlSourceConfigFactory implements Serializable {
                 props,
                 jdbcProperties,
                 inlongMetric,
-                inlongAudit,
                 inlongAudit,
                 includeIncremental,
                 ghostDdlChange,
