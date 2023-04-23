@@ -52,11 +52,14 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
     private final static String DELIMITER1 = "&";
     private final static String DELIMITER2 = "_";
 
+    private final int defaultPartitionId;
+
     public InLongFixedPartitionPartitioner(Map<String, String> patternPartitionMap, String partitionPattern) {
         this.patternPartitionMap = patternPartitionMap;
         this.regexPatternMap = new HashMap<>();
         this.databasePattern = partitionPattern.split(DELIMITER2)[0];
         this.tablePattern = partitionPattern.split(DELIMITER2)[1];
+        this.defaultPartitionId = Integer.parseInt(patternPartitionMap.getOrDefault(DEFAULT_PARTITION, "0"));
     }
 
     @Override
@@ -67,13 +70,6 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
 
     @Override
     public int partition(T record, byte[] key, byte[] value, String targetTopic, int[] partitions) {
-        int partition = 0;
-        try {
-            partition = Integer.parseInt(patternPartitionMap.getOrDefault(DEFAULT_PARTITION, "0"));
-        } catch (Exception e) {
-            LOG.error("ParseInt for DEFAULT_PARTITION  error， default partition use 0", e);
-        }
-
         try {
             for (Map.Entry<String, String> entry : patternPartitionMap.entrySet()) {
                 if (DEFAULT_PARTITION.equals(entry.getKey())) {
@@ -92,7 +88,7 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
         } catch (Exception e) {
             LOG.warn("Extract partition failed", e);
         }
-        return partition;
+        return defaultPartitionId;
     }
 
     private boolean match(String name, String nameRegex) {
