@@ -123,6 +123,15 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                                     + "have been published in the specified interval. This improves the resumability of the connector "
                                     + "for low volume namespaces. Use 0 to disable. Defaults to 30000.");
 
+    public static final ConfigOption<Boolean> CHANGELOG_NORMALIZE_ENABLED =
+            ConfigOptions.key("changelog.normalize.enabled")
+                    .booleanType()
+                    .defaultValue(Boolean.TRUE)
+                    .withDescription("MongoDB's Change Stream lacks the -U message, "
+                            + "so it needs to be converted to Flink UPSERT changelog using "
+                            + "the Changelog Normalize operator. The default value is true. (For scenarios that do not "
+                            + "require the -U message, this operator can be disabled.) \n");
+
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
@@ -176,6 +185,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         final String rowKindFiltered = config.get(ROW_KINDS_FILTERED).isEmpty()
                 ? ROW_KINDS_FILTERED.defaultValue()
                 : config.get(ROW_KINDS_FILTERED);
+        Boolean changelogNormalizeEnabled = config.get(CHANGELOG_NORMALIZE_ENABLED);
 
         return new MongoDBTableSource(
                 physicalSchema,
@@ -202,7 +212,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 inlongMetric,
                 inlongAudit,
                 rowKindFiltered,
-                sourceMultipleEnable);
+                sourceMultipleEnable,
+                changelogNormalizeEnabled);
     }
 
     private void checkPrimaryKey(UniqueConstraint pk, String message) {
@@ -248,6 +259,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
         options.add(CHUNK_META_GROUP_SIZE);
+        options.add(CHANGELOG_NORMALIZE_ENABLED);
         return options;
     }
 }

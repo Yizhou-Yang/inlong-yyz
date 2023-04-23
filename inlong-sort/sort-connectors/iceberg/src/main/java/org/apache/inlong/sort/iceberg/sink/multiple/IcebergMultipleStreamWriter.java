@@ -56,7 +56,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.Closeable;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -257,7 +256,7 @@ public class IcebergMultipleStreamWriter extends IcebergProcessFunction<RecordWi
                 for (RowData data : recordWithSchema.getData()) {
                     String dataBaseName = tableId.namespace().toString();
                     String tableName = tableId.name();
-                    long size = data == null ? 0 : data.toString().getBytes(StandardCharsets.UTF_8).length;
+                    long size = sinkMetricData.getDataSize(data);
 
                     try {
                         multipleWriters.get(tableId).processElement(data);
@@ -289,7 +288,7 @@ public class IcebergMultipleStreamWriter extends IcebergProcessFunction<RecordWi
                                 dirtySink.invoke(builder.build());
                                 if (sinkMetricData != null) {
                                     sinkMetricData.outputDirtyMetricsWithEstimate(dataBaseName,
-                                            null, tableName, data.toString());
+                                            tableName, 1, size);
                                 }
                             } catch (Exception ex) {
                                 if (!dirtyOptions.ignoreSideOutputErrors()) {

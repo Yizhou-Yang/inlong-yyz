@@ -144,8 +144,19 @@ public class PackProxyMessage {
             while (!messageQueue.isEmpty()) {
                 // pre check message size
                 ProxyMessage peekMessage = messageQueue.peek();
-                if (peekMessage == null
-                        || resultBatchSize + peekMessage.getBody().length > maxPackSize) {
+                if (peekMessage == null) {
+                    break;
+                }
+
+                // if the message size is greater than max pack size,should drop it.
+                int peekMessageLength = peekMessage.getBody().length;
+                if (peekMessageLength > maxPackSize) {
+                    LOGGER.warn("message size is {}, greater than max pack size {}, drop it!",
+                            peekMessage.getBody().length, maxPackSize);
+                    messageQueue.remove();
+                    break;
+                }
+                if (resultBatchSize + peekMessageLength > maxPackSize) {
                     break;
                 }
                 ProxyMessage message = messageQueue.remove();

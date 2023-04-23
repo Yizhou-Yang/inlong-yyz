@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.hive;
+package org.apache.inlong.sort.hive.util;
 
 import static org.apache.flink.table.types.logical.LogicalTypeRoot.DATE;
 import static org.apache.flink.table.types.logical.LogicalTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE;
@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.map.CaseInsensitiveMap;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.flink.connectors.hive.FlinkHiveException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
@@ -71,6 +73,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.inlong.sort.base.sink.PartitionPolicy;
+import org.apache.inlong.sort.hive.HiveWriterFactory;
 import org.apache.inlong.sort.hive.table.HiveTableInlongFactory;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -243,7 +246,7 @@ public class HiveTableUtil {
      */
     public static HiveWriterFactory getWriterFactory(HiveShim hiveShim, String hiveVersion,
             ObjectIdentifier identifier) {
-        if (!HiveTableInlongFactory.getFactoryMap().containsKey(identifier)) {
+        if (!CacheHolder.getFactoryMap().containsKey(identifier)) {
             HiveConf hiveConf = HiveTableInlongFactory.getHiveConf();
             try (HiveMetastoreClientWrapper client = HiveMetastoreClientFactory.create(hiveConf, hiveVersion)) {
                 List<String> tableNames = client.getAllTables(identifier.getDatabaseName());
@@ -280,7 +283,7 @@ public class HiveTableUtil {
                 HiveWriterFactory writerFactory = new HiveWriterFactory(new JobConf(hiveConf), hiveOutputFormatClz, sd,
                         schema, partitions, HiveReflectionUtils.getTableMetadata(hiveShim, table), hiveShim,
                         isCompressed, true);
-                HiveTableInlongFactory.getFactoryMap().put(identifier, writerFactory);
+                CacheHolder.getFactoryMap().put(identifier, writerFactory);
             } catch (TException e) {
                 throw new CatalogException("Failed to query Hive metaStore", e);
             } catch (ClassNotFoundException e) {
@@ -289,7 +292,7 @@ public class HiveTableUtil {
                 throw new FlinkHiveException("Failed to get hive metastore client", e);
             }
         }
-        return HiveTableInlongFactory.getFactoryMap().get(identifier);
+        return CacheHolder.getFactoryMap().get(identifier);
     }
 
     /**
@@ -442,14 +445,16 @@ public class HiveTableUtil {
      * @param replaceLineBreak if replace line break to blank to avoid data corrupt when hive text table
      * @return generic row data
      */
-    public static GenericRowData getRowData(Map<String, Object> record, String[] allColumns, DataType[] allTypes,
-            boolean replaceLineBreak) {
+    public static Pair<GenericRowData, Long> getRowData(Map<String, Object> record, String[] allColumns,
+            DataType[] allTypes, boolean replaceLineBreak) {
         GenericRowData genericRowData = new GenericRowData(RowKind.INSERT, allColumns.length);
+        long byteSize = 0;
         for (int index = 0; index < allColumns.length; index++) {
             String columnName = allColumns[index];
             LogicalType logicalType = allTypes[index].getLogicalType();
             LogicalTypeRoot typeRoot = logicalType.getTypeRoot();
             Object raw = record.get(columnName);
+            byteSize += raw == null ? 0 : String.valueOf(raw).getBytes(StandardCharsets.UTF_8).length;
             switch (typeRoot) {
                 case BOOLEAN:
                     genericRowData.setField(index, raw != null ? Boolean.parseBoolean(String.valueOf(raw)) : null);
@@ -507,7 +512,7 @@ public class HiveTableUtil {
                     break;
             }
         }
-        return genericRowData;
+        return new ImmutablePair<>(genericRowData, byteSize);
     }
 
     /**

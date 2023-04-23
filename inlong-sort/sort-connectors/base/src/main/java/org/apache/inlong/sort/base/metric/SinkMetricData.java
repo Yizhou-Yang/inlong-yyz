@@ -21,6 +21,7 @@ import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Meter;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.SimpleCounter;
+import org.apache.flink.table.data.binary.BinaryRowData;
 import org.apache.inlong.audit.AuditOperator;
 import org.apache.inlong.sort.base.Constants;
 import org.apache.inlong.sort.base.metric.MetricOption.RegisteredMetric;
@@ -253,13 +254,25 @@ public class SinkMetricData implements MetricData {
     }
 
     public void invokeWithEstimate(Object o) {
-        long size = o.toString().getBytes(StandardCharsets.UTF_8).length;
-        invoke(1, size);
+        invoke(1, getDataSize(o));
     }
 
     public void invokeDirtyWithEstimate(Object o) {
-        long size = o.toString().getBytes(StandardCharsets.UTF_8).length;
-        invokeDirty(1, size);
+        invokeDirty(1, getDataSize(o));
+    }
+
+    public long getDataSize(Object object) {
+        if (object == null) {
+            return 0L;
+        }
+        long size;
+        if (object instanceof BinaryRowData) {
+            BinaryRowData binaryRowData = (BinaryRowData) object;
+            size = binaryRowData.getSizeInBytes();
+        } else {
+            size = object.toString().getBytes(StandardCharsets.UTF_8).length;
+        }
+        return size;
     }
 
     public void invoke(long rowCount, long rowSize) {

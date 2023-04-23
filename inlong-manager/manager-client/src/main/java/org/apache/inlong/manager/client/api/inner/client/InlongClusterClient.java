@@ -30,6 +30,7 @@ import org.apache.inlong.manager.pojo.cluster.ClusterRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagPageRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterTagResponse;
+import org.apache.inlong.manager.pojo.cluster.agent.AgentClusterNodeRequest;
 import org.apache.inlong.manager.pojo.common.PageResult;
 import org.apache.inlong.manager.pojo.common.Response;
 import org.apache.inlong.manager.pojo.common.UpdateResult;
@@ -293,6 +294,19 @@ public class InlongClusterClient {
     public Boolean deleteNode(Integer id) {
         Preconditions.checkNotNull(id, "cluster id should not be empty");
         Response<Boolean> response = ClientUtils.executeHttpCall(inlongClusterApi.deleteNode(id));
+        ClientUtils.assertRespSuccess(response);
+        return response.getData();
+    }
+
+    /**
+     * Logic delete cluster node.
+     *
+     * @param request
+     * @return whether succeed
+     */
+    public Boolean logicDeleteNodeByAgentGroup(AgentClusterNodeRequest request) {
+        Preconditions.checkNotNull(request, "cluster id should not be empty");
+        Response<Boolean> response = ClientUtils.executeHttpCall(inlongClusterApi.logicDeleteNodeByAgentGroup(request));
         ClientUtils.assertRespSuccess(response);
         return response.getData();
     }

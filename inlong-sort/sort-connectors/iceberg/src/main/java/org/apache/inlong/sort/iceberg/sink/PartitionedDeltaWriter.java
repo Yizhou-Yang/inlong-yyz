@@ -17,6 +17,7 @@
 
 package org.apache.inlong.sort.iceberg.sink;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.iceberg.FileFormat;
@@ -29,15 +30,27 @@ import org.apache.iceberg.io.OutputFileFactory;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
 import org.apache.iceberg.util.Tasks;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Copy from iceberg-flink:iceberg-flink-1.13:0.13.2
  */
 class PartitionedDeltaWriter extends BaseDeltaTaskWriter {
+
+    private static final ExecutorService EXECUTOR_SERVICE = new ThreadPoolExecutor(
+            10,
+            20,
+            100L,
+            TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<>(1000),
+            new ThreadFactoryBuilder().setNameFormat("iceberg-writer-close-thread-%s").build(),
+            new CallerRunsPolicy());
 
     private final PartitionKey partitionKey;
 
@@ -77,13 +90,13 @@ class PartitionedDeltaWriter extends BaseDeltaTaskWriter {
     public void close() {
         try {
             Tasks.foreach(writers.values())
+                    .executeWith(EXECUTOR_SERVICE)
                     .throwFailureWhenFinished()
                     .noRetry()
-                    .run(RowDataDeltaWriter::close, IOException.class);
-
+                    .run(RowDataDeltaWriter::close, Exception.class);
             writers.clear();
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to close equality delta writer", e);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to close equality delta writer", e);
         }
     }
 }

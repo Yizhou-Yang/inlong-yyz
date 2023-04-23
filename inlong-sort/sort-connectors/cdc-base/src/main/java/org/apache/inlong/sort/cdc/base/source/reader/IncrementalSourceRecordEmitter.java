@@ -45,6 +45,8 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.isHeartbeatEvent;
+
 /**
  * The {@link RecordEmitter} implementation for {@link IncrementalSourceReader}.
  *
@@ -108,15 +110,24 @@ public class IncrementalSourceRecordEmitter<T>
                 emitElement(element, output);
             }
         } else if (isDataChangeRecord(element)) {
-            if (splitState.isStreamSplitState()) {
-                Offset position = getOffsetPosition(element);
-                splitState.asStreamSplitState().setStartingOffset(position);
-            }
+            LOG.trace("Process DataChangeRecord: {}; splitState = {}", element, splitState);
+            updateStartingOffsetForSplit(splitState, element);
             reportMetrics(element);
             emitElement(element, output);
+        } else if (isHeartbeatEvent(element)) {
+            LOG.trace("Process Heartbeat: {}; splitState = {}", element, splitState);
+            updateStartingOffsetForSplit(splitState, element);
         } else {
             // unknown element
-            LOG.info("Meet unknown element {}, just skip.", element);
+            LOG.info(
+                    "Meet unknown element {} for splitState = {}, just skip.", element, splitState);
+        }
+    }
+
+    protected void updateStartingOffsetForSplit(SourceSplitState splitState, SourceRecord element) {
+        if (splitState.isStreamSplitState()) {
+            Offset position = getOffsetPosition(element);
+            splitState.asStreamSplitState().setStartingOffset(position);
         }
     }
 

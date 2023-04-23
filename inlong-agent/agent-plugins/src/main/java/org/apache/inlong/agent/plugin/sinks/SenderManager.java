@@ -288,7 +288,7 @@ public class SenderManager {
                 AuditUtils.add(AuditUtils.AUDIT_ID_AGENT_SEND_SUCCESS, groupId, streamId, dataTime, msgCnt,
                         batchMessage.getTotalSize());
                 if (sourcePath != null) {
-                    taskPositionManager.updateSinkPosition(batchMessage, sourcePath, msgCnt);
+                    taskPositionManager.updateSinkPosition(batchMessage.getJobId(), sourcePath, msgCnt, false);
                 }
             } else {
                 metricItem.pluginSendFailCount.addAndGet(msgCnt);
@@ -343,7 +343,7 @@ public class SenderManager {
                     batchMessage.getTotalSize());
             getMetricItem(groupId, streamId).pluginSendSuccessCount.addAndGet(msgCnt);
             if (sourcePath != null) {
-                taskPositionManager.updateSinkPosition(batchMessage, sourcePath, msgCnt);
+                taskPositionManager.updateSinkPosition(batchMessage.getJobId(), sourcePath, msgCnt, false);
             }
         }
 

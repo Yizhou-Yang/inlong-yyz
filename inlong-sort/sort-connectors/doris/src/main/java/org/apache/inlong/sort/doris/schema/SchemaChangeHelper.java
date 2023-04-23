@@ -125,7 +125,8 @@ public class SchemaChangeHelper {
             if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
                 throw new SchemaChangeHandleException(
                         String.format("Parse database, table from origin data failed, origin data: %s",
-                                new String(originData)), e);
+                                new String(originData)),
+                        e);
             }
             LOGGER.warn("Parse database, table from origin data failed, origin data: {}", new String(originData), e);
             if (exceptionPolicy == SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE) {
@@ -397,7 +398,6 @@ public class SchemaChangeHelper {
             default:
         }
     }
-
 
     private Map<String, Object> buildRequestParam(String column, boolean dropColumn) {
         Map<String, Object> params = new HashMap<>();

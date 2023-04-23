@@ -18,29 +18,21 @@
 package org.apache.inlong.sort.hive.table;
 
 import com.google.common.base.Preconditions;
-import java.util.HashMap;
-import java.util.function.Function;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connectors.hive.HiveLookupTableSource;
 import org.apache.flink.connectors.hive.HiveTableSource;
 import org.apache.flink.table.catalog.CatalogTable;
-import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.source.DynamicTableSource;
-import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.descriptors.DescriptorProperties;
 import org.apache.flink.table.factories.DynamicTableSinkFactory;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.filesystem.FileSystemOptions;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
-import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
-import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
 import org.apache.inlong.sort.base.dirty.sink.DirtySink;
@@ -53,8 +45,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.inlong.sort.hive.HiveWriterFactory;
-import org.apache.inlong.sort.hive.filesystem.HadoopRenameFileCommitter;
 
 import static org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions.DEFAULT_DATABASE;
 import static org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions.HADOOP_CONF_DIR;
@@ -81,31 +71,6 @@ import static org.apache.inlong.sort.hive.HiveOptions.HIVE_DATABASE;
 public class HiveTableInlongFactory implements DynamicTableSourceFactory, DynamicTableSinkFactory {
 
     private static final HiveConf hiveConf = new HiveConf();
-
-    /**
-     * hive writer factory cache
-     */
-    private static final HashMap<ObjectIdentifier, HiveWriterFactory> factoryMap = new HashMap<>(16);
-    /**
-     * hive record writer cache
-     */
-    private static final HashMap<Path, FileSinkOperator.RecordWriter> recordWriterHashMap = new HashMap<>(16);
-    /**
-     * hive hdfs file committer cache
-     */
-    private static final HashMap<Path, HadoopRenameFileCommitter> fileCommitterHashMap = new HashMap<>(16);
-    /**
-     * hive row converter cache
-     */
-    private static final HashMap<Path, Function<RowData, Writable>> rowConverterHashMap = new HashMap<>(16);
-    /**
-     * hive schema check time cache
-     */
-    private static final HashMap<ObjectIdentifier, Long> schemaCheckTimeMap = new HashMap<>(16);
-    /**
-     * ignore writing hive table after exception as schema policy is STOP_PARTIAL
-     */
-    private static final HashMap<ObjectIdentifier, Long> ignoreWritingTableMap = new HashMap<>(16);
 
     @Override
     public String factoryIdentifier() {
@@ -241,30 +206,6 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
         for (Map.Entry<String, String> entry : properties.entrySet()) {
             hiveConf.set(entry.getKey(), entry.getValue());
         }
-    }
-
-    public static HashMap<Path, RecordWriter> getRecordWriterHashMap() {
-        return recordWriterHashMap;
-    }
-
-    public static HashMap<Path, Function<RowData, Writable>> getRowConverterHashMap() {
-        return rowConverterHashMap;
-    }
-
-    public static HashMap<ObjectIdentifier, HiveWriterFactory> getFactoryMap() {
-        return factoryMap;
-    }
-
-    public static HashMap<Path, HadoopRenameFileCommitter> getFileCommitterHashMap() {
-        return fileCommitterHashMap;
-    }
-
-    public static HashMap<ObjectIdentifier, Long> getSchemaCheckTimeMap() {
-        return schemaCheckTimeMap;
-    }
-
-    public static HashMap<ObjectIdentifier, Long> getIgnoreWritingTableMap() {
-        return ignoreWritingTableMap;
     }
 
     public static HiveConf getHiveConf() {

@@ -247,9 +247,9 @@ public class OperationHelperTest {
                 + "UNIQUE KEY(`a`,`b`)\n"
                 + "COMMENT 'create table auto'\n"
                 + "DISTRIBUTED BY HASH(`a`,`b`)\n"
-                        + "PROPERTIES (\n"
-                        + "\t\"light_schema_change\" = \"true\"\n"
-                        + ")",
+                + "PROPERTIES (\n"
+                + "\t\"light_schema_change\" = \"true\"\n"
+                + ")",
                 helper.buildCreateTableStatement(database, table, primaryKeys, operation));
     }
 }
