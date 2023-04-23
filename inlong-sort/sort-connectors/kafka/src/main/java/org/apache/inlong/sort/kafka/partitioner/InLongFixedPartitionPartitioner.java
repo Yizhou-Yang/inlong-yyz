@@ -25,7 +25,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -51,11 +53,14 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
 
     private final static String DELIMITER1 = "&";
     private final static String DELIMITER2 = "_";
+    private final static String DELIMITER3 = ":";
+    private final static String DELIMITER4 = ",";
 
     private final int defaultPartitionId;
 
-    public InLongFixedPartitionPartitioner(Map<String, String> patternPartitionMap, String partitionPattern) {
-        this.patternPartitionMap = patternPartitionMap;
+
+    public InLongFixedPartitionPartitioner(String patternPartitionMapConfig, String partitionPattern) {
+        this.patternPartitionMap = configToMap(patternPartitionMapConfig);
         this.regexPatternMap = new HashMap<>();
         this.databasePattern = partitionPattern.split(DELIMITER2)[0];
         this.tablePattern = partitionPattern.split(DELIMITER2)[1];
@@ -98,5 +103,19 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
         return regexPatternMap.computeIfAbsent(nameRegex, regex -> Pattern.compile(regex))
                 .matcher(name)
                 .matches();
+    }
+
+    private Map<String, String> configToMap(String patternPartitionMapStr) {
+        if (patternPartitionMapStr == null) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, String> patternPartitionMap = new LinkedHashMap<>();
+        for (String entry : patternPartitionMapStr.split(DELIMITER4)) {
+            String pattern = entry.split(DELIMITER3)[0];
+            String partition = entry.split(DELIMITER3)[1];
+            patternPartitionMap.put(pattern, partition);
+        }
+        return patternPartitionMap;
     }
 }

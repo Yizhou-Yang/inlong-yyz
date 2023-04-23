@@ -156,9 +156,11 @@ public abstract class AbstractStreamingWriter<IN, OUT> extends AbstractStreamOpe
                             INLONG_METRIC_STATE_NAME, TypeInformation.of(new TypeHint<MetricState>() {
                             })));
         }
+
         if (context.isRestored()) {
             metricState = MetricStateUtils.restoreMetricState(metricStateListState,
                     getRuntimeContext().getIndexOfThisSubtask(), getRuntimeContext().getNumberOfParallelSubtasks());
+
         }
 
         MetricOption metricOption = MetricOption.builder().withInlongLabels(inlongMetric)

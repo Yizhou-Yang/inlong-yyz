@@ -194,4 +194,5 @@ public class HadoopPathBasedBulkFormatBuilder<IN, BucketID, T extends HadoopPath
     public void setMetricData(@Nullable SinkTableMetricData metricData) {
         this.metricData = metricData;
     }
+
 }
