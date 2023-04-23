@@ -128,7 +128,9 @@ public class SchemaChangeHelper {
                                 new String(originData)), e);
             }
             LOGGER.warn("Parse database, table from origin data failed, origin data: {}", new String(originData), e);
-            dirtySinkHelper.invoke(new String(originData), DirtyType.JSON_PROCESS_ERROR, e);
+            if (exceptionPolicy == SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE) {
+                dirtySinkHelper.invoke(new String(originData), DirtyType.JSON_PROCESS_ERROR, e);
+            }
             if (metricData != null) {
                 metricData.invokeDirty(1, originData.length);
             }
@@ -179,10 +181,12 @@ public class SchemaChangeHelper {
 
     private void handleDirtyData(JsonNode data, byte[] originData, String database,
             String table, DirtyType dirtyType, Throwable e) {
-        String label = parseValue(data, dirtySinkHelper.getDirtyOptions().getLabels());
-        String logTag = parseValue(data, dirtySinkHelper.getDirtyOptions().getLogTag());
-        String identifier = parseValue(data, dirtySinkHelper.getDirtyOptions().getIdentifier());
-        dirtySinkHelper.invoke(new String(originData), dirtyType, label, logTag, identifier, e);
+        if (exceptionPolicy == SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE) {
+            String label = parseValue(data, dirtySinkHelper.getDirtyOptions().getLabels());
+            String logTag = parseValue(data, dirtySinkHelper.getDirtyOptions().getLogTag());
+            String identifier = parseValue(data, dirtySinkHelper.getDirtyOptions().getIdentifier());
+            dirtySinkHelper.invoke(new String(originData), dirtyType, label, logTag, identifier, e);
+        }
         if (metricData != null) {
             metricData.outputDirtyMetricsWithEstimate(database, table, 1, originData.length);
         }
@@ -293,14 +297,15 @@ public class SchemaChangeHelper {
                 // The checkLightSchemaChange is removed because most scenarios support it
                 boolean result = executeStatement(database, statement);
                 if (!result) {
-                    LOGGER.error("Add column failed,statement: {}", statement);
+                    LOGGER.error("Alter table failed,statement: {}", statement);
                     throw new SchemaChangeHandleException(String.format("Add column failed,statement: %s", statement));
                 }
+                LOGGER.info("Alter table success,statement: {}", statement);
                 reportMetric(database, table, originData.length);
             } catch (Exception e) {
                 if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
                     throw new SchemaChangeHandleException(
-                            String.format("Add column failed, origin schema: %s", originSchema), e);
+                            String.format("Alter table failed, origin schema: %s", originSchema), e);
                 }
                 handleDirtyData(data, originData, database, table, DirtyType.HANDLE_ALTER_TABLE_ERROR, e);
             }
