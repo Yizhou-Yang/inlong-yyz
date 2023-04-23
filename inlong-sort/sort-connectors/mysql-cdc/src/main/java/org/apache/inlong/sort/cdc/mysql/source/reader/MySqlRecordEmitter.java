@@ -26,11 +26,8 @@ import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecord.Fields;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
-import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.Statement;
@@ -45,7 +42,6 @@ import org.apache.inlong.sort.cdc.base.debezium.history.FlinkJsonTableChangeSeri
 import org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceConfig;
 import org.apache.inlong.sort.cdc.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffset;
-import org.apache.inlong.sort.cdc.mysql.source.split.MySqlBinlogSplitState;
 import org.apache.inlong.sort.cdc.mysql.source.split.MySqlSplitState;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
@@ -139,11 +135,10 @@ public final class MySqlRecordEmitter<T>
             for (TableChange tableChange : changes) {
                 splitState.asBinlogSplitState().recordSchema(tableChange.getId(), tableChange);
                 if (includeSchemaChanges) {
-                    TableChange newTableChange = ColumnFilterUtil.createTableChange(tableChange, columnNameFilter);
                     if (ghostDdlChange) {
                         updateGhostDdlElement(element, splitState, historyRecord, ghostTableRegex);
                     }
-                    outputDdlElement(element, output, splitState, newTableChange);
+                    outputDdlElement(element, output, splitState, tableChange);
                 }
             }
 
@@ -252,51 +247,6 @@ public final class MySqlRecordEmitter<T>
         Struct value = (Struct) element.value();
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         source.put(AbstractSourceInfo.SERVER_NAME_KEY, dataSourceName);
-    }
-
-    private void collectGhostDdl(SourceRecord element, MySqlSplitState splitState, HistoryRecord historyRecord) {
-        String ddl = historyRecord.document().getString(Fields.DDL_STATEMENTS);
-        String tableName = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableName(element);
-        Pattern compile = Pattern.compile(this.ghostTableRegex);
-        Matcher matcher = compile.matcher(tableName);
-        if (matcher.find()) {
-            tableName = matcher.group(1);
-            String dbName = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getDbName(element);
-            TableId tableId = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableId(
-                    dbName,
-                    tableName);
-            MySqlBinlogSplitState mySqlBinlogSplitState = splitState.asBinlogSplitState();
-            if (ddl.toUpperCase().startsWith(DDL_OP_ALTER)
-                    && mySqlBinlogSplitState.getTableSchemas().containsKey(tableId)) {
-                String matchTableInSqlRegex = ghostTableRegex;
-                if (matchTableInSqlRegex.startsWith(CARET) && matchTableInSqlRegex.endsWith(DOLLAR)) {
-                    matchTableInSqlRegex = matchTableInSqlRegex.substring(1, matchTableInSqlRegex.length() - 1);
-                }
-                mySqlBinlogSplitState.recordTableDdl(
-                        tableId,
-                        ddl.replace(GHOST_TAG, "").replaceAll("\\s+", " ").replaceAll(matchTableInSqlRegex, tableName));
-            }
-        }
-    }
-
-    private void updateGhostDdlElement(SourceRecord element, MySqlSplitState splitState, HistoryRecord historyRecord) {
-        String tableNames = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableName(element);
-        for (String tableName : tableNames.split(",")) {
-            Pattern compile = Pattern.compile(ghostTableRegex);
-            Matcher matcher = compile.matcher(tableName);
-            if (matcher.find()) {
-                tableName = matcher.group(1);
-                String dbName = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getDbName(element);
-                TableId tableId = org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableId(
-                        dbName,
-                        tableName);
-                String ddl = splitState.asBinlogSplitState().getTableDdls().get(tableId);
-                Struct value = (Struct) element.value();
-                // Update source.table and historyRecord
-                value.getStruct(Fields.SOURCE).put(TABLE_NAME, tableName);
-                value.put(HISTORY_RECORD_FIELD, historyRecord.document().set(Fields.DDL_STATEMENTS, ddl).toString());
-            }
-        }
     }
 
     private void updateSnapshotRecord(SourceRecord element, MySqlSplitState splitState) {
