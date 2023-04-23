@@ -244,6 +244,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .ghostDdlChange(ghostDdlChange)
                             .ghostTableRegex(ghostTableRegex)
                             .dataSourceName(dataSourceName)
+                            .migrateAll(migrateAll)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {

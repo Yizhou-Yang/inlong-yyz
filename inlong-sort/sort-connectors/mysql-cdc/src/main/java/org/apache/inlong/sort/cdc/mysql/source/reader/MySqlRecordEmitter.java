@@ -101,6 +101,7 @@ public final class MySqlRecordEmitter<T>
     private volatile Long snapDuration;
     private volatile long snapEarliestTime = 0L;
     private volatile long snapProcessTime = 0L;
+    private final boolean migrateAll;
 
     private boolean includeIncremental;
     private boolean ghostDdlChange;
@@ -123,6 +124,7 @@ public final class MySqlRecordEmitter<T>
         this.ghostDdlChange = sourceConfig.isGhostDdlChange();
         this.ghostTableRegex = sourceConfig.getGhostTableRegex();
         this.dataSourceName = sourceConfig.getDataSourceName();
+        this.migrateAll = migrateAll;
     }
 
     @Override
@@ -231,16 +233,20 @@ public final class MySqlRecordEmitter<T>
             element,
                 new Collector<T>() {
 
-                    @Override
-                    public void collect(final T t) {
-                        Struct value = (Struct) element.value();
-                        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                        String databaseName = source.getString(AbstractSourceInfo.DATABASE_NAME_KEY);
-                        String tableName = source.getString(AbstractSourceInfo.TABLE_NAME_KEY);
+                        @Override
+                        public void collect(final T t) {
+                            if (migrateAll) {
+                                Struct value = (Struct) element.value();
+                                Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+                                String databaseName = source.getString(AbstractSourceInfo.DATABASE_NAME_KEY);
+                                String tableName = source.getString(AbstractSourceInfo.TABLE_NAME_KEY);
 
-                        sourceReaderMetrics.outputMetrics(databaseName, tableName, iSnapShot, t);
-                        output.collect(t);
-                    }
+                                sourceReaderMetrics.outputMetrics(databaseName, tableName, iSnapShot, t);
+                            } else {
+                                sourceReaderMetrics.outputMetrics(null, null, iSnapShot, t);
+                            }
+                            output.collect(t);
+                        }
 
                     @Override
                     public void close() {

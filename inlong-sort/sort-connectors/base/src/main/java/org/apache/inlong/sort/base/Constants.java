@@ -133,7 +133,7 @@ public final class Constants {
     public static final String KEY_VALUE_DELIMITER = "=";
 
     // sort received successfully
-    public static final Integer AUDIT_SORT_INPUT = 7;
+    public static final String AUDIT_SORT_INPUT = "7";
 
     // sort send successfully
     public static final Integer AUDIT_SORT_OUTPUT = 8;

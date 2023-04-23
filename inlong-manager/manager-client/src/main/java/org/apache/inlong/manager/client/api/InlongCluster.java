@@ -20,6 +20,7 @@ package org.apache.inlong.manager.client.api;
 import org.apache.inlong.manager.pojo.cluster.ClusterInfo;
 import org.apache.inlong.manager.pojo.cluster.ClusterNodeResponse;
 import org.apache.inlong.manager.pojo.cluster.ClusterRequest;
+import org.apache.inlong.manager.pojo.cluster.agent.AgentClusterNodeRequest;
 
 import java.util.List;
 
@@ -64,5 +65,12 @@ public interface InlongCluster {
      * @return clusterInfo
      */
     ClusterInfo saveCluster(ClusterRequest clusterRequest);
+
+    /**
+     * logic delete agent cluster node by agentGroup and ip
+     *
+     * @param agentClusterNodeRequest
+     */
+    Boolean logicDeleteNodeByAgentGroup(AgentClusterNodeRequest agentClusterNodeRequest);
 
 }

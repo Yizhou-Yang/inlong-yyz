@@ -184,8 +184,12 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             LOGGER.error(String.format("Deserialize error, raw data: %s",
                     new String(element.getValue().getBinary(0))), e);
             if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE == multipleSinkOption.getSchemaUpdatePolicy()) {
+                // If the table name and library name are "unknown",
+                // it will not conflict with the table and library names in the IcebergMultipleStreamWriter operator,
+                // so it can be counted here
                 handleDirtyData(new String(element.getValue().getBinary(0)),
-                        null, DirtyType.DESERIALIZE_ERROR, e, TableIdentifier.of("unknow", "unknow"));
+                        null, DirtyType.DESERIALIZE_ERROR, e,
+                        TableIdentifier.of("unknown", "unknown"));
             }
             return;
         }
@@ -196,7 +200,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             LOGGER.error(String.format("Table identifier parse error, raw data: %s", jsonNode), e);
             if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE == multipleSinkOption.getSchemaUpdatePolicy()) {
                 handleDirtyData(jsonNode, jsonNode, DirtyType.TABLE_IDENTIFIER_PARSE_ERROR, e,
-                        TableIdentifier.of("unknow", "unknow"));
+                        TableIdentifier.of("unknown", "unknown"));
             }
         }
         if (blacklist.contains(tableId)) {
@@ -225,7 +229,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             if (!dirtyOptions.ignoreDirty()) {
                 if (metricData != null) {
                     metricData.outputDirtyMetricsWithEstimate(tableId.namespace().toString(),
-                            null, tableId.name(), rowData.toString());
+                            tableId.name(), rowData);
                 }
             } else {
                 handleDirtyData(rowData.toString(), jsonNode, DirtyType.EXTRACT_ROWDATA_ERROR, e, tableId,
@@ -241,6 +245,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             TableIdentifier tableId) {
         handleDirtyData(dirtyData, rootNode, dirtyType, e, tableId, true);
     }
+
     private void handleDirtyData(Object dirtyData,
             JsonNode rootNode,
             DirtyType dirtyType,
@@ -265,7 +270,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
                     dirtyOptions.getIdentifier(), e);
         }
         if (metricData != null && needDirtyMetric) {
-            metricData.outputDirtyMetricsWithEstimate(tableId.namespace().toString(), null, tableId.name(), dirtyData);
+            metricData.outputDirtyMetricsWithEstimate(tableId.namespace().toString(), tableId.name(), dirtyData);
         }
     }
 
@@ -378,8 +383,8 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
                                         if (!dirtyOptions.ignoreDirty()) {
                                             if (metricData != null) {
                                                 metricData.outputDirtyMetricsWithEstimate(
-                                                        tableId.namespace().toString(),
-                                                        null, tableId.name(), rowData.toString());
+                                                        tableId.namespace().toString(), tableId.name(),
+                                                        rowData);
                                             }
                                         } else {
                                             handleDirtyData(rowData.toString(), jsonNode,
