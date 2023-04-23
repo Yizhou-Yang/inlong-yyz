@@ -69,6 +69,12 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
     public int partition(T record, byte[] key, byte[] value, String targetTopic, int[] partitions) {
         int partition = 0;
         try {
+            partition = Integer.parseInt(patternPartitionMap.getOrDefault(DEFAULT_PARTITION, "0"));
+        } catch (Exception e) {
+            LOG.error("ParseInt for DEFAULT_PARTITION  error， default partition use 0", e);
+        }
+
+        try {
             for (Map.Entry<String, String> entry : patternPartitionMap.entrySet()) {
                 if (DEFAULT_PARTITION.equals(entry.getKey())) {
                     continue;
@@ -83,7 +89,6 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
                     return Integer.parseInt(entry.getValue());
                 }
             }
-            return Integer.parseInt(patternPartitionMap.getOrDefault(DEFAULT_PARTITION, "0"));
         } catch (Exception e) {
             LOG.warn("Extract partition failed", e);
         }
@@ -91,6 +96,9 @@ public class InLongFixedPartitionPartitioner<T> extends FlinkKafkaPartitioner<T>
     }
 
     private boolean match(String name, String nameRegex) {
+        if (nameRegex.equals("*")) {
+            return true;
+        }
         return regexPatternMap.computeIfAbsent(nameRegex, regex -> Pattern.compile(regex))
                 .matcher(name)
                 .matches();
