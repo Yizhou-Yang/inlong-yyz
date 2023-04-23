@@ -72,6 +72,8 @@ public class MySqlSourceConfig implements Serializable {
     private final boolean includeIncremental;
     private final boolean ghostDdlChange;
     private final String ghostTableRegex;
+    private final boolean ghostDdlChange;
+    private final String ghostTableRegex;
     private final String dataSourceName;
     private final boolean migrateAll;
 

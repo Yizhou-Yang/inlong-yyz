@@ -79,6 +79,11 @@ public final class Constants {
      * Node id used in inlong metric
      */
     public static final String NODE_ID = "nodeId";
+    // sort received successfully
+    public static final String AUDIT_SORT_INPUT = "7";
+
+    // sort send successfully
+    public static final Integer AUDIT_SORT_OUTPUT = 8;
     /**
      * Database Name used in inlong metric
      */
@@ -131,12 +136,6 @@ public final class Constants {
      * The delimiter of key and value, it is used for 'inlong.metric.labels' or 'sink.dirty.labels'
      */
     public static final String KEY_VALUE_DELIMITER = "=";
-
-    // sort received successfully
-    public static final String AUDIT_SORT_INPUT = "7";
-
-    // sort send successfully
-    public static final Integer AUDIT_SORT_OUTPUT = 8;
 
     public static final String INLONG_METRIC_STATE_NAME = "inlong-metric-states";
 
@@ -244,7 +243,7 @@ public final class Constants {
             ConfigOptions.key("sink.multiple.ignore-single-table-errors")
                     .booleanType()
                     .defaultValue(true)
-                    .withDescription("Whether ignore the single table errors when multiple sink writing scenario.");
+                    .withDescription("Whether ignore the single table erros when multiple sink writing scenario.");
 
     public static final ConfigOption<Boolean> SINK_MULTIPLE_PK_AUTO_GENERATED =
             ConfigOptions.key("sink.multiple.pk-auto-generated")
