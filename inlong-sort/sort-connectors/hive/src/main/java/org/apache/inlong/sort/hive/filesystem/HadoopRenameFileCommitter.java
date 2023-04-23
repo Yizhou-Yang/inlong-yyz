@@ -26,7 +26,7 @@ import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.util.UUID;
-import org.apache.inlong.sort.hive.table.HiveTableInlongFactory;
+import org.apache.inlong.sort.hive.util.CacheHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,12 +106,12 @@ public class HadoopRenameFileCommitter implements HadoopFileCommitter {
     }
 
     private void commitMultiple(boolean assertFileExists) throws IOException {
-        LOG.info("file committer cache {}", HiveTableInlongFactory.getFileCommitterHashMap());
-        Iterator<Path> iterator = HiveTableInlongFactory.getFileCommitterHashMap().keySet().iterator();
+        LOG.info("file committer cache {}", CacheHolder.getFileCommitterHashMap());
+        Iterator<Path> iterator = CacheHolder.getFileCommitterHashMap().keySet().iterator();
         while (iterator.hasNext()) {
             Path path = iterator.next();
             if (path.getName().equals(tempFilePath.getName())) {
-                HadoopRenameFileCommitter committer = HiveTableInlongFactory.getFileCommitterHashMap().get(path);
+                HadoopRenameFileCommitter committer = CacheHolder.getFileCommitterHashMap().get(path);
                 committer.rename(assertFileExists);
                 iterator.remove();
             }

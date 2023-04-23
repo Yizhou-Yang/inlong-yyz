@@ -75,9 +75,9 @@ import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
 import org.apache.inlong.sort.base.sink.PartitionPolicy;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.hive.HiveBulkWriterFactory;
-import org.apache.inlong.sort.hive.HiveTableUtil;
+import org.apache.inlong.sort.hive.util.CacheHolder;
+import org.apache.inlong.sort.hive.util.HiveTableUtil;
 import org.apache.inlong.sort.hive.HiveWriterFactory;
-import org.apache.inlong.sort.hive.table.HiveTableInlongFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,7 +96,6 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
     private Path targetPath;
     private Path inProgressPath;
     private final HiveShim hiveShim;
-
     private final String hiveVersion;
 
     private final boolean sinkMultipleEnable;
@@ -163,7 +162,7 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
         int recordSize = 0;
         JsonNode rootNode = null;
         ObjectIdentifier identifier = null;
-        HashMap<ObjectIdentifier, Long> ignoreWritingTableMap = HiveTableInlongFactory.getIgnoreWritingTableMap();
+        HashMap<ObjectIdentifier, Long> ignoreWritingTableMap = CacheHolder.getIgnoreWritingTableMap();
         try {
             if (sinkMultipleEnable) {
                 GenericRowData rowData = (GenericRowData) element;
@@ -171,7 +170,6 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
                     jsonFormat = (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(sinkMultipleFormat);
                 }
                 byte[] rawData = (byte[]) rowData.getField(0);
-                recordSize = rawData.length;
                 rootNode = jsonFormat.deserialize(rawData);
                 LOG.debug("root node: {}", rootNode);
                 boolean isDDL = jsonFormat.extractDDLFlag(rootNode);
@@ -216,7 +214,7 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
                     boolean changed = checkSchema(identifier, writerFactory, schema);
                     if (changed) {
                         // remove cache and reload hive writer factory
-                        HiveTableInlongFactory.getFactoryMap().remove(identifier);
+                        CacheHolder.getFactoryMap().remove(identifier);
                         writerFactory = HiveTableUtil.getWriterFactory(hiveShim, hiveVersion, identifier);
                         assert writerFactory != null;
                         FileSinkOperator.RecordWriter recordWriter = writerFactory.createRecordWriter(
@@ -224,15 +222,17 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
                         Function<RowData, Writable> rowConverter = writerFactory.createRowDataConverter();
                         writer.setRecordWriter(recordWriter);
                         writer.setRowConverter(rowConverter);
-                        HiveTableInlongFactory.getRecordWriterHashMap().put(inProgressFilePath, recordWriter);
-                        HiveTableInlongFactory.getRowConverterHashMap().put(inProgressFilePath, rowConverter);
+                        CacheHolder.getRecordWriterHashMap().put(inProgressFilePath, recordWriter);
+                        CacheHolder.getRowConverterHashMap().put(inProgressFilePath, rowConverter);
                     }
 
                     LOG.debug("record: {}", record);
                     LOG.debug("columns : {}", Arrays.deepToString(writerFactory.getAllColumns()));
                     LOG.debug("types: {}", Arrays.deepToString(writerFactory.getAllTypes()));
-                    GenericRowData genericRowData = HiveTableUtil.getRowData(record, writerFactory.getAllColumns(),
-                            writerFactory.getAllTypes(), replaceLineBreak);
+                    Pair<GenericRowData, Long> rowDataPair = HiveTableUtil.getRowData(record,
+                            writerFactory.getAllColumns(), writerFactory.getAllTypes(), replaceLineBreak);
+                    GenericRowData genericRowData = rowDataPair.getLeft();
+                    recordSize += rowDataPair.getRight();
                     LOG.debug("generic row data: {}", genericRowData);
                     writer.addElement(genericRowData);
                 }
@@ -388,14 +388,14 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
             HiveWriterFactory writerFactory, Path inProgressFilePath) {
         FileSinkOperator.RecordWriter recordWriter;
         Function<RowData, Writable> rowConverter;
-        if (!HiveTableInlongFactory.getRecordWriterHashMap().containsKey(inProgressFilePath)) {
+        if (!CacheHolder.getRecordWriterHashMap().containsKey(inProgressFilePath)) {
             recordWriter = writerFactory.createRecordWriter(inProgressFilePath);
             rowConverter = writerFactory.createRowDataConverter();
-            HiveTableInlongFactory.getRecordWriterHashMap().put(inProgressFilePath, recordWriter);
-            HiveTableInlongFactory.getRowConverterHashMap().put(inProgressFilePath, rowConverter);
+            CacheHolder.getRecordWriterHashMap().put(inProgressFilePath, recordWriter);
+            CacheHolder.getRowConverterHashMap().put(inProgressFilePath, rowConverter);
         } else {
-            recordWriter = HiveTableInlongFactory.getRecordWriterHashMap().get(inProgressFilePath);
-            rowConverter = HiveTableInlongFactory.getRowConverterHashMap().get(inProgressFilePath);
+            recordWriter = CacheHolder.getRecordWriterHashMap().get(inProgressFilePath);
+            rowConverter = CacheHolder.getRowConverterHashMap().get(inProgressFilePath);
         }
         return new ImmutablePair<>(recordWriter, rowConverter);
     }
@@ -409,7 +409,7 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
      * @return if schema has changed
      */
     private boolean checkSchema(ObjectIdentifier identifier, HiveWriterFactory writerFactory, RowType schema) {
-        HashMap<ObjectIdentifier, Long> schemaCheckTimeMap = HiveTableInlongFactory.getSchemaCheckTimeMap();
+        HashMap<ObjectIdentifier, Long> schemaCheckTimeMap = CacheHolder.getSchemaCheckTimeMap();
         long lastUpdate = schemaCheckTimeMap.getOrDefault(identifier, -1L);
         // handle the schema every `HIVE_SCHEMA_SCAN_INTERVAL` milliseconds
         int scanSchemaInterval = Integer.parseInt(writerFactory.getJobConf()
@@ -431,20 +431,20 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
     @Override
     public PendingFileRecoverable closeForCommit() throws IOException {
         if (sinkMultipleEnable) {
-            LOG.info("record writer cache {}", HiveTableInlongFactory.getRecordWriterHashMap());
-            Iterator<Path> iterator = HiveTableInlongFactory.getRecordWriterHashMap().keySet().iterator();
+            LOG.info("record writer cache {}", CacheHolder.getRecordWriterHashMap());
+            Iterator<Path> iterator = CacheHolder.getRecordWriterHashMap().keySet().iterator();
             while (iterator.hasNext()) {
                 Path inProgressFilePath = iterator.next();
                 // one flink batch writes many hive tables, they are the same inProgressPath
                 if (inProgressFilePath.getName().equals(this.inProgressPath.getName())) {
-                    FileSinkOperator.RecordWriter recordWriter = HiveTableInlongFactory.getRecordWriterHashMap()
+                    FileSinkOperator.RecordWriter recordWriter = CacheHolder.getRecordWriterHashMap()
                             .get(inProgressFilePath);
                     writer.setRecordWriter(recordWriter);
                     writer.flush();
                     writer.finish();
                     // clear cache
                     iterator.remove();
-                    HiveTableInlongFactory.getRowConverterHashMap().remove(inProgressFilePath);
+                    CacheHolder.getRowConverterHashMap().remove(inProgressFilePath);
 
                     // parse the target location of hive table
                     String tmpFileName = inProgressFilePath.getName();
@@ -457,7 +457,7 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
                             targetPath,
                             inProgressFilePath,
                             true);
-                    HiveTableInlongFactory.getFileCommitterHashMap().put(inProgressFilePath, committer);
+                    CacheHolder.getFileCommitterHashMap().put(inProgressFilePath, committer);
                 }
             }
         } else {

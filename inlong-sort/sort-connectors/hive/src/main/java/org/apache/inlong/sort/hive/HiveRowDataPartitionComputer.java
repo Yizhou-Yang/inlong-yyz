@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.hive.client.HiveShim;
@@ -46,7 +47,8 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
 import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
 import org.apache.inlong.sort.base.sink.PartitionPolicy;
-import org.apache.inlong.sort.hive.table.HiveTableInlongFactory;
+import org.apache.inlong.sort.hive.util.CacheHolder;
+import org.apache.inlong.sort.hive.util.HiveTableUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,8 +138,7 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
                 Map<String, Object> rawData = physicalDataList.get(0);
                 ObjectIdentifier identifier = HiveTableUtil.createObjectIdentifier(databaseName, tableName);
 
-                HashMap<ObjectIdentifier, Long> ignoreWritingTableMap =
-                        HiveTableInlongFactory.getIgnoreWritingTableMap();
+                HashMap<ObjectIdentifier, Long> ignoreWritingTableMap = CacheHolder.getIgnoreWritingTableMap();
                 // ignore writing data into this table
                 if (ignoreWritingTableMap.containsKey(identifier)) {
                     return partSpec;
@@ -162,8 +163,9 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
 
                 boolean replaceLineBreak = hiveWriterFactory.getStorageDescriptor().getInputFormat()
                         .contains("TextInputFormat");
-                GenericRowData genericRowData = HiveTableUtil.getRowData(rawData, columnNames, allTypes,
+                Pair<GenericRowData, Long> pair = HiveTableUtil.getRowData(rawData, columnNames, allTypes,
                         replaceLineBreak);
+                GenericRowData genericRowData = pair.getLeft();
 
                 Object field;
                 for (int i = 0; i < partitionIndexes.length; i++) {
