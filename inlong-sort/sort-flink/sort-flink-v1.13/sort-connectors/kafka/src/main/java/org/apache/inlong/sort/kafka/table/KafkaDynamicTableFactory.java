@@ -57,6 +57,7 @@ import org.apache.inlong.sort.base.dirty.utils.DirtySinkFactoryUtils;
 import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
 import org.apache.inlong.sort.kafka.KafkaDynamicSink;
 import org.apache.inlong.sort.kafka.partitioner.InLongFixedPartitionPartitioner;
+import org.apache.inlong.sort.kafka.partitioner.PrimaryKeyPartitioner;
 import org.apache.inlong.sort.kafka.partitioner.RawDataHashPartitioner;
 
 import javax.annotation.Nullable;
@@ -116,6 +117,7 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
     public static final String IDENTIFIER = "kafka-inlong";
 
     public static final String SINK_PARTITIONER_VALUE_RAW_HASH = "raw-hash";
+    public static final String SINK_PARTITIONER_VALUE_PRIMARY_KEY = "primaryKey";
 
     public static final String SINK_PARTITIONER_VALUE_INLONG_FIXED_PARTITION = "inlong-fixed-partition";
 
@@ -261,6 +263,10 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
             rawHashPartitioner.setPartitionPattern(tableOptions.getOptional(SINK_MULTIPLE_PARTITION_PATTERN)
                     .orElse(null));
             return Optional.of(rawHashPartitioner);
+        } else if (tableOptions.getOptional(SINK_PARTITIONER).isPresent()
+                && SINK_PARTITIONER_VALUE_PRIMARY_KEY.equals(tableOptions.getOptional(SINK_PARTITIONER).get())) {
+            PrimaryKeyPartitioner<RowData> primaryKeyPartitioner = new PrimaryKeyPartitioner<>();
+            return Optional.of(primaryKeyPartitioner);
         }
         Optional<FlinkKafkaPartitioner<RowData>> partitioner = KafkaOptions
                 .getFlinkKafkaPartitioner(tableOptions, classLoader);
