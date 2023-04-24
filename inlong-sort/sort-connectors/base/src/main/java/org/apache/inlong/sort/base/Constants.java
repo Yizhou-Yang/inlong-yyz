@@ -190,9 +190,9 @@ public final class Constants {
                     .withDescription(
                             "The format of multiple sink, it represents the real format of the raw binary data");
 
-    public static final ConfigOption<Map<String, String>> PATTERN_PARTITION_MAP =
+    public static final ConfigOption<String> PATTERN_PARTITION_MAP =
             ConfigOptions.key("pattern.partition.map")
-                    .mapType()
+                    .stringType()
                     .noDefaultValue()
                     .withDescription(
                             "Pattern rules and partition maps");
