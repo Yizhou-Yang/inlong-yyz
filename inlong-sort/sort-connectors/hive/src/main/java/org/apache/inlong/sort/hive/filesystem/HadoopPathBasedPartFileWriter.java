@@ -240,10 +240,16 @@ public class HadoopPathBasedPartFileWriter<IN, BucketID> extends AbstractPartFil
                     metricData.outputMetrics(databaseName, tableName, recordNum, recordSize);
                 }
             } else {
-                BinaryRowData data = (BinaryRowData) element;
+                RowData data = (RowData) element;
                 writer.addElement(data);
                 if (metricData != null) {
-                    metricData.invoke(1, data.getSizeInBytes());
+                    if (data instanceof BinaryRowData) {
+                        // mysql cdc sends BinaryRowData
+                        metricData.invoke(1, ((BinaryRowData) data).getSizeInBytes());
+                    } else {
+                        // oracle cdc sends GenericRowData
+                        metricData.invoke(1, data.toString().getBytes(StandardCharsets.UTF_8).length);
+                    }
                 }
             }
         } catch (Exception e) {
