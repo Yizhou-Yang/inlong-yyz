@@ -80,7 +80,7 @@ public class MaskDataUtilsTest {
                 + "    'server-id' = '10011',\n"
                 + "    'scan.incremental.snapshot.enabled' = 'true',\n"
                 + "    'username' = 'root',\n"
-                + "    'password' =  'inlong',\n"
+                + "    'password' = 'inlong',\n"
                 + "    'table-name' = 'user'\n"
                 + ")";
 
@@ -98,7 +98,7 @@ public class MaskDataUtilsTest {
                 + "    'server-id' = '10011',\n"
                 + "    'scan.incremental.snapshot.enabled' = 'true',\n"
                 + "    'username' = 'root',\n"
-                + "    'password' =   '******',\n"
+                + "    'password' = '******',\n"
                 + "    'table-name' = 'user'\n"
                 + ")";
         StringBuilder buffer = new StringBuilder(unmasked);
