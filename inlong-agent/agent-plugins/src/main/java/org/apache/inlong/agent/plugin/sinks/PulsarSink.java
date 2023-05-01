@@ -17,43 +17,6 @@
 
 package org.apache.inlong.agent.plugin.sinks;
 
-import com.google.common.base.Preconditions;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.inlong.agent.common.AgentThreadFactory;
-import org.apache.inlong.agent.conf.AgentConfiguration;
-import org.apache.inlong.agent.conf.JobProfile;
-import org.apache.inlong.agent.core.task.TaskPositionManager;
-import org.apache.inlong.agent.message.BatchProxyMessage;
-import org.apache.inlong.agent.message.EndMessage;
-import org.apache.inlong.agent.message.PackProxyMessage;
-import org.apache.inlong.agent.message.ProxyMessage;
-import org.apache.inlong.agent.metrics.audit.AuditUtils;
-import org.apache.inlong.agent.plugin.Message;
-import org.apache.inlong.agent.utils.AgentUtils;
-import org.apache.inlong.agent.utils.ThreadUtils;
-import org.apache.inlong.common.msg.InLongMsg;
-import org.apache.inlong.common.pojo.dataproxy.MQClusterInfo;
-import org.apache.pulsar.client.api.CompressionType;
-import org.apache.pulsar.client.api.MessageId;
-import org.apache.pulsar.client.api.Producer;
-import org.apache.pulsar.client.api.PulsarClient;
-import org.apache.pulsar.client.api.PulsarClientException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import static org.apache.inlong.agent.constant.AgentConstants.DEFAULT_BLOCK_IF_QUEUE_FULL;
 import static org.apache.inlong.agent.constant.AgentConstants.DEFAULT_COMPRESSION_TYPE;
 import static org.apache.inlong.agent.constant.AgentConstants.DEFAULT_ENABLE_ASYNC_SEND;
@@ -82,6 +45,42 @@ import static org.apache.inlong.agent.constant.AgentConstants.PULSAR_CLIENT_PROD
 import static org.apache.inlong.agent.constant.AgentConstants.PULSAR_CLIENT_TIMEOUT_SECOND;
 import static org.apache.inlong.agent.constant.AgentConstants.PULSAR_CONNECTION_PRE_BROKER;
 import static org.apache.inlong.agent.constant.AgentConstants.PULSAR_SINK_SEND_QUEUE_SIZE;
+
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.inlong.agent.common.AgentThreadFactory;
+import org.apache.inlong.agent.conf.AgentConfiguration;
+import org.apache.inlong.agent.conf.JobProfile;
+import org.apache.inlong.agent.core.task.TaskPositionManager;
+import org.apache.inlong.agent.message.BatchProxyMessage;
+import org.apache.inlong.agent.message.EndMessage;
+import org.apache.inlong.agent.message.PackProxyMessage;
+import org.apache.inlong.agent.message.ProxyMessage;
+import org.apache.inlong.agent.metrics.audit.AuditUtils;
+import org.apache.inlong.agent.plugin.Message;
+import org.apache.inlong.agent.utils.AgentUtils;
+import org.apache.inlong.agent.utils.ThreadUtils;
+import org.apache.inlong.common.msg.InLongMsg;
+import org.apache.inlong.common.pojo.dataproxy.MQClusterInfo;
+import org.apache.pulsar.client.api.CompressionType;
+import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.api.Producer;
+import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.PulsarClientException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class PulsarSink extends AbstractSink {
 
@@ -235,11 +234,12 @@ public class PulsarSink extends AbstractSink {
                             }
                         }
                     });
-                    AgentUtils.silenceSleepInMs(batchFlushInterval);
                 } catch (Exception ex) {
                     LOGGER.error("error caught", ex);
                 } catch (Throwable t) {
                     ThreadUtils.threadThrowableHandler(Thread.currentThread(), t);
+                } finally {
+                    AgentUtils.silenceSleepInMs(batchFlushInterval);
                 }
             }
         };
@@ -298,7 +298,6 @@ public class PulsarSink extends AbstractSink {
                     updateSuccessSendMetrics(batchMsg);
                 }
             });
-
         } else {
             try {
                 producer.newMessage().eventTime(batchMsg.getDataTime()).value(message.buildArray()).send();
