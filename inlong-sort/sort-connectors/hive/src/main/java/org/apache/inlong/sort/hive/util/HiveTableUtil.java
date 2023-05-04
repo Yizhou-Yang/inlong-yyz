@@ -67,6 +67,7 @@ import org.apache.flink.types.RowKind;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -165,7 +166,9 @@ public class HiveTableUtil {
             if (alter) {
                 table.getSd().setCols(fieldSchemaList);
                 IMetaStoreClient metaStoreClient = getMetaStoreClient(client);
-                metaStoreClient.alter_table(databaseName, tableName, table, true);
+                EnvironmentContext environmentContext = new EnvironmentContext();
+                environmentContext.putToProperties("CASCADE", "true");
+                metaStoreClient.alter_table_with_environmentContext(databaseName, tableName, table, environmentContext);
                 LOG.info("alter table {}.{} success", databaseName, tableName);
                 return true;
             }
