@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.cdc.mongodb.source.splitters;
+package org.apache.inlong.sort.cdc.mongodb.source.assigners.splitters;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.BSON_MIN_KEY;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.ID_FIELD;
@@ -39,7 +39,7 @@ import java.util.Map;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.SnapshotSplit;
+import org.apache.inlong.sort.cdc.base.source.meta.split.SnapshotSplit;
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
 import org.bson.BsonInt32;
@@ -53,6 +53,7 @@ import org.slf4j.LoggerFactory;
  * <p>Uses the `SplitVector` command to generate chunks for a collection. eg. <code>
  * db.runCommand({splitVector:"inventory.products", keyPattern:{_id:1}, maxChunkSize:64})</code>
  * Requires `splitVector` privilege.
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
  */
 @Internal
 public class SplitVectorSplitStrategy implements SplitStrategy {

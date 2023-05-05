@@ -47,10 +47,10 @@ import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOp
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.USERNAME;
 import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SOURCE_MULTIPLE_ENABLE;
-import static org.apache.inlong.sort.cdc.mongodb.MongoDBSource.ERROR_TOLERANCE_NONE;
 
 /**
  * Factory for creating configured instance of {@link MongoDBTableSource}.
@@ -60,46 +60,6 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
     private static final String IDENTIFIER = "mongodb-cdc-inlong";
 
     private static final String DOCUMENT_ID_FIELD = "_id";
-
-    private static final ConfigOption<String> ERRORS_TOLERANCE =
-            ConfigOptions.key("errors.tolerance")
-                    .stringType()
-                    .defaultValue(ERROR_TOLERANCE_NONE)
-                    .withDescription(
-                            "Whether to continue processing messages if an error is encountered. "
-                                    + "When set to none, the connector reports an error and blocks further processing "
-                                    + "of the rest of the records when it encounters an error. "
-                                    + "When set to all, the connector silently ignores any bad messages."
-                                    + "Accepted Values: 'none' or 'all'. Default 'none'.");
-
-    private static final ConfigOption<Boolean> ERRORS_LOG_ENABLE =
-            ConfigOptions.key("errors.log.enable")
-                    .booleanType()
-                    .defaultValue(Boolean.TRUE)
-                    .withDescription(
-                            "Whether details of failed operations should be written to the log file. "
-                                    + "When set to true, both errors that are tolerated (determined by the errors"
-                                    + ".tolerance setting) "
-                                    + "and not tolerated are written. When set to false, errors that are tolerated "
-                                    + "are omitted.");
-
-    private static final ConfigOption<String> COPY_EXISTING_PIPELINE =
-            ConfigOptions.key("copy.existing.pipeline")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "An array of JSON objects describing the pipeline operations "
-                                    + "to run when copying existing data. "
-                                    + "This can improve the use of indexes by the copying manager and make copying "
-                                    + "more efficient.");
-
-    private static final ConfigOption<Integer> COPY_EXISTING_MAX_THREADS =
-            ConfigOptions.key("copy.existing.max.threads")
-                    .intType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "The number of threads to use when performing the data copy."
-                                    + " Defaults to the number of processors.");
 
     public static final ConfigOption<String> ROW_KINDS_FILTERED =
             ConfigOptions.key("row-kinds-filtered")
@@ -111,17 +71,11 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                             + "\"+I\" represents INSERT.\n"
                             + "\"-U\" represents UPDATE_BEFORE.\n"
                             + "\"+U\" represents UPDATE_AFTER.\n"
+                            + "\"-D\" represents DELETE.\n"
+                            + "\"-T\" represents DROP COLLECTION.\n"
+                            + "\"-K\" represents DROP DATABASE.\n"
+                            + "\"+R\" represents RENAME.\n"
                             + "\"-D\" represents DELETE.");
-
-    public static final ConfigOption<Integer> HEARTBEAT_INTERVAL_MILLIS =
-            ConfigOptions.key("heartbeat.interval.ms")
-                    .intType()
-                    .defaultValue(30000)
-                    .withDescription(
-                            "The length of time in milliseconds between sending heartbeat messages."
-                                    + "Heartbeat messages contain the post batch resume token and are sent when no source records "
-                                    + "have been published in the specified interval. This improves the resumability of the connector "
-                                    + "for low volume namespaces. Use 0 to disable. Defaults to 30000.");
 
     public static final ConfigOption<Boolean> CHANGELOG_NORMALIZE_ENABLED =
             ConfigOptions.key("changelog.normalize.enabled")
@@ -150,17 +104,12 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         final String collection = config.getOptional(COLLECTION).orElse(null);
 
         Integer batchSize = config.get(BATCH_SIZE);
-        final String errorsTolerance = config.get(ERRORS_TOLERANCE);
-        final Boolean errorsLogEnable = config.get(ERRORS_LOG_ENABLE);
-
         final Integer pollMaxBatchSize = config.get(POLL_MAX_BATCH_SIZE);
         final Integer pollAwaitTimeMillis = config.get(POLL_AWAIT_TIME_MILLIS);
 
         final Integer heartbeatIntervalMillis = config.get(HEARTBEAT_INTERVAL_MILLIS);
 
         final Boolean copyExisting = config.get(COPY_EXISTING);
-        final String copyExistingPipeline = config.getOptional(COPY_EXISTING_PIPELINE).orElse(null);
-        final Integer copyExistingMaxThreads = config.getOptional(COPY_EXISTING_MAX_THREADS).orElse(null);
         final Integer copyExistingQueueSize = config.getOptional(COPY_EXISTING_QUEUE_SIZE).orElse(null);
 
         final String zoneId = context.getConfiguration().get(TableConfigOptions.LOCAL_TIME_ZONE);
@@ -195,11 +144,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 database,
                 collection,
                 connectionOptions,
-                errorsTolerance,
-                errorsLogEnable,
                 copyExisting,
-                copyExistingPipeline,
-                copyExistingMaxThreads,
                 copyExistingQueueSize,
                 batchSize,
                 pollMaxBatchSize,
@@ -242,11 +187,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(CONNECTION_OPTIONS);
         options.add(DATABASE);
         options.add(COLLECTION);
-        options.add(ERRORS_TOLERANCE);
-        options.add(ERRORS_LOG_ENABLE);
         options.add(COPY_EXISTING);
-        options.add(COPY_EXISTING_PIPELINE);
-        options.add(COPY_EXISTING_MAX_THREADS);
         options.add(COPY_EXISTING_QUEUE_SIZE);
         options.add(BATCH_SIZE);
         options.add(POLL_MAX_BATCH_SIZE);
@@ -256,6 +197,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SOURCE_MULTIPLE_ENABLE);
         options.add(INLONG_METRIC);
         options.add(INLONG_AUDIT);
+        options.add(AUDIT_KEYS);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
         options.add(CHUNK_META_GROUP_SIZE);

@@ -45,7 +45,6 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.changestream.ChangeStreamDocument;
 import com.mongodb.client.model.changestream.FullDocument;
-import com.ververica.cdc.connectors.mongodb.source.offset.ChangeStreamDescriptor;
 import io.debezium.relational.TableId;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +54,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.sort.cdc.mongodb.source.config.MongoDBSourceConfig;
 import org.apache.inlong.sort.cdc.mongodb.source.connection.MongoClientPool;
+import org.apache.inlong.sort.cdc.mongodb.source.offset.ChangeStreamDescriptor;
 import org.bson.BsonDocument;
 import org.bson.BsonDouble;
 import org.bson.BsonInt32;
@@ -65,10 +65,13 @@ import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Utilities of MongoDB operations. */
+/** Utilities of MongoDB operations.
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
+ */
 public class MongoUtils {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MongoUtils.class);
+    private static final Logger LOG = LoggerFactory.getLogger(
+            com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.class);
 
     public static final BsonDouble COMMAND_SUCCEED_FLAG = new BsonDouble(1.0d);
 
@@ -166,6 +169,7 @@ public class MongoUtils {
             LOG.info("Preparing change stream for collection {}.{}", database, collection);
             changeStream = coll.watch();
         } else if (StringUtils.isNotEmpty(database) && namespaceRegex != null) {
+            MongoDatabase db = mongoClient.getDatabase(database);
             List<Bson> pipeline = new ArrayList<>();
             pipeline.add(ADD_NS_FIELD);
             Bson nsFilter = regex(ADD_NS_FIELD_NAME, namespaceRegex);
@@ -174,7 +178,6 @@ public class MongoUtils {
                     "Preparing change stream for database {} with namespace regex filter {}",
                     database,
                     namespaceRegex);
-            MongoDatabase db = mongoClient.getDatabase(database);
             changeStream = db.watch(pipeline);
         } else if (StringUtils.isNotEmpty(database)) {
             MongoDatabase db = mongoClient.getDatabase(database);

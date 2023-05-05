@@ -27,7 +27,6 @@ import io.debezium.relational.history.DatabaseHistoryException;
 import io.debezium.relational.history.DatabaseHistoryListener;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecordComparator;
-
 import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;

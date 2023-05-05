@@ -30,9 +30,12 @@ import com.ververica.cdc.connectors.base.options.StartupOptions;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.flink.annotation.Internal;
-import org.apache.inlong.sort.cdc.mongodb.source.config.SourceConfig.Factory;
+import org.apache.inlong.sort.cdc.base.config.SourceConfig.Factory;
 
-/** A factory to construct {@link MongoDBSourceConfig}. */
+/** A factory to construct {@link MongoDBSourceConfig}.
+ *
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
+ */
 @Internal
 public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> {
 
@@ -179,6 +182,16 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
+    public MongoDBSourceConfigFactory inlongMetric(String inlongMetric) {
+        this.inlongMetric = inlongMetric;
+        return this;
+    }
+
+    public MongoDBSourceConfigFactory inlongAudit(String inlongAudit) {
+        this.inlongAudit = inlongAudit;
+        return this;
+    }
+
     /**
      * The group size of split meta, if the meta size exceeds the group size, the meta will be
      * divided into multiple groups.
@@ -214,15 +227,4 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 inlongMetric,
                 inlongAudit);
     }
-
-    public MongoDBSourceConfigFactory inlongMetric(String inlongMetric) {
-        this.inlongMetric = inlongMetric;
-        return this;
-    }
-
-    public MongoDBSourceConfigFactory inlongAudit(String inlongAudit) {
-        this.inlongAudit = inlongAudit;
-        return this;
-    }
-
 }

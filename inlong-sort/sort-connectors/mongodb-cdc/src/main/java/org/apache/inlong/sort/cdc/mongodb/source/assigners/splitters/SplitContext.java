@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.cdc.mongodb.source.splitters;
+package org.apache.inlong.sort.cdc.mongodb.source.assigners.splitters;
 
 import static org.apache.inlong.sort.cdc.mongodb.source.utils.MongoUtils.clientFor;
 import static org.apache.inlong.sort.cdc.mongodb.source.utils.MongoUtils.collStats;
@@ -31,6 +31,7 @@ import org.bson.BsonInt64;
 /**
  * The split context used by {@link SplitStrategy} to split collection into a set of chunks for
  * MongoDB data source.
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
  */
 @Internal
 public class SplitContext {
@@ -51,8 +52,7 @@ public class SplitContext {
         this.chunkSizeMB = chunkSizeMB;
     }
 
-    public static SplitContext of(
-            MongoDBSourceConfig sourceConfig, TableId collectionId) {
+    public static SplitContext of(MongoDBSourceConfig sourceConfig, TableId collectionId) {
         MongoClient mongoClient = clientFor(sourceConfig);
         return new SplitContext(
                 mongoClient,

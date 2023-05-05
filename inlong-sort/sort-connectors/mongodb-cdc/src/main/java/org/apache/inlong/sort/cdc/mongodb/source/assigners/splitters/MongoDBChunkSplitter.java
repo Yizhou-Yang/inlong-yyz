@@ -15,16 +15,18 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.cdc.mongodb.source.splitters;
+package org.apache.inlong.sort.cdc.mongodb.source.assigners.splitters;
 
 import io.debezium.relational.TableId;
 import java.util.Collection;
 import org.apache.flink.annotation.Experimental;
-import org.apache.inlong.sort.cdc.mongodb.source.assigner.splitter.ChunkSplitter;
+import org.apache.inlong.sort.cdc.base.source.assigner.splitter.ChunkSplitter;
+import org.apache.inlong.sort.cdc.base.source.meta.split.SnapshotSplit;
 import org.apache.inlong.sort.cdc.mongodb.source.config.MongoDBSourceConfig;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.SnapshotSplit;
 
-/** The splitter used to split collection into a set of chunks for MongoDB data source. */
+/** The splitter used to split collection into a set of chunks for MongoDB data source.
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
+ */
 @Experimental
 public class MongoDBChunkSplitter implements ChunkSplitter {
 

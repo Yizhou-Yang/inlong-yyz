@@ -28,8 +28,6 @@ import static org.apache.inlong.sort.cdc.mongodb.source.utils.MongoUtils.getCurr
 import static org.apache.inlong.sort.cdc.mongodb.source.utils.MongoUtils.getLatestResumeToken;
 
 import com.mongodb.client.MongoClient;
-import com.ververica.cdc.connectors.mongodb.source.offset.ChangeStreamDescriptor;
-import com.ververica.cdc.connectors.mongodb.source.offset.ChangeStreamOffset;
 import com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.CollectionDiscoveryInfo;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
@@ -42,19 +40,24 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.apache.flink.annotation.Experimental;
-import org.apache.inlong.sort.cdc.mongodb.source.assigner.splitter.ChunkSplitter;
+import org.apache.inlong.sort.cdc.base.dialect.DataSourceDialect;
+import org.apache.inlong.sort.cdc.base.source.assigner.splitter.ChunkSplitter;
+import org.apache.inlong.sort.cdc.base.source.meta.split.SourceSplitBase;
+import org.apache.inlong.sort.cdc.base.source.reader.external.FetchTask;
+import org.apache.inlong.sort.cdc.mongodb.source.assigners.splitters.MongoDBChunkSplitter;
 import org.apache.inlong.sort.cdc.mongodb.source.config.MongoDBSourceConfig;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.SourceSplitBase;
-import org.apache.inlong.sort.cdc.mongodb.source.reader.external.FetchTask;
+import org.apache.inlong.sort.cdc.mongodb.source.offset.ChangeStreamDescriptor;
+import org.apache.inlong.sort.cdc.mongodb.source.offset.ChangeStreamOffset;
 import org.apache.inlong.sort.cdc.mongodb.source.reader.fetch.MongoDBFetchTaskContext;
 import org.apache.inlong.sort.cdc.mongodb.source.reader.fetch.MongoDBScanFetchTask;
 import org.apache.inlong.sort.cdc.mongodb.source.reader.fetch.MongoDBStreamFetchTask;
-import org.apache.inlong.sort.cdc.mongodb.source.splitters.MongoDBChunkSplitter;
 import org.bson.BsonDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** The {@link DataSourceDialect} implementation for MongoDB datasource. */
+/** The {@link DataSourceDialect} implementation for MongoDB datasource.
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
+ */
 @Experimental
 public class MongoDBDialect implements DataSourceDialect<MongoDBSourceConfig> {
 
