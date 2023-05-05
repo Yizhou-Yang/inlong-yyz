@@ -278,8 +278,13 @@ public class MaskDataUtils {
         return charPos;
     }
 
-    public static String removeMaskMsg(String sql) {
-        StringBuilder buffer = new StringBuilder(sql);
+    /**
+     * mask sensitive message
+     * @param message raw message
+     * @return non-sensitive message
+     */
+    public static String maskSensitiveMessage(String message) {
+        StringBuilder buffer = new StringBuilder(message);
         mask(buffer);
         return buffer.toString();
     }
