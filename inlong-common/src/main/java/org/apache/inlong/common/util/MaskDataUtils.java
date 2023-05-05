@@ -33,6 +33,7 @@ public class MaskDataUtils {
             "secret_id", "secretId",
             "secret_key", "secretKey",
             "public_key", "publicKey",
+            "service.secret.key", "qcloud.dlc.secret-key",
             "gateway.url");
     private static final List<String> SEPARATORS = Arrays.asList(":", "=", "\": \"", "\":\"");
     private static final List<Character> STOP_CHARACTERS = Arrays.asList('\'', '"');
