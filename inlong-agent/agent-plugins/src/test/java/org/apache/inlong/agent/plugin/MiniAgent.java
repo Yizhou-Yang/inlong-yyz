@@ -17,6 +17,11 @@
 
 package org.apache.inlong.agent.plugin;
 
+import static org.apache.inlong.agent.constant.AgentConstants.AGENT_FETCH_CENTER_INTERVAL_SECONDS;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
 import org.apache.inlong.agent.conf.AgentConfiguration;
 import org.apache.inlong.agent.conf.JobProfile;
 import org.apache.inlong.agent.conf.ProfileFetcher;
@@ -28,12 +33,6 @@ import org.powermock.api.mockito.PowerMockito;
 import org.powermock.api.support.membermodification.MemberModifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.LinkedBlockingQueue;
-
-import static org.apache.inlong.agent.constant.AgentConstants.AGENT_FETCH_CENTER_INTERVAL_SECONDS;
 
 public class MiniAgent {
 
@@ -93,18 +92,19 @@ public class MiniAgent {
     }
 
     public void submitTrigger(TriggerProfile triggerProfile) {
-        manager.getTriggerManager().submitTrigger(triggerProfile);
+        manager.getTriggerManager().submitTrigger(triggerProfile, true);
         triggerProfileCache.add(triggerProfile);
     }
 
     public void cleanupJobs() {
-        jobProfileCache.forEach(jobProfile -> manager.getJobManager().deleteJob(jobProfile.getInstanceId()));
+        jobProfileCache.forEach(jobProfile -> manager.getJobManager().deleteJob(jobProfile.getInstanceId(), false));
         jobProfileCache.clear();
     }
 
     public void cleanupTriggers() {
         triggerProfileCache
-                .forEach(triggerProfile -> manager.getTriggerManager().deleteTrigger(triggerProfile.getTriggerId()));
+                .forEach(triggerProfile -> manager.getTriggerManager()
+                        .deleteTrigger(triggerProfile.getTriggerId(), false));
         triggerProfileCache.clear();
     }
 }

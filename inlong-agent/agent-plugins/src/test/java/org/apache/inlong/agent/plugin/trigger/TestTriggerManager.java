@@ -17,6 +17,12 @@
 
 package org.apache.inlong.agent.plugin.trigger;
 
+import static org.awaitility.Awaitility.await;
+
+import java.nio.file.WatchKey;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.inlong.agent.conf.AgentConfiguration;
 import org.apache.inlong.agent.conf.TriggerProfile;
 import org.apache.inlong.agent.constant.AgentConstants;
@@ -30,13 +36,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.nio.file.WatchKey;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
-import static org.awaitility.Awaitility.await;
 
 public class TestTriggerManager {
 
@@ -167,7 +166,7 @@ public class TestTriggerManager {
         });
 
         // shutdown trigger
-        agent.getManager().getTriggerManager().deleteTrigger(triggerProfile1.getTriggerId());
+        agent.getManager().getTriggerManager().deleteTrigger(triggerProfile1.getTriggerId(), false);
         await().atMost(10, TimeUnit.SECONDS).until(() -> trigger.getWatchers().size() == 0);
         TestUtils.deleteFile(WATCH_FOLDER.getRoot().getAbsolutePath() + "/1.log");
     }
