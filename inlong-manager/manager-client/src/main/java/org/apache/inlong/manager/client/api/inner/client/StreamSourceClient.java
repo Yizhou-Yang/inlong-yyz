@@ -25,6 +25,7 @@ import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
 import org.apache.inlong.manager.common.util.Preconditions;
 import org.apache.inlong.manager.pojo.common.PageResult;
 import org.apache.inlong.manager.pojo.common.Response;
+import org.apache.inlong.manager.pojo.source.SourcePageRequest;
 import org.apache.inlong.manager.pojo.source.SourceRequest;
 import org.apache.inlong.manager.pojo.source.StreamSource;
 
@@ -61,8 +62,22 @@ public class StreamSourceClient {
      * List stream sources by the specified source type.
      */
     public List<StreamSource> listSources(String groupId, String streamId, String sourceType) {
+        SourcePageRequest pageRequest = new SourcePageRequest();
+        pageRequest.setInlongGroupId(groupId);
+        pageRequest.setInlongStreamId(streamId);
+        pageRequest.setSourceType(sourceType);
         Response<PageResult<StreamSource>> response = ClientUtils.executeHttpCall(
-                streamSourceApi.listSources(groupId, streamId, sourceType));
+                streamSourceApi.listSources(pageRequest));
+        ClientUtils.assertRespSuccess(response);
+        return response.getData().getList();
+    }
+
+    /**
+     * Paging query stream source info based on conditions.
+     */
+    public List<StreamSource> listSources(SourcePageRequest pageRequest) {
+        Response<PageResult<StreamSource>> response = ClientUtils.executeHttpCall(
+                streamSourceApi.listSources(pageRequest));
         ClientUtils.assertRespSuccess(response);
         return response.getData().getList();
     }
@@ -83,7 +98,7 @@ public class StreamSourceClient {
      * Delete data source information by id.
      */
     public boolean deleteSource(int id) {
-        Preconditions.checkTrue(id > 0, "sourceId is illegal");
+        Preconditions.expectTrue(id > 0, "sourceId is illegal");
         Response<Boolean> response = ClientUtils.executeHttpCall(streamSourceApi.deleteSource(id));
         ClientUtils.assertRespSuccess(response);
         return response.getData();
@@ -97,8 +112,8 @@ public class StreamSourceClient {
      * @return Whether succeed
      */
     public boolean forceDelete(String groupId, String streamId) {
-        Preconditions.checkNotNull(groupId, ErrorCodeEnum.GROUP_ID_IS_EMPTY.getMessage());
-        Preconditions.checkNotNull(streamId, ErrorCodeEnum.STREAM_ID_IS_EMPTY.getMessage());
+        Preconditions.expectNotBlank(groupId, ErrorCodeEnum.GROUP_ID_IS_EMPTY);
+        Preconditions.expectNotBlank(streamId, ErrorCodeEnum.STREAM_ID_IS_EMPTY);
 
         Response<Boolean> response = ClientUtils.executeHttpCall(streamSourceApi.forceDelete(groupId, streamId));
         ClientUtils.assertRespSuccess(response);
@@ -106,7 +121,7 @@ public class StreamSourceClient {
     }
 
     public StreamSource get(int id) {
-        Preconditions.checkTrue(id > 0, "sourceId is illegal");
+        Preconditions.expectTrue(id > 0, "sourceId is illegal");
         Response<StreamSource> response = ClientUtils.executeHttpCall(streamSourceApi.get(id));
         ClientUtils.assertRespSuccess(response);
         return response.getData();

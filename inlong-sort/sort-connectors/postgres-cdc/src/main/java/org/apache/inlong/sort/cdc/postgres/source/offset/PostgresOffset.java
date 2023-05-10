@@ -137,7 +137,6 @@ public class PostgresOffset extends Offset {
 
     @Override
     public Map<String, ?> getOffset() {
-
         return offset;
     }
 }

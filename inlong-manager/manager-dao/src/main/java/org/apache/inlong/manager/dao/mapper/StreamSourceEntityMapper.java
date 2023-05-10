@@ -42,6 +42,16 @@ public interface StreamSourceEntityMapper {
     StreamSourceEntity selectForAgentTask(Integer id);
 
     /**
+     * Select one sub source by template id and agent ip.
+     *
+     * @param templateId template id
+     * @param agentIp agent ip
+     * @return stream source info
+     */
+    StreamSourceEntity selectOneByTemplatedIdAndAgentIp(@Param("templateId") Integer templateId,
+            @Param("agentIp") String agentIp);
+
+    /**
      * Query un-deleted sources by the given agentIp.
      */
     List<StreamSourceEntity> selectByAgentIp(@Param("agentIp") String agentIp);
@@ -81,6 +91,13 @@ public interface StreamSourceEntityMapper {
             @Param("clusterName") String clusterName);
 
     /**
+     * Query the tasks by the given status list and type List.
+     */
+    List<StreamSourceEntity> selectAllByAgentIpAndCluster(@Param("statusList") List<Integer> statusList,
+            @Param("sourceTypeList") List<String> sourceTypeList, @Param("agentIp") String agentIp,
+            @Param("clusterName") String clusterName);
+
+    /**
      * Query the template tasks by the given status list and type List and clusterName.
      */
     List<StreamSourceEntity> selectTemplateSourceByCluster(@Param("statusList") List<Integer> statusList,
@@ -112,6 +129,12 @@ public interface StreamSourceEntityMapper {
      */
     List<String> selectSourceType(@Param("groupId") String groupId, @Param("streamId") String streamId);
 
+    /**
+     * Query need update source according to the dataNodeName , clusterName, sourceType
+     */
+    List<Integer> selectNeedUpdateIdsByClusterAndDataNode(@Param("clusterName") String clusterName,
+            @Param("nodeName") String nodeName, @Param("sourceType") String sourceType);
+
     int updateByPrimaryKeySelective(StreamSourceEntity record);
 
     int updateByRelatedId(@Param("groupId") String groupId, @Param("streamId") String streamId,
@@ -134,12 +157,30 @@ public interface StreamSourceEntityMapper {
             @Param("nextStatus") Integer nextStatus);
 
     /**
+     * Update the previous status to `nextStatus` by the given group id and stream id.
+     *
+     * @apiNote Should not change the modify_time
+     */
+    int updatePreviousStatusByRelatedId(@Param("id") Integer id,
+            @Param("previousStatus") Integer previousStatus);
+
+    /**
      * Update the agentIp and uuid.
      */
     int updateIpAndUuid(@Param("id") Integer id, @Param("agentIp") String agentIp, @Param("uuid") String uuid,
             @Param("changeTime") Boolean changeModifyTime);
 
     int updateSnapshot(StreamSourceEntity entity);
+
+    /**
+     * Update the source status
+     *
+     * @param idList source id list
+     * @param status modify the status to this
+     * @param operator operator name
+     */
+    void updateStatusByIds(@Param("idList") List<Integer> idList, @Param("status") Integer status,
+            @Param("operator") String operator);
 
     /**
      * Physical delete stream sources by group id and stream id

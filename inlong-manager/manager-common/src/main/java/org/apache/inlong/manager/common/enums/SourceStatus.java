@@ -34,6 +34,7 @@ public enum SourceStatus {
     SOURCE_NORMAL(101, "normal"),
     SOURCE_FAILED(102, "failed"),
     SOURCE_FROZEN(104, "frozen"),
+    HEARTBEAT_TIMEOUT(105, "heartbeat timeout"),
 
     // if not approved
     SOURCE_NEW(110, "new created"),
@@ -95,53 +96,69 @@ public enum SourceStatus {
         SOURCE_STATE_AUTOMATON.put(SOURCE_NORMAL,
                 Sets.newHashSet(SOURCE_DISABLE, SOURCE_NORMAL, SOURCE_FAILED, TO_BE_ISSUED_DELETE,
                         TO_BE_ISSUED_RETRY, TO_BE_ISSUED_BACKTRACK, TO_BE_ISSUED_FROZEN, TO_BE_ISSUED_ACTIVE,
-                        TO_BE_ISSUED_CHECK, TO_BE_ISSUED_REDO_METRIC, TO_BE_ISSUED_MAKEUP));
+                        TO_BE_ISSUED_CHECK, TO_BE_ISSUED_REDO_METRIC, TO_BE_ISSUED_MAKEUP, HEARTBEAT_TIMEOUT));
 
         // failed
-        SOURCE_STATE_AUTOMATON.put(SOURCE_FAILED, Sets.newHashSet(SOURCE_DISABLE, SOURCE_FAILED, TO_BE_ISSUED_RETRY));
+        SOURCE_STATE_AUTOMATON.put(SOURCE_FAILED,
+                Sets.newHashSet(SOURCE_DISABLE, SOURCE_FAILED, TO_BE_ISSUED_RETRY, HEARTBEAT_TIMEOUT));
 
         // frozen
-        SOURCE_STATE_AUTOMATON.put(SOURCE_FROZEN, Sets.newHashSet(SOURCE_DISABLE, SOURCE_FROZEN, TO_BE_ISSUED_ACTIVE));
+        SOURCE_STATE_AUTOMATON.put(SOURCE_FROZEN,
+                Sets.newHashSet(SOURCE_DISABLE, SOURCE_FROZEN, TO_BE_ISSUED_ACTIVE, HEARTBEAT_TIMEOUT));
 
         // [xxx] bo be issued
-        HashSet<SourceStatus> tobeAddNext = Sets.newHashSet(BEEN_ISSUED_ADD, SOURCE_DISABLE);
+        HashSet<SourceStatus> tobeAddNext = Sets.newHashSet(BEEN_ISSUED_ADD, SOURCE_DISABLE, HEARTBEAT_TIMEOUT);
         tobeAddNext.addAll(TOBE_ISSUED_SET);
         SOURCE_STATE_AUTOMATON.put(TO_BE_ISSUED_ADD, tobeAddNext);
-        HashSet<SourceStatus> tobeDeleteNext = Sets.newHashSet(BEEN_ISSUED_DELETE);
+        HashSet<SourceStatus> tobeDeleteNext = Sets.newHashSet(BEEN_ISSUED_DELETE, HEARTBEAT_TIMEOUT);
         tobeDeleteNext.addAll(TOBE_ISSUED_SET);
         SOURCE_STATE_AUTOMATON.put(TO_BE_ISSUED_DELETE, Sets.newHashSet(tobeDeleteNext));
-        HashSet<SourceStatus> tobeRetryNext = Sets.newHashSet(BEEN_ISSUED_RETRY);
+        HashSet<SourceStatus> tobeRetryNext = Sets.newHashSet(BEEN_ISSUED_RETRY, HEARTBEAT_TIMEOUT);
         tobeRetryNext.addAll(TOBE_ISSUED_SET);
         SOURCE_STATE_AUTOMATON.put(TO_BE_ISSUED_RETRY, Sets.newHashSet(tobeRetryNext));
-        HashSet<SourceStatus> tobeBacktrackNext = Sets.newHashSet(BEEN_ISSUED_BACKTRACK);
+        HashSet<SourceStatus> tobeBacktrackNext = Sets.newHashSet(BEEN_ISSUED_BACKTRACK, HEARTBEAT_TIMEOUT);
         tobeBacktrackNext.addAll(TOBE_ISSUED_SET);
         SOURCE_STATE_AUTOMATON.put(TO_BE_ISSUED_BACKTRACK, Sets.newHashSet(tobeBacktrackNext));
-        HashSet<SourceStatus> tobeFrozenNext = Sets.newHashSet(BEEN_ISSUED_FROZEN);
+        HashSet<SourceStatus> tobeFrozenNext = Sets.newHashSet(BEEN_ISSUED_FROZEN, HEARTBEAT_TIMEOUT);
         tobeFrozenNext.addAll(TOBE_ISSUED_SET);
         SOURCE_STATE_AUTOMATON.put(TO_BE_ISSUED_FROZEN, Sets.newHashSet(tobeFrozenNext));
-        HashSet<SourceStatus> tobeActiveNext = Sets.newHashSet(BEEN_ISSUED_ACTIVE);
+        HashSet<SourceStatus> tobeActiveNext = Sets.newHashSet(BEEN_ISSUED_ACTIVE, HEARTBEAT_TIMEOUT);
         tobeActiveNext.addAll(TOBE_ISSUED_SET);
         SOURCE_STATE_AUTOMATON.put(TO_BE_ISSUED_ACTIVE, Sets.newHashSet(tobeActiveNext));
-        HashSet<SourceStatus> tobeCheckNext = Sets.newHashSet(BEEN_ISSUED_CHECK);
+        HashSet<SourceStatus> tobeCheckNext = Sets.newHashSet(BEEN_ISSUED_CHECK, HEARTBEAT_TIMEOUT);
         tobeCheckNext.addAll(TOBE_ISSUED_SET);
         SOURCE_STATE_AUTOMATON.put(TO_BE_ISSUED_CHECK, Sets.newHashSet(tobeCheckNext));
-        HashSet<SourceStatus> tobeRedoMetricNext = Sets.newHashSet(BEEN_ISSUED_REDO_METRIC);
+        HashSet<SourceStatus> tobeRedoMetricNext = Sets.newHashSet(BEEN_ISSUED_REDO_METRIC, HEARTBEAT_TIMEOUT);
         tobeRedoMetricNext.addAll(TOBE_ISSUED_SET);
         SOURCE_STATE_AUTOMATON.put(TO_BE_ISSUED_REDO_METRIC, Sets.newHashSet(tobeRedoMetricNext));
-        HashSet<SourceStatus> tobeMakeupNext = Sets.newHashSet(BEEN_ISSUED_MAKEUP);
+        HashSet<SourceStatus> tobeMakeupNext = Sets.newHashSet(BEEN_ISSUED_MAKEUP, HEARTBEAT_TIMEOUT);
         tobeMakeupNext.addAll(TOBE_ISSUED_SET);
         SOURCE_STATE_AUTOMATON.put(TO_BE_ISSUED_MAKEUP, Sets.newHashSet(tobeMakeupNext));
 
         // [xxx] been issued
-        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_ADD, Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED));
-        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_DELETE, Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED));
-        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_RETRY, Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED));
-        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_BACKTRACK, Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED));
-        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_FROZEN, Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED));
-        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_ACTIVE, Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED));
-        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_CHECK, Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED));
-        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_REDO_METRIC, Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED));
-        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_MAKEUP, Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED));
+        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_ADD, Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED, HEARTBEAT_TIMEOUT));
+        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_DELETE,
+                Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED, HEARTBEAT_TIMEOUT));
+        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_RETRY, Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED, HEARTBEAT_TIMEOUT));
+        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_BACKTRACK,
+                Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED, HEARTBEAT_TIMEOUT));
+        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_FROZEN,
+                Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED, HEARTBEAT_TIMEOUT));
+        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_ACTIVE,
+                Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED, HEARTBEAT_TIMEOUT));
+        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_CHECK, Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED, HEARTBEAT_TIMEOUT));
+        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_REDO_METRIC,
+                Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED, HEARTBEAT_TIMEOUT));
+        SOURCE_STATE_AUTOMATON.put(BEEN_ISSUED_MAKEUP,
+                Sets.newHashSet(SOURCE_NORMAL, SOURCE_FAILED, HEARTBEAT_TIMEOUT));
+        SOURCE_STATE_AUTOMATON.put(HEARTBEAT_TIMEOUT,
+                Sets.newHashSet(SOURCE_DISABLE, SOURCE_NORMAL, SOURCE_FAILED, SOURCE_FROZEN, TO_BE_ISSUED_ADD,
+                        TO_BE_ISSUED_DELETE,
+                        TO_BE_ISSUED_RETRY, TO_BE_ISSUED_BACKTRACK, TO_BE_ISSUED_FROZEN, TO_BE_ISSUED_ACTIVE,
+                        TO_BE_ISSUED_CHECK, TO_BE_ISSUED_REDO_METRIC, TO_BE_ISSUED_MAKEUP, BEEN_ISSUED_ADD,
+                        BEEN_ISSUED_DELETE, BEEN_ISSUED_RETRY, BEEN_ISSUED_BACKTRACK, BEEN_ISSUED_FROZEN,
+                        BEEN_ISSUED_ACTIVE, BEEN_ISSUED_CHECK, BEEN_ISSUED_REDO_METRIC, BEEN_ISSUED_MAKEUP,
+                        HEARTBEAT_TIMEOUT));
     }
 
     private final Integer code;

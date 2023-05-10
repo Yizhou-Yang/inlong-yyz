@@ -21,35 +21,32 @@ components:
   agent: true
   dashboard: true
   dataproxy: true
-  tubemqManager: true
-  tubemqServer: true
   manager: true
   audit: true
   mysql: true
-  zookeeper: true
 
 images:
   agent:
     repository: inlong/agent
-    tag: 1.4.0
+    tag: 1.6.0
   dashboard:
     repository: inlong/dashboard
-    tag: 1.4.0
+    tag: 1.6.0
   dataproxy:
     repository: inlong/dataproxy
-    tag: 1.4.0
+    tag: 1.6.0
   tubemqManager:
     repository: inlong/tubemq-manager
-    tag: 1.4.0
+    tag: 1.6.0
   tubemqServer:
     repository: inlong/tubemq-all
-    tag: 1.4.0
+    tag: 1.6.0
   manager:
     repository: inlong/manager
-    tag: 1.4.0
+    tag: 1.6.0
   audit:
     repository: inlong/audit
-    tag: 1.4.0
+    tag: 1.6.0
   mysql:
     repository: mysql
     tag: 8.0.28
@@ -59,7 +56,7 @@ images:
   initContainer:
     repository: busybox
     tag: latest
-  pullPolicy: "IfNotPresent"
+  pullPolicy: "Always"
 
 ingress:
   enabled: false
@@ -170,6 +167,8 @@ dashboard:
 
 dataproxy:
   component: "dataproxy"
+  # option, tubemq/pulsar/kafka, pulsar as default.
+  mqType: "pulsar"
   replicas: 1
   # The updateStrategy field allows you to configure and disable automated rolling updates for containers, labels, resource request/limits, and annotations for the Pods in a StatefulSet.
   # There are two possible values: OnDelete and RollingUpdate.
@@ -658,20 +657,23 @@ tubemqBroker:
       -XX:MaxRAMPercentage=80.0
       -XX:-UseAdaptiveSizePolicy
 
-# If exists external MySQL or Pulsar, you can set the 'enable' field value to true and configure related information.
 external:
+  # If exists external MySQL, you can set the 'enable' field value to true and configure related information.
   mysql:
     enabled: false
     hostname: "localhost"
     port: 3306
     username: "root"
-    password: "password"
-  # If there is no external Pulsar, InLong will use TubeMQ.
+    password: "inlong"
+  # If choose Pulsar as an MQ service for DataProxy, you need to configure the cluster address.
   pulsar:
-    enabled: false
     serviceUrl: "localhost:6650"
     adminUrl: "localhost:8080"
+    auditTopicName: "persistent://public/default/inlong-audit"
+  # If choose Kafka as an MQ service for DataProxy, you need to configure the cluster address.
+  kafka:
+    bootstrap_server_url: "localhost:9092"
+  # the REST server address for Flink
   flink:
-    enabled: true
     hostname: "127.0.0.1"
     port: 8081

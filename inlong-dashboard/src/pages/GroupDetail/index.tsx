@@ -25,9 +25,7 @@ import { useParams, useRequest, useSet, useHistory, useLocation } from '@/hooks'
 import { useTranslation } from 'react-i18next';
 import request from '@/utils/request';
 import Info from './Info';
-import DataSources from './DataSources';
 import DataStream from './DataStream';
-import DataStorage from './DataStorage';
 import Audit from './Audit';
 
 const Comp: React.FC = () => {
@@ -73,16 +71,6 @@ const Comp: React.FC = () => {
           content: DataStream,
         },
         {
-          label: t('pages.GroupDetail.Sources'),
-          value: 'dataSources',
-          content: DataSources,
-        },
-        {
-          label: t('pages.GroupDetail.Sinks'),
-          value: 'streamSink',
-          content: DataStorage,
-        },
-        {
           label: t('pages.GroupDetail.Audit'),
           value: 'audit',
           content: Audit,
@@ -111,6 +99,25 @@ const Comp: React.FC = () => {
   };
 
   const onSubmit = async () => {
+    const sourceData = await request({
+      url: `/source/list`,
+      method: 'POST',
+      data: {
+        inlongGroupId: id,
+      },
+    });
+    const sinkData = await request({
+      url: `/sink/list`,
+      method: 'POST',
+      data: {
+        inlongGroupId: id,
+      },
+    });
+
+    if (sourceData.total < 1 && sinkData.total < 1) {
+      message.warn(t('pages.GroupDetail.Info.SubmittedWarn'));
+      return;
+    }
     await request({
       url: `/group/startProcess/${id}`,
       method: 'POST',

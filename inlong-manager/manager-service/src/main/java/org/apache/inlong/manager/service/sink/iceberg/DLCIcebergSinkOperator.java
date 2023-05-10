@@ -62,7 +62,7 @@ public class DLCIcebergSinkOperator extends AbstractSinkOperator {
 
     @Override
     protected void setTargetEntity(SinkRequest request, StreamSinkEntity targetEntity) {
-        Preconditions.checkTrue(this.getSinkType().equals(request.getSinkType()),
+        Preconditions.expectTrue(this.getSinkType().equals(request.getSinkType()),
                 ErrorCodeEnum.SINK_TYPE_NOT_SUPPORT.getMessage() + ": " + getSinkType());
         DLCIcebergSinkRequest dlcIcebergSinkRequest = (DLCIcebergSinkRequest) request;
 

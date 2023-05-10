@@ -21,6 +21,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.inlong.manager.common.consts.InlongConstants;
 import org.apache.inlong.manager.common.enums.GroupOperateType;
+import org.apache.inlong.manager.common.enums.GroupStatus;
 import org.apache.inlong.manager.common.enums.TaskEvent;
 import org.apache.inlong.manager.common.enums.TaskStatus;
 import org.apache.inlong.manager.common.exceptions.WorkflowListenerException;
@@ -33,6 +34,7 @@ import org.apache.inlong.manager.pojo.workflow.form.process.StreamResourceProces
 import org.apache.inlong.manager.service.group.InlongGroupService;
 import org.apache.inlong.manager.service.resource.queue.QueueResourceOperator;
 import org.apache.inlong.manager.service.resource.queue.QueueResourceOperatorFactory;
+import org.apache.inlong.manager.service.stream.InlongStreamService;
 import org.apache.inlong.manager.service.workflow.WorkflowService;
 import org.apache.inlong.manager.workflow.WorkflowContext;
 import org.apache.inlong.manager.workflow.event.ListenerResult;
@@ -77,6 +79,8 @@ public class QueueResourceListener implements QueueOperateListener {
     @Autowired
     private InlongGroupService groupService;
     @Autowired
+    private InlongStreamService streamService;
+    @Autowired
     private WorkflowService workflowService;
     @Autowired
     private QueueResourceOperatorFactory queueOperatorFactory;
@@ -106,6 +110,9 @@ public class QueueResourceListener implements QueueOperateListener {
             log.error(msg);
             throw new WorkflowListenerException(msg);
         }
+        // Read the current information
+        groupProcessForm.setGroupInfo(groupInfo);
+        groupProcessForm.setStreamInfos(streamService.list(groupId));
 
         if (InlongConstants.DISABLE_CREATE_RESOURCE.equals(groupInfo.getEnableCreateResource())) {
             log.warn("skip to execute QueueResourceListener as disable create resource for groupId={}", groupId);
@@ -117,12 +124,14 @@ public class QueueResourceListener implements QueueOperateListener {
         String operator = context.getOperator();
         switch (operateType) {
             case INIT:
+                groupService.updateStatus(groupId, GroupStatus.CONFIG_ING.getCode(), operator);
                 // create queue resource for inlong group
                 queueOperator.createQueueForGroup(groupInfo, operator);
                 // create queue resource for all inlong streams under the inlong group
                 this.createQueueForStreams(groupInfo, groupProcessForm.getStreamInfos(), operator);
                 break;
             case DELETE:
+                groupService.updateStatus(groupId, GroupStatus.DELETING.getCode(), operator);
                 queueOperator.deleteQueueForGroup(groupInfo, operator);
                 break;
             default:

@@ -223,6 +223,19 @@
             </if>
         </where>
     </select>
+    <select id="selectAllByIdentifier" resultType="org.apache.inlong.manager.dao.entity.InlongStreamEntity">
+        select
+        <include refid="Base_Column_List"/>
+        from inlong_stream
+        <where>
+            <if test="groupId != null and groupId != ''">
+                and inlong_group_id = #{groupId, jdbcType=VARCHAR}
+            </if>
+            <if test="streamId != null and streamId != ''">
+                and inlong_stream_id = #{streamId, jdbcType=VARCHAR}
+            </if>
+        </where>
+    </select>
     <select id="selectExistByIdentifier" resultType="java.lang.Integer">
         select count(1)
         from inlong_stream
@@ -260,6 +273,12 @@
             </if>
             <if test="request.status != null and request.status != ''">
                 and stream.status = #{request.status, jdbcType=INTEGER}
+            </if>
+            <if test="request.statusList != null and request.statusList.size() > 0">
+                and stream.status in
+                <foreach collection="request.statusList" item="status" index="index" open="(" close=")" separator=",">
+                    #{status}
+                </foreach>
             </if>
         </where>
         <choose>

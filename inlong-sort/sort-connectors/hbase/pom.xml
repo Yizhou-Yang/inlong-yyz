@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.apache.inlong</groupId>
         <artifactId>sort-connectors</artifactId>
-        <version>1.5.0-SNAPSHOT</version>
+        <version>1.6.0</version>
     </parent>
 
     <artifactId>sort-connector-hbase</artifactId>
@@ -108,6 +108,7 @@
                                     <include>org.apache.commons:commons-crypto</include>
                                     <include>org.apache.commons:commons-lang3</include>
                                     <include>io.netty:netty-all</include>
+                                    <include>com.google.protobuf:*</include>
                                     <include>io.dropwizard.metrics:metrics-core</include>
                                     <include>com.amazonaws:*</include>
                                     <include>com.fasterxml.jackson.core:*</include>

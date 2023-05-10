@@ -3,7 +3,7 @@ InLong Agent is available for development and experience.
 
 ##### Pull Image
 ```
-docker pull inlong/agent:1.4.0
+docker pull inlong/agent:1.6.0
 ```
 
 ##### Start Container

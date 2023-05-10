@@ -81,17 +81,17 @@ public class ClickHouseDataNodeOperator extends AbstractDataNodeOperator {
             ClickHouseDataNodeDTO dto = ClickHouseDataNodeDTO.getFromRequest(ckDataNodeRequest);
             targetEntity.setExtParams(objectMapper.writeValueAsString(dto));
         } catch (Exception e) {
-            LOGGER.error("failed to set entity for hive data node: ", e);
-            throw new BusinessException(ErrorCodeEnum.SOURCE_INFO_INCORRECT.getMessage());
+            throw new BusinessException(ErrorCodeEnum.SOURCE_INFO_INCORRECT,
+                    String.format("Failed to build extParams for ClickHouse node: %s", e.getMessage()));
         }
     }
 
     @Override
     public Boolean testConnection(DataNodeRequest request) {
-        String url = request.getUrl();
+        String url = ClickHouseDataNodeDTO.convertToJdbcUrl(request.getUrl());
         String username = request.getUsername();
         String password = request.getToken();
-        Preconditions.checkNotNull(url, "connection url cannot be empty");
+        Preconditions.expectNotBlank(url, ErrorCodeEnum.INVALID_PARAMETER, "connection url cannot be empty");
         try (Connection ignored = ClickHouseJdbcUtils.getConnection(url, username, password)) {
             LOGGER.info("clickhouse connection not null - connection success for url={}, username={}, password={}", url,
                     username, password);

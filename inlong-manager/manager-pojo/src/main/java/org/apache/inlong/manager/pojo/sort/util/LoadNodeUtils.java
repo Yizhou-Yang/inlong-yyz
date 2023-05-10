@@ -39,9 +39,12 @@ import org.apache.inlong.manager.pojo.sink.hive.HiveSink;
 import org.apache.inlong.manager.pojo.sink.hudi.HudiSink;
 import org.apache.inlong.manager.pojo.sink.iceberg.IcebergSink;
 import org.apache.inlong.manager.pojo.sink.kafka.KafkaSink;
+import org.apache.inlong.manager.pojo.sink.kudu.KuduSink;
 import org.apache.inlong.manager.pojo.sink.mysql.MySQLSink;
+import org.apache.inlong.manager.pojo.sink.mysql.MySQLSinkDTO;
 import org.apache.inlong.manager.pojo.sink.oracle.OracleSink;
 import org.apache.inlong.manager.pojo.sink.postgresql.PostgreSQLSink;
+import org.apache.inlong.manager.pojo.sink.redis.RedisSink;
 import org.apache.inlong.manager.pojo.sink.sqlserver.SQLServerSink;
 import org.apache.inlong.manager.pojo.sink.starrocks.StarRocksSink;
 import org.apache.inlong.manager.pojo.sink.tdsqlpostgresql.TDSQLPostgreSQLSink;
@@ -56,6 +59,7 @@ import org.apache.inlong.sort.protocol.node.format.CanalJsonFormat;
 import org.apache.inlong.sort.protocol.node.format.CsvFormat;
 import org.apache.inlong.sort.protocol.node.format.DebeziumJsonFormat;
 import org.apache.inlong.sort.protocol.node.format.Format;
+import org.apache.inlong.sort.protocol.node.format.InLongMsgFormat;
 import org.apache.inlong.sort.protocol.node.format.JsonFormat;
 import org.apache.inlong.sort.protocol.node.format.RawFormat;
 import org.apache.inlong.sort.protocol.node.load.ClickHouseLoadNode;
@@ -69,9 +73,11 @@ import org.apache.inlong.sort.protocol.node.load.HiveLoadNode;
 import org.apache.inlong.sort.protocol.node.load.HudiLoadNode;
 import org.apache.inlong.sort.protocol.node.load.IcebergLoadNode;
 import org.apache.inlong.sort.protocol.node.load.KafkaLoadNode;
+import org.apache.inlong.sort.protocol.node.load.KuduLoadNode;
 import org.apache.inlong.sort.protocol.node.load.MySqlLoadNode;
 import org.apache.inlong.sort.protocol.node.load.OracleLoadNode;
 import org.apache.inlong.sort.protocol.node.load.PostgresLoadNode;
+import org.apache.inlong.sort.protocol.node.load.RedisLoadNode;
 import org.apache.inlong.sort.protocol.node.load.SqlServerLoadNode;
 import org.apache.inlong.sort.protocol.node.load.StarRocksLoadNode;
 import org.apache.inlong.sort.protocol.node.load.TDSQLPostgresLoadNode;
@@ -149,6 +155,10 @@ public class LoadNodeUtils {
                 return createLoadNode((DorisSink) streamSink, fieldInfos, fieldRelations, properties);
             case SinkType.STARROCKS:
                 return createLoadNode((StarRocksSink) streamSink, fieldInfos, fieldRelations, properties);
+            case SinkType.KUDU:
+                return createLoadNode((KuduSink) streamSink, fieldInfos, fieldRelations, properties);
+            case SinkType.REDIS:
+                return createLoadNode((RedisSink) streamSink, fieldInfos, fieldRelations, properties);
             default:
                 throw new BusinessException(String.format("Unsupported sinkType=%s to create load node", sinkType));
         }
@@ -385,6 +395,86 @@ public class LoadNodeUtils {
     }
 
     /**
+     * Create load node of Kudu.
+     */
+    public static KuduLoadNode createLoadNode(
+            KuduSink kuduSink,
+            List<FieldInfo> fieldInfos,
+            List<FieldRelation> fieldRelations,
+            Map<String, String> properties) {
+        return new KuduLoadNode(
+                kuduSink.getSinkName(),
+                kuduSink.getSinkName(),
+                fieldInfos,
+                fieldRelations,
+                null,
+                null,
+                null,
+                properties,
+                kuduSink.getMasters(),
+                kuduSink.getTableName(),
+                kuduSink.getPartitionKey());
+    }
+
+    private static LoadNode createLoadNode(
+            RedisSink redisSink,
+            List<FieldInfo> fieldInfos,
+            List<FieldRelation> fieldRelations,
+            Map<String, String> properties) {
+        String clusterMode = redisSink.getClusterMode();
+        String dataType = redisSink.getDataType();
+        String schemaMapMode = redisSink.getSchemaMapMode();
+        String host = redisSink.getHost();
+        Integer port = redisSink.getPort();
+        String clusterNodes = redisSink.getClusterNodes();
+        String sentinelMasterName = redisSink.getSentinelMasterName();
+        String sentinelsInfo = redisSink.getSentinelsInfo();
+        Integer database = redisSink.getDatabase();
+        String password = redisSink.getPassword();
+        Integer ttl = redisSink.getTtl();
+        Integer timeout = redisSink.getTimeout();
+        Integer soTimeout = redisSink.getSoTimeout();
+        Integer maxTotal = redisSink.getMaxTotal();
+        Integer maxIdle = redisSink.getMaxIdle();
+        Integer minIdle = redisSink.getMinIdle();
+        Integer maxRetries = redisSink.getMaxRetries();
+
+        Format format = parsingFormat(
+                redisSink.getFormatDataType(),
+                false,
+                redisSink.getFormatDataSeparator(),
+                false);
+
+        return new RedisLoadNode(
+                redisSink.getSinkName(),
+                redisSink.getSinkName(),
+                fieldInfos,
+                fieldRelations,
+                null,
+                null,
+                null,
+                properties,
+                clusterMode,
+                dataType,
+                schemaMapMode,
+                host,
+                port,
+                clusterNodes,
+                sentinelMasterName,
+                sentinelsInfo,
+                database,
+                password,
+                ttl,
+                format,
+                timeout,
+                soTimeout,
+                maxTotal,
+                maxIdle,
+                minIdle,
+                maxRetries);
+    }
+
+    /**
      * Create load node of Iceberg.
      */
     public static IcebergLoadNode createLoadNode(IcebergSink icebergSink, List<FieldInfo> fieldInfos,
@@ -541,7 +631,7 @@ public class LoadNodeUtils {
                 null,
                 null,
                 properties,
-                mysqlSink.getJdbcUrl(),
+                MySQLSinkDTO.setDbNameToUrl(mysqlSink.getJdbcUrl(), mysqlSink.getDatabaseName()),
                 mysqlSink.getUsername(),
                 mysqlSink.getPassword(),
                 mysqlSink.getTableName(),
@@ -674,6 +764,61 @@ public class LoadNodeUtils {
                         String.format(ErrorCodeEnum.PARTITION_FIELD_NO_SOURCE_FIELD.getMessage(), fieldName));
             }
         }
+    }
+
+    /**
+     * Parse format
+     *
+     * @param formatName data serialization, support: csv, json, canal, avro, etc
+     * @param wrapWithInlongMsg whether wrap content with {@link InLongMsgFormat}
+     * @param separatorStr the separator of data content
+     * @param ignoreParseErrors whether ignore deserialization error data
+     * @return the format for serialized content
+     */
+    private static Format parsingFormat(
+            String formatName,
+            boolean wrapWithInlongMsg,
+            String separatorStr,
+            boolean ignoreParseErrors) {
+        Format format;
+        DataTypeEnum dataType = DataTypeEnum.forType(formatName);
+        switch (dataType) {
+            case CSV:
+                if (StringUtils.isNumeric(separatorStr)) {
+                    char dataSeparator = (char) Integer.parseInt(separatorStr);
+                    separatorStr = Character.toString(dataSeparator);
+                }
+                CsvFormat csvFormat = new CsvFormat(separatorStr);
+                csvFormat.setIgnoreParseErrors(ignoreParseErrors);
+                format = csvFormat;
+                break;
+            case AVRO:
+                format = new AvroFormat();
+                break;
+            case JSON:
+                JsonFormat jsonFormat = new JsonFormat();
+                jsonFormat.setIgnoreParseErrors(ignoreParseErrors);
+                format = jsonFormat;
+                break;
+            case CANAL:
+                format = new CanalJsonFormat();
+                break;
+            case DEBEZIUM_JSON:
+                DebeziumJsonFormat debeziumJsonFormat = new DebeziumJsonFormat();
+                debeziumJsonFormat.setIgnoreParseErrors(ignoreParseErrors);
+                format = debeziumJsonFormat;
+                break;
+            case RAW:
+                format = new RawFormat();
+                break;
+            default:
+                throw new IllegalArgumentException(String.format("Unsupported dataType=%s", dataType));
+        }
+        if (wrapWithInlongMsg) {
+            Format innerFormat = format;
+            format = new InLongMsgFormat(innerFormat, false);
+        }
+        return format;
     }
 
 }

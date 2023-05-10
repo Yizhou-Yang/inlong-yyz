@@ -19,10 +19,12 @@ package org.apache.inlong.manager.service.node;
 
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.manager.common.consts.InlongConstants;
 import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
 import org.apache.inlong.manager.common.enums.UserTypeEnum;
 import org.apache.inlong.manager.common.exceptions.BusinessException;
+import org.apache.inlong.manager.common.util.Preconditions;
 import org.apache.inlong.manager.dao.entity.DataNodeEntity;
 import org.apache.inlong.manager.dao.mapper.DataNodeEntityMapper;
 import org.apache.inlong.manager.pojo.common.PageResult;
@@ -31,6 +33,7 @@ import org.apache.inlong.manager.pojo.node.DataNodeInfo;
 import org.apache.inlong.manager.pojo.node.DataNodePageRequest;
 import org.apache.inlong.manager.pojo.node.DataNodeRequest;
 import org.apache.inlong.manager.pojo.user.UserInfo;
+import org.apache.inlong.manager.service.user.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +55,8 @@ public class DataNodeServiceImpl implements DataNodeService {
     private DataNodeEntityMapper dataNodeMapper;
     @Autowired
     private DataNodeOperatorFactory operatorFactory;
+    @Autowired
+    private UserService userService;
 
     @Override
     public Integer save(DataNodeRequest request, String operator) {
@@ -74,16 +79,8 @@ public class DataNodeServiceImpl implements DataNodeService {
 
     @Override
     public Integer save(DataNodeRequest request, UserInfo opInfo) {
-        // check request parameter
-        if (request == null) {
-            throw new BusinessException(ErrorCodeEnum.REQUEST_IS_EMPTY);
-        }
-        // check operator info
-        if (opInfo == null) {
-            throw new BusinessException(ErrorCodeEnum.LOGIN_USER_EMPTY);
-        }
         // only the person in charges can query
-        if (!opInfo.getRoles().contains(UserTypeEnum.ADMIN.name())) {
+        if (!opInfo.getAccountType().equals(UserTypeEnum.ADMIN.getCode())) {
             throw new BusinessException(ErrorCodeEnum.PERMISSION_REQUIRED);
         }
         // check if data node already exist
@@ -100,13 +97,14 @@ public class DataNodeServiceImpl implements DataNodeService {
     }
 
     @Override
-    public DataNodeInfo get(Integer id) {
+    public DataNodeInfo get(Integer id, String currentUser) {
         DataNodeEntity entity = dataNodeMapper.selectById(id);
         if (entity == null) {
             LOGGER.error("data node not found by id={}", id);
             throw new BusinessException("data node not found");
         }
-
+        userService.checkUser(entity.getInCharges(), currentUser,
+                "Current user does not have permission to get data node info");
         String dataNodeType = entity.getType();
         DataNodeOperator dataNodeOperator = operatorFactory.getInstance(dataNodeType);
         DataNodeInfo dataNodeInfo = dataNodeOperator.getFromEntity(entity);
@@ -116,23 +114,14 @@ public class DataNodeServiceImpl implements DataNodeService {
 
     @Override
     public DataNodeInfo get(Integer id, UserInfo opInfo) {
-        if (id == null) {
-            throw new BusinessException(ErrorCodeEnum.ID_IS_EMPTY);
-        }
-        // check operator info
-        if (opInfo == null) {
-            throw new BusinessException(ErrorCodeEnum.LOGIN_USER_EMPTY);
-        }
-        // only the person in charges can query
-        if (!opInfo.getRoles().contains(UserTypeEnum.ADMIN.name())) {
-            throw new BusinessException(ErrorCodeEnum.PERMISSION_REQUIRED);
-        }
         DataNodeEntity entity = dataNodeMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException("data node not found");
+            throw new BusinessException(ErrorCodeEnum.DATA_NODE_NOT_FOUND);
         }
-        String dataNodeType = entity.getType();
-        DataNodeOperator dataNodeOperator = operatorFactory.getInstance(dataNodeType);
+        // only the person in charges can query
+        userService.checkUser(entity.getInCharges(), opInfo.getName(),
+                "Current user does not have permission to get data node info");
+        DataNodeOperator dataNodeOperator = operatorFactory.getInstance(entity.getType());
         return dataNodeOperator.getFromEntity(entity);
     }
 
@@ -170,18 +159,8 @@ public class DataNodeServiceImpl implements DataNodeService {
 
     @Override
     public List<DataNodeInfo> list(DataNodePageRequest request, UserInfo opInfo) {
-        // check request parameter
-        if (request == null) {
-            throw new BusinessException(ErrorCodeEnum.REQUEST_IS_EMPTY);
-        }
-        // check operator info
-        if (opInfo == null) {
-            throw new BusinessException(ErrorCodeEnum.LOGIN_USER_EMPTY);
-        }
-        // only the person in charges can query
-        if (!opInfo.getRoles().contains(UserTypeEnum.ADMIN.name())) {
-            throw new BusinessException(ErrorCodeEnum.PERMISSION_REQUIRED);
-        }
+        request.setCurrentUser(opInfo.getName());
+        request.setIsAdminRole(opInfo.getRoles().contains(UserTypeEnum.ADMIN.name()));
         // query result
         List<DataNodeEntity> nodeEntities = dataNodeMapper.selectByCondition(request);
         return nodeEntities.stream()
@@ -195,21 +174,33 @@ public class DataNodeServiceImpl implements DataNodeService {
     @Transactional(rollbackFor = Throwable.class)
     public Boolean update(DataNodeRequest request, String operator) {
         LOGGER.info("begin to update data node by id: {}", request);
-
-        // Check whether the data node name exists with the same groupId and streamId
-        String name = request.getName();
-        String type = request.getType();
-        DataNodeEntity existEntity = dataNodeMapper.selectByUniqueKey(name, type);
-        Integer id = request.getId();
-        if (existEntity != null && !existEntity.getId().equals(id)) {
-            String errMsg = String.format("data node already exist for name=%s, type=%s", name, type);
-            LOGGER.error(errMsg);
-            throw new BusinessException(errMsg);
+        // check whether record existed
+        DataNodeEntity curEntity = dataNodeMapper.selectById(request.getId());
+        if (curEntity == null) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_NOT_FOUND,
+                    String.format("data node record not found by id=%d", request.getId()));
         }
-
+        userService.checkUser(curEntity.getInCharges(), operator,
+                "Current user does not have permission to update data node info");
+        // check whether modify unmodifiable parameters
+        chkUnmodifiableParams(curEntity, request);
+        // Check whether the data node name exists with the same name and type
+        if (request.getName() != null) {
+            if (StringUtils.isBlank(request.getName())) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER,
+                        "the name changed of data node is blank!");
+            }
+            DataNodeEntity existEntity =
+                    dataNodeMapper.selectByUniqueKey(request.getName(), request.getType());
+            if (existEntity != null && !existEntity.getId().equals(request.getId())) {
+                throw new BusinessException(ErrorCodeEnum.RECORD_DUPLICATE,
+                        String.format("data node already exist for name=%s, type=%s, required id=%s, exist id=%s",
+                                request.getName(), request.getType(), request.getId(), existEntity.getId()));
+            }
+        }
         DataNodeOperator dataNodeOperator = operatorFactory.getInstance(request.getType());
         dataNodeOperator.updateOpt(request, operator);
-
+        dataNodeOperator.updateRelatedStreamSource(request, curEntity, operator);
         LOGGER.info("success to update data node={}", request);
         return true;
     }
@@ -217,32 +208,37 @@ public class DataNodeServiceImpl implements DataNodeService {
     @Override
     @Transactional(rollbackFor = Throwable.class)
     public Boolean update(DataNodeRequest request, UserInfo opInfo) {
-        // check request parameter
-        if (request == null) {
-            throw new BusinessException(ErrorCodeEnum.REQUEST_IS_EMPTY);
-        }
-        // check operator info
-        if (opInfo == null) {
-            throw new BusinessException(ErrorCodeEnum.LOGIN_USER_EMPTY);
-        }
         // only the person in charges can query
-        if (!opInfo.getRoles().contains(UserTypeEnum.ADMIN.name())) {
+        if (!opInfo.getAccountType().equals(UserTypeEnum.ADMIN.getCode())) {
             throw new BusinessException(ErrorCodeEnum.PERMISSION_REQUIRED);
         }
-        // Check whether the data node name exists with the same groupId and streamId
-        DataNodeEntity existEntity =
-                dataNodeMapper.selectByUniqueKey(request.getName(), request.getType());
-        if (existEntity == null) {
-            throw new BusinessException(ErrorCodeEnum.DATA_NODE_NOT_FOUND);
+        // check the record existed
+        DataNodeEntity curEntity = dataNodeMapper.selectById(request.getId());
+        if (curEntity == null) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_NOT_FOUND,
+                    String.format("data node record not found by id=%d", request.getId()));
         }
-        Integer id = request.getId();
-        if (id != null && !existEntity.getId().equals(id)) {
-            throw new BusinessException(ErrorCodeEnum.DATA_NODE_ID_CHANGED,
-                    String.format("data node already exist for name=%s, type=%s, required id=%s, exist id=%s",
-                            request.getName(), request.getType(), id, existEntity.getId()));
+        userService.checkUser(curEntity.getInCharges(), opInfo.getName(),
+                "Current user does not have permission to update data node info");
+        // check whether modify unmodifiable parameters
+        chkUnmodifiableParams(curEntity, request);
+        // Check whether the data node name exists with the same name and type
+        if (request.getName() != null) {
+            if (StringUtils.isBlank(request.getName())) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER,
+                        "the name changed of data node is blank!");
+            }
+            DataNodeEntity existEntity =
+                    dataNodeMapper.selectByUniqueKey(request.getName(), request.getType());
+            if (existEntity != null && !existEntity.getId().equals(request.getId())) {
+                throw new BusinessException(ErrorCodeEnum.RECORD_DUPLICATE,
+                        String.format("data node already exist for name=%s, type=%s, required id=%s, exist id=%s",
+                                request.getName(), request.getType(), request.getId(), existEntity.getId()));
+            }
         }
         DataNodeOperator dataNodeOperator = operatorFactory.getInstance(request.getType());
         dataNodeOperator.updateOpt(request, opInfo.getName());
+        dataNodeOperator.updateRelatedStreamSource(request, curEntity, opInfo.getName());
         return true;
     }
 
@@ -260,7 +256,8 @@ public class DataNodeServiceImpl implements DataNodeService {
             LOGGER.error(errMsg);
             throw new BusinessException(errMsg);
         }
-
+        userService.checkUser(entity.getInCharges(), operator,
+                "Current user does not have permission to update data node info");
         request.setId(entity.getId());
         Boolean result = this.update(request, operator);
         LOGGER.info("success to update data node by key: {}", request);
@@ -270,32 +267,24 @@ public class DataNodeServiceImpl implements DataNodeService {
     @Override
     public Boolean delete(Integer id, String operator) {
         DataNodeEntity entity = dataNodeMapper.selectById(id);
-        if (entity == null || entity.getIsDeleted() > InlongConstants.UN_DELETED) {
-            LOGGER.error("data node not found or was already deleted for id={}", id);
-            return false;
-        }
-
+        Preconditions.expectNotNull(entity, ErrorCodeEnum.DATA_NODE_NOT_FOUND,
+                ErrorCodeEnum.DATA_NODE_NOT_FOUND.getMessage());
+        userService.checkUser(entity.getInCharges(), operator,
+                "Current user does not have permission to delete data node info");
         return delete(entity, operator);
     }
 
     @Override
     public Boolean delete(Integer id, UserInfo opInfo) {
-        // check id parameter
-        if (id == null) {
-            throw new BusinessException(ErrorCodeEnum.ID_IS_EMPTY);
-        }
-        // check operator info
-        if (opInfo == null) {
-            throw new BusinessException(ErrorCodeEnum.LOGIN_USER_EMPTY);
-        }
         // only the person in charges can query
-        if (!opInfo.getRoles().contains(UserTypeEnum.ADMIN.name())) {
+        if (!opInfo.getAccountType().equals(UserTypeEnum.ADMIN.getCode())) {
             throw new BusinessException(ErrorCodeEnum.PERMISSION_REQUIRED);
         }
         DataNodeEntity entity = dataNodeMapper.selectById(id);
-        if (entity == null || entity.getIsDeleted() > InlongConstants.UN_DELETED) {
-            return true;
-        }
+        Preconditions.expectNotNull(entity, ErrorCodeEnum.DATA_NODE_NOT_FOUND,
+                ErrorCodeEnum.DATA_NODE_NOT_FOUND.getMessage());
+        userService.checkUser(entity.getInCharges(), opInfo.getName(),
+                "Current user does not have permission to delete data node info");
         // delete record
         entity.setIsDeleted(entity.getId());
         entity.setModifier(opInfo.getName());
@@ -321,13 +310,24 @@ public class DataNodeServiceImpl implements DataNodeService {
         return true;
     }
 
+    private void chkUnmodifiableParams(DataNodeEntity curEntity, DataNodeRequest request) {
+        // check type
+        Preconditions.expectEquals(curEntity.getType(), request.getType(),
+                ErrorCodeEnum.INVALID_PARAMETER, "type not allowed modify");
+        // check record version
+        Preconditions.expectEquals(curEntity.getVersion(), request.getVersion(),
+                ErrorCodeEnum.CONFIG_EXPIRED,
+                String.format("record has expired with record version=%d, request version=%d",
+                        curEntity.getVersion(), request.getVersion()));
+    }
+
     @Override
     public Boolean deleteByKey(String name, String type, String operator) {
         DataNodeEntity entity = dataNodeMapper.selectByUniqueKey(name, type);
-        if (entity == null || entity.getIsDeleted() > InlongConstants.UN_DELETED) {
-            LOGGER.error("data node not found or was already deleted for name={}", name);
-            return false;
-        }
+        Preconditions.expectNotNull(entity, ErrorCodeEnum.DATA_NODE_NOT_FOUND,
+                ErrorCodeEnum.DATA_NODE_NOT_FOUND.getMessage());
+        userService.checkUser(entity.getInCharges(), operator,
+                "Current user does not have permission to delete data node info");
         return delete(entity, operator);
     }
 

@@ -20,6 +20,7 @@ package org.apache.inlong.manager.service.node.mysql;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.manager.common.consts.DataNodeType;
+import org.apache.inlong.manager.common.consts.SourceType;
 import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
 import org.apache.inlong.manager.common.exceptions.BusinessException;
 import org.apache.inlong.manager.common.util.CommonBeanUtils;
@@ -38,6 +39,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.sql.Connection;
+import java.util.Objects;
 
 /**
  * MySQL data node operator
@@ -72,8 +74,6 @@ public class MySQLDataNodeOperator extends AbstractDataNodeOperator {
             MySQLDataNodeDTO dto = MySQLDataNodeDTO.getFromJson(entity.getExtParams());
             CommonBeanUtils.copyProperties(dto, dataNodeInfo);
         }
-
-        LOGGER.debug("success to get MySQL data node from entity");
         return dataNodeInfo;
     }
 
@@ -84,19 +84,18 @@ public class MySQLDataNodeOperator extends AbstractDataNodeOperator {
         try {
             MySQLDataNodeDTO dto = MySQLDataNodeDTO.getFromRequest(dataNodeRequest);
             targetEntity.setExtParams(objectMapper.writeValueAsString(dto));
-            LOGGER.debug("success to set entity for MySQL data node");
         } catch (Exception e) {
-            LOGGER.error("failed to set entity for MySQL data node: ", e);
-            throw new BusinessException(ErrorCodeEnum.SOURCE_INFO_INCORRECT.getMessage());
+            throw new BusinessException(ErrorCodeEnum.SOURCE_INFO_INCORRECT,
+                    String.format("Failed to build extParams for MySQL node: %s", e.getMessage()));
         }
     }
 
     @Override
     public Boolean testConnection(DataNodeRequest request) {
-        String jdbcUrl = request.getUrl();
+        String jdbcUrl = MySQLDataNodeDTO.convertToJdbcurl(request.getUrl());
         String username = request.getUsername();
         String password = request.getToken();
-        Preconditions.checkNotNull(jdbcUrl, "connection jdbcUrl cannot be empty");
+        Preconditions.expectNotBlank(jdbcUrl, ErrorCodeEnum.INVALID_PARAMETER, "connection jdbcUrl cannot be empty");
         try (Connection ignored = MySQLJdbcUtils.getConnection(jdbcUrl, username, password)) {
             LOGGER.info("mysql connection not null - connection success for jdbcUrl={}, username={}, password={}",
                     jdbcUrl, username, password);
@@ -106,6 +105,19 @@ public class MySQLDataNodeOperator extends AbstractDataNodeOperator {
                     username, password);
             LOGGER.error(errMsg, e);
             throw new BusinessException(errMsg);
+        }
+    }
+
+    @Override
+    public void updateRelatedStreamSource(DataNodeRequest request, DataNodeEntity entity, String operator) {
+        MySQLDataNodeRequest mySQLDataNodeRequest = (MySQLDataNodeRequest) request;
+        MySQLDataNodeInfo mySQLDataNodeInfo = (MySQLDataNodeInfo) this.getFromEntity(entity);
+        boolean changed = !Objects.equals(mySQLDataNodeRequest.getUrl(), mySQLDataNodeInfo.getUrl())
+                || !Objects.equals(mySQLDataNodeRequest.getBackupUrl(), mySQLDataNodeInfo.getBackupUrl())
+                || !Objects.equals(mySQLDataNodeRequest.getUsername(), mySQLDataNodeInfo.getUsername())
+                || !Objects.equals(mySQLDataNodeRequest.getToken(), mySQLDataNodeInfo.getToken());
+        if (changed) {
+            retryStreamSourceByDataNodeNameAndType(request.getName(), SourceType.MYSQL_SQL, operator);
         }
     }
 

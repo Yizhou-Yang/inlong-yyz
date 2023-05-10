@@ -43,6 +43,8 @@ public interface InlongGroupEntityMapper {
 
     InlongGroupEntity selectByGroupId(String groupId);
 
+    InlongGroupEntity selectAllByGroupId(String groupId);
+
     InlongGroupEntity selectByGroupIdForUpdate(String groupId);
 
     List<InlongGroupEntity> selectByCondition(InlongGroupPageRequest request);

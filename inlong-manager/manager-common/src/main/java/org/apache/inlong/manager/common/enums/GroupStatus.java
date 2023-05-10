@@ -19,6 +19,7 @@ package org.apache.inlong.manager.common.enums;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import org.apache.inlong.manager.common.exceptions.BusinessException;
 
 import java.util.Locale;
 import java.util.Map;
@@ -65,7 +66,7 @@ public enum GroupStatus {
 
         GROUP_STATE_AUTOMATON.put(CONFIG_ING, Sets.newHashSet(CONFIG_ING, CONFIG_FAILED, CONFIG_SUCCESSFUL));
         GROUP_STATE_AUTOMATON.put(CONFIG_FAILED,
-                Sets.newHashSet(CONFIG_FAILED, CONFIG_SUCCESSFUL, TO_BE_APPROVAL, DELETING));
+                Sets.newHashSet(CONFIG_FAILED, CONFIG_ING, CONFIG_SUCCESSFUL, TO_BE_APPROVAL, DELETING));
         GROUP_STATE_AUTOMATON.put(CONFIG_SUCCESSFUL,
                 Sets.newHashSet(CONFIG_SUCCESSFUL, TO_BE_APPROVAL, CONFIG_ING, SUSPENDING, DELETING, FINISH));
 
@@ -95,7 +96,8 @@ public enum GroupStatus {
                 return status;
             }
         }
-        throw new IllegalStateException(String.format("Illegal code=%s for GroupStatus", code));
+        throw new BusinessException(ErrorCodeEnum.ILLEGAL_RECORD_FIELD_VALUE,
+                String.format("Illegal code=%s for GroupStatus", code));
     }
 
     public static boolean notAllowedTransition(GroupStatus pre, GroupStatus now) {
@@ -121,6 +123,14 @@ public enum GroupStatus {
         return status == GroupStatus.TO_BE_SUBMIT
                 || status == GroupStatus.TO_BE_APPROVAL
                 || status == GroupStatus.APPROVE_REJECTED
+                || status == GroupStatus.CONFIG_FAILED;
+    }
+
+    /**
+     * Checks whether the given status allows updating stream source.
+     */
+    public static boolean allowedUpdateSource(GroupStatus status) {
+        return status == GroupStatus.CONFIG_SUCCESSFUL
                 || status == GroupStatus.CONFIG_FAILED;
     }
 

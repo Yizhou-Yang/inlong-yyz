@@ -283,8 +283,8 @@ CREATE TABLE IF NOT EXISTS `inlong_stream_field`
     `field_type`          varchar(20)  NOT NULL COMMENT 'field type',
     `field_comment`       varchar(50)  DEFAULT NULL COMMENT 'Field description',
     `is_meta_field`       smallint(3)  DEFAULT '0' COMMENT 'Is this field a meta field? 0: no, 1: yes',
-    `meta_field_name`     varchar(20)  DEFAULT NULL COMMENT 'Meta field name',
-    `field_format`        varchar(50)  DEFAULT NULL COMMENT 'Field format, including: MICROSECONDS, MILLISECONDS, SECONDS, SQL, ISO_8601 and custom such as yyyy-MM-dd HH:mm:ss',
+    `meta_field_name`     varchar(120) DEFAULT NULL COMMENT 'Meta field name',
+    `field_format`        text         DEFAULT NULL COMMENT 'Field format, including: MICROSECONDS, MILLISECONDS, SECONDS, custom such as yyyy-MM-dd HH:mm:ss, and serialize format of complex type or decimal precision, etc.',
     `rank_num`            smallint(6)  DEFAULT '0' COMMENT 'Field order (front-end display field order)',
     `is_deleted`          int(11)      DEFAULT '0' COMMENT 'Whether to delete, 0: not deleted, > 0: deleted',
     PRIMARY KEY (`id`),
@@ -418,8 +418,8 @@ CREATE TABLE IF NOT EXISTS `stream_source_field`
     `field_type`       varchar(20)  NOT NULL COMMENT 'field type',
     `field_comment`    varchar(50)  DEFAULT NULL COMMENT 'Field description',
     `is_meta_field`    smallint(3)  DEFAULT '0' COMMENT 'Is this field a meta field? 0: no, 1: yes',
-    `meta_field_name`  varchar(20)  DEFAULT NULL COMMENT 'Meta field name',
-    `field_format`     varchar(50)  DEFAULT NULL COMMENT 'Field format, including: MICROSECONDS, MILLISECONDS, SECONDS, SQL, ISO_8601 and custom such as yyyy-MM-dd HH:mm:ss',
+    `meta_field_name`  varchar(120) DEFAULT NULL COMMENT 'Meta field name',
+    `field_format`     text         DEFAULT NULL COMMENT 'Field format, including: MICROSECONDS, MILLISECONDS, SECONDS, custom such as yyyy-MM-dd HH:mm:ss, and serialize format of complex type or decimal precision, etc.',
     `rank_num`         smallint(6)  DEFAULT '0' COMMENT 'Field order (front-end display field order)',
     `is_deleted`       int(11)      DEFAULT '0' COMMENT 'Whether to delete, 0: not deleted, > 0: deleted',
     PRIMARY KEY (`id`),
@@ -443,8 +443,8 @@ CREATE TABLE IF NOT EXISTS `stream_transform_field`
     `field_type`        varchar(50)  NOT NULL COMMENT 'Field type',
     `field_comment`     varchar(2000) DEFAULT NULL COMMENT 'Field description',
     `is_meta_field`     smallint(3)   DEFAULT '0' COMMENT 'Is this field a meta field? 0: no, 1: yes',
-    `meta_field_name`   varchar(20)   DEFAULT NULL COMMENT 'Meta field name',
-    `field_format`      varchar(50)   DEFAULT NULL COMMENT 'Field format, including: MICROSECONDS, MILLISECONDS, SECONDS, SQL, ISO_8601 and custom such as yyyy-MM-dd HH:mm:ss',
+    `meta_field_name`   varchar(120)  DEFAULT NULL COMMENT 'Meta field name',
+    `field_format`      text          DEFAULT NULL COMMENT 'Field format, including: MICROSECONDS, MILLISECONDS, SECONDS, custom such as yyyy-MM-dd HH:mm:ss, and serialize format of complex type or decimal precision, etc.',
     `rank_num`          smallint(6)   DEFAULT '0' COMMENT 'Field order (front-end display field order)',
     `is_deleted`        int(11)       DEFAULT '0' COMMENT 'Whether to delete, 0: not deleted, > 0: deleted',
     `origin_node_name`  varchar(256)  DEFAULT '' COMMENT 'Origin node name which stream field belongs',
@@ -472,8 +472,8 @@ CREATE TABLE IF NOT EXISTS `stream_sink_field`
     `field_comment`     varchar(2000) DEFAULT NULL COMMENT 'Field description',
     `ext_params`        text COMMENT 'Field ext params',
     `is_meta_field`     smallint(3)   DEFAULT '0' COMMENT 'Is this field a meta field? 0: no, 1: yes',
-    `meta_field_name`   varchar(20)   DEFAULT NULL COMMENT 'Meta field name',
-    `field_format`      varchar(50)   DEFAULT NULL COMMENT 'Field format, including: MICROSECONDS, MILLISECONDS, SECONDS, SQL, ISO_8601 and custom such as yyyy-MM-dd HH:mm:ss',
+    `meta_field_name`   varchar(120)  DEFAULT NULL COMMENT 'Meta field name',
+    `field_format`      text          DEFAULT NULL COMMENT 'Field format, including: MICROSECONDS, MILLISECONDS, SECONDS, custom such as yyyy-MM-dd HH:mm:ss, and serialize format of complex type or decimal precision, etc.',
     `origin_node_name`  varchar(256)  DEFAULT '' COMMENT 'Origin node name which stream field belongs',
     `origin_field_name` varchar(50)   DEFAULT '' COMMENT 'Origin field name before transform operation',
     `rank_num`          smallint(6)   DEFAULT '0' COMMENT 'Field order (front-end display field order)',
@@ -745,6 +745,51 @@ CREATE TABLE IF NOT EXISTS `stream_heartbeat`
     PRIMARY KEY (`id`),
     UNIQUE KEY `unique_stream_heartbeat` (`component`, `instance`, `inlong_group_id`, `inlong_stream_id`)
 );
+-- ----------------------------
+-- Table structure for audit_base
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS `audit_base`
+(
+    `id`               int(11)      NOT NULL AUTO_INCREMENT COMMENT 'Incremental primary key',
+    `name`             varchar(256) NOT NULL COMMENT 'Audit base name',
+    `type`             varchar(20)  NOT NULL COMMENT 'Audit base item type, such as: AGENT, DATAPROXY, etc',
+    `is_sent`          int(4)       NOT NULL DEFAULT '0' COMMENT '0: received, 1: sent',
+    `audit_id`         varchar(11)  NOT NULL COMMENT 'Audit ID mapping of audit name',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `unique_audit_base_type` (`type`, `is_sent`),
+    UNIQUE KEY `unique_audit_base_name` (`name`)
+);
+
+-- ----------------------------
+-- Insert audit_base item
+-- ----------------------------
+INSERT INTO `audit_base`(`name`, `type`, `is_sent`, `audit_id`)
+VALUES ('audit_sdk_collect', 'SDK', 0, '1'),
+       ('audit_sdk_sent', 'SDK', 1, '2'),
+       ('audit_agent_collect', 'AGENT', 0, '3'),
+       ('audit_agent_sent', 'AGENT', 1, '4'),
+       ('audit_dataproxy_received', 'DATAPROXY', 0, '5'),
+       ('audit_dataproxy_sent', 'DATAPROXY', 1, '6'),
+       ('audit_sort_hive_input', 'HIVE', 0, '7'),
+       ('audit_sort_hive_output', 'HIVE', 1, '8'),
+       ('audit_sort_clickhouse_input', 'CLICKHOUSE', 0, '9'),
+       ('audit_sort_clickhouse_output', 'CLICKHOUSE', 1, '10'),
+       ('audit_sort_es_input', 'ELASTICSEARCH', 0, '11'),
+       ('audit_sort_es_output', 'ELASTICSEARCH', 1, '12'),
+       ('audit_sort_starrocks_input', 'STARROCKS', 0, '13'),
+       ('audit_sort_starrocks_output', 'STARROCKS', 1, '14'),
+       ('audit_sort_hudi_input', 'HUDI', 0, '15'),
+       ('audit_sort_hudi_output', 'HUDI', 1, '16'),
+       ('audit_sort_iceberg_input', 'ICEBERG', 0, '17'),
+       ('audit_sort_iceberg_output', 'ICEBERG', 1, '18'),
+       ('audit_sort_hbase_input', 'HBASE', 0, '19'),
+       ('audit_sort_hbase_output', 'HBASE', 1, '20'),
+       ('audit_sort_doris_input', 'DORIS', 0, '21'),
+       ('audit_sort_doris_output', 'DORIS', 1, '22'),
+       ('audit_sort_mysql_input', 'MYSQL', 0, '23'),
+       ('audit_sort_mysql_output', 'MYSQL', 1, '24'),
+       ('audit_sort_kudu_input', 'KUDU', 0, '25'),
+       ('audit_sort_kudu_output', 'KUDU', 1, '26');
 
 -- ----------------------------
 

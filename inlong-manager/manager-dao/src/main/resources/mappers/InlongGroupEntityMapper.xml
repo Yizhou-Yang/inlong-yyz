@@ -108,6 +108,12 @@
         where inlong_group_id = #{groupId, jdbcType=VARCHAR}
         and is_deleted = 0
     </select>
+    <select id="selectAllByGroupId" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from inlong_group
+        where inlong_group_id = #{groupId, jdbcType=VARCHAR}
+    </select>
     <select id="selectByGroupIdForUpdate" resultMap="BaseResultMap">
         select
         <include refid="Base_Column_List"/>

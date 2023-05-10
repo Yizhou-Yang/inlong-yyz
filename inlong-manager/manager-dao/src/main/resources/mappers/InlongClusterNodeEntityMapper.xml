@@ -77,7 +77,8 @@
         select
         <include refid="Base_Column_List"/>
         from inlong_cluster_node
-        where id = #{id,jdbcType=INTEGER}
+        where is_deleted = 0
+        and id = #{id,jdbcType=INTEGER}
     </select>
     <select id="selectByUniqueKey" parameterType="org.apache.inlong.manager.pojo.cluster.ClusterRequest"
             resultType="org.apache.inlong.manager.dao.entity.InlongClusterNodeEntity">
@@ -132,7 +133,16 @@
             </if>
         </where>
     </select>
-
+    <select id="selectByIpAndType" resultType="org.apache.inlong.manager.dao.entity.InlongClusterNodeEntity">
+        select
+        <include refid="Base_Column_List"/>
+        from inlong_cluster_node
+        where is_deleted = 0
+        <if test="type != null and type != ''">
+            and type = #{type, jdbcType=VARCHAR}
+        </if>
+        and ip = #{ip, jdbcType=VARCHAR}
+    </select>
     <update id="updateById" parameterType="org.apache.inlong.manager.dao.entity.InlongClusterNodeEntity">
         update inlong_cluster_node
         set parent_id     = #{parentId,jdbcType=INTEGER},
@@ -149,6 +159,47 @@
             version       = #{version,jdbcType=INTEGER} + 1
         where id = #{id,jdbcType=INTEGER}
           and version = #{version,jdbcType=INTEGER}
+    </update>
+    <update id="updateByIdSelective" parameterType="org.apache.inlong.manager.dao.entity.InlongClusterNodeEntity">
+        update inlong_cluster_node
+        <set>
+            <if test="parentId != null">
+                parent_id = #{parentId,jdbcType=INTEGER},
+            </if>
+            <if test="type != null">
+                type = #{type,jdbcType=VARCHAR},
+            </if>
+            <if test="ip != null">
+                ip = #{ip,jdbcType=VARCHAR},
+            </if>
+            <if test="port != null">
+                port = #{port,jdbcType=INTEGER},
+            </if>
+            <if test="protocolType != null">
+                protocol_type = #{protocolType,jdbcType=VARCHAR},
+            </if>
+            <if test="nodeLoad != null">
+                node_load = #{nodeLoad,jdbcType=INTEGER},
+            </if>
+            <if test="extParams != null">
+                ext_params = #{extParams,jdbcType=LONGVARCHAR},
+            </if>
+            <if test="description != null">
+                description = #{description,jdbcType=VARCHAR},
+            </if>
+            <if test="status != null">
+                status = #{status,jdbcType=INTEGER},
+            </if>
+            <if test="isDeleted != null">
+                is_deleted = #{isDeleted,jdbcType=INTEGER},
+            </if>
+            <if test="modifier != null">
+                modifier = #{modifier,jdbcType=VARCHAR},
+            </if>
+            version = #{version,jdbcType=INTEGER} + 1
+        </set>
+        where id = #{id,jdbcType=INTEGER}
+        and version = #{version,jdbcType=INTEGER}
     </update>
 
     <delete id="deleteById" parameterType="java.lang.Integer">
@@ -177,5 +228,22 @@
         <if test="extParams != null and extParams != ''">
             and ext_params like CONCAT("%", #{extParams}, "%")
         </if>
+    </update>
+    <update id="updateStatus">
+        update inlong_cluster_node
+        <set>
+            <if test="nextStatus != null">
+                status = #{nextStatus,jdbcType=INTEGER}
+            </if>
+        </set>
+        <where>
+            is_deleted = 0
+            <if test="status != null">
+                and status = #{status,jdbcType=INTEGER}
+            </if>
+            <if test="id != null">
+                and id = #{id,jdbcType=INTEGER}
+            </if>
+        </where>
     </update>
 </mapper>

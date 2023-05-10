@@ -83,7 +83,7 @@ class DataNodeControllerTest extends WebBaseTest {
         Assertions.assertTrue(success);
 
         DataNodeEntity dataNodeEntity = dataNodeMapper.selectById(dataNodeId);
-        Assertions.assertEquals(dataNodeEntity.getId(), dataNodeEntity.getIsDeleted());
+        Assertions.assertNull(dataNodeEntity);
     }
 
     @Test
@@ -110,7 +110,7 @@ class DataNodeControllerTest extends WebBaseTest {
         Assertions.assertTrue(success);
 
         DataNodeEntity dataNodeEntity = dataNodeMapper.selectById(dataNodeId);
-        Assertions.assertEquals(dataNodeEntity.getId(), dataNodeEntity.getIsDeleted());
+        Assertions.assertNull(dataNodeEntity);
     }
 
     @Test
@@ -118,7 +118,7 @@ class DataNodeControllerTest extends WebBaseTest {
         // insert the test data
         DataNodeEntity nodeEntity = new DataNodeEntity();
         nodeEntity.setName("test");
-        nodeEntity.setType("MYSQL");
+        nodeEntity.setType(DataNodeType.HIVE);
         nodeEntity.setIsDeleted(0);
         nodeEntity.setModifier("test");
         nodeEntity.setCreator("test");
@@ -177,7 +177,6 @@ class DataNodeControllerTest extends WebBaseTest {
 
         Response<Boolean> response = getResBody(mvcResult, Boolean.class);
         Assertions.assertFalse(response.isSuccess());
-        Assertions.assertEquals("id: must not be null\n", response.getErrMsg());
     }
 
 }

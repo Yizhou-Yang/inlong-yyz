@@ -65,8 +65,10 @@ import org.apache.inlong.manager.pojo.group.pulsar.InlongPulsarInfo;
 import org.apache.inlong.manager.pojo.group.pulsar.InlongPulsarRequest;
 import org.apache.inlong.manager.pojo.group.pulsar.InlongPulsarTopicInfo;
 import org.apache.inlong.manager.pojo.node.DataNodeInfo;
+import org.apache.inlong.manager.pojo.node.DataNodePageRequest;
 import org.apache.inlong.manager.pojo.node.hive.HiveDataNodeInfo;
 import org.apache.inlong.manager.pojo.node.hive.HiveDataNodeRequest;
+import org.apache.inlong.manager.pojo.sink.SinkField;
 import org.apache.inlong.manager.pojo.sink.StreamSink;
 import org.apache.inlong.manager.pojo.sink.ck.ClickHouseSink;
 import org.apache.inlong.manager.pojo.sink.es.ElasticsearchSink;
@@ -660,7 +662,7 @@ class ClientFactoryTest {
                         .build());
 
         stubFor(
-                get(urlMatching("/inlong/manager/api/sink/list.*"))
+                post(urlMatching("/inlong/manager/api/sink/list.*"))
                         .willReturn(
                                 okJson(JsonUtils.toJsonString(
                                         Response.success(new PageResult<>(Lists.newArrayList(sinkList)))))));
@@ -672,7 +674,7 @@ class ClientFactoryTest {
     @Test
     void testListSink4AllTypeShouldThrowException() {
         stubFor(
-                get(urlMatching("/inlong/manager/api/sink/list.*"))
+                post(urlMatching("/inlong/manager/api/sink/list.*"))
                         .willReturn(
                                 okJson(JsonUtils.toJsonString(
                                         Response.fail("groupId should not empty")))));
@@ -717,7 +719,6 @@ class ClientFactoryTest {
                 .clusterTags("test_cluster_tag")
                 .type(ClusterType.PULSAR)
                 .adminUrl("http://127.0.0.1:8080")
-                .tenant("public")
                 .build();
 
         stubFor(
@@ -922,7 +923,6 @@ class ClientFactoryTest {
         List<DataNodeInfo> nodeResponses = Lists.newArrayList(
                 HiveDataNodeInfo.builder()
                         .id(1)
-                        .name("test_node")
                         .type(DataNodeType.HIVE)
                         .build());
 
@@ -931,9 +931,8 @@ class ClientFactoryTest {
                         .willReturn(
                                 okJson(JsonUtils.toJsonString(Response.success(new PageResult<>(nodeResponses))))));
 
-        HiveDataNodeRequest request = new HiveDataNodeRequest();
-        request.setName("test_hive_node");
-        PageResult<DataNodeInfo> pageInfo = dataNodeClient.list(request);
+        DataNodePageRequest pageRequest = new DataNodePageRequest();
+        PageResult<DataNodeInfo> pageInfo = dataNodeClient.list(pageRequest);
         Assertions.assertEquals(JsonUtils.toJsonString(pageInfo.getList()), JsonUtils.toJsonString(nodeResponses));
     }
 
@@ -1020,6 +1019,42 @@ class ClientFactoryTest {
                                         Response.success(true)))));
         Boolean isDelete = userClient.delete(1);
         Assertions.assertTrue(isDelete);
+    }
+
+    @Test
+    void testParseStreamFields() {
+        List<StreamField> streamFieldList = Lists.newArrayList(
+                StreamField.builder()
+                        .fieldName("test_name")
+                        .fieldType("string")
+                        .build());
+        stubFor(
+                post(urlMatching("/inlong/manager/api/stream/parseFields.*"))
+                        .willReturn(
+                                okJson(JsonUtils.toJsonString(
+                                        Response.success(Lists.newArrayList(streamFieldList))))));
+
+        List<StreamField> responseList = streamClient.parseFields("{\"test_name\":\"string\"}");
+        Assertions.assertEquals(JsonUtils.toJsonString(responseList), JsonUtils.toJsonString(streamFieldList));
+
+    }
+
+    @Test
+    void testParseSinkFields() {
+        List<SinkField> sinkFieldList = Lists.newArrayList(
+                SinkField.builder()
+                        .fieldName("test_name")
+                        .fieldType("string")
+                        .build());
+        stubFor(
+                post(urlMatching("/inlong/manager/api/sink/parseFields.*"))
+                        .willReturn(
+                                okJson(JsonUtils.toJsonString(
+                                        Response.success(Lists.newArrayList(sinkFieldList))))));
+
+        List<SinkField> responseList = sinkClient.parseFields("{\"test_name\":\"string\"}");
+        Assertions.assertEquals(JsonUtils.toJsonString(responseList), JsonUtils.toJsonString(sinkFieldList));
+
     }
 
 }

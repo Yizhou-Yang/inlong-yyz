@@ -38,7 +38,6 @@ export default class ClickHouseNode
 
   @FieldDecorator({
     type: 'password',
-    rules: [{ required: true }],
   })
   @I18n('meta.Nodes.ClickHouse.Password')
   token: string;
@@ -48,7 +47,7 @@ export default class ClickHouseNode
     rules: [{ required: true }],
     props: values => ({
       disabled: [110, 130].includes(values?.status),
-      placeholder: 'jdbc:clickhouse://127.0.0.1:8123',
+      placeholder: '127.0.0.1:8123',
     }),
   })
   @I18n('meta.Nodes.ClickHouse.Url')

@@ -211,6 +211,16 @@ public interface StreamSourceService {
     Boolean deleteAll(String groupId, String streamId, String operator);
 
     /**
+     * Update source status when source is heartbeat timeout by the given groupId and streamId
+     *
+     * @param id The primary key of the source.
+     * @param targetStatus The target status.
+     * @param operator The operator name.
+     * @return whether succeed
+     */
+    Boolean updateStatusWhenTimeout(Integer id, Integer targetStatus, String operator);
+
+    /**
      * According to the inlong stream id, query the list of source types owned by it.
      *
      * @param groupId Inlong group id.

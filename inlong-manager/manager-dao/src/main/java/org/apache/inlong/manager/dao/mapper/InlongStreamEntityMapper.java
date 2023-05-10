@@ -38,6 +38,8 @@ public interface InlongStreamEntityMapper {
 
     InlongStreamEntity selectByIdentifier(@Param("groupId") String groupId, @Param("streamId") String streamId);
 
+    InlongStreamEntity selectAllByIdentifier(@Param("groupId") String groupId, @Param("streamId") String streamId);
+
     Integer selectExistByIdentifier(@Param("groupId") String groupId, @Param("streamId") String streamId);
 
     /**

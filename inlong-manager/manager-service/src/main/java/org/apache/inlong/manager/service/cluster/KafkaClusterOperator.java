@@ -75,7 +75,6 @@ public class KafkaClusterOperator extends AbstractClusterOperator {
             CommonBeanUtils.copyProperties(dto, kafkaClusterInfo);
         }
 
-        LOGGER.info("success to get kafka cluster info from entity");
         return kafkaClusterInfo;
     }
 
@@ -85,24 +84,25 @@ public class KafkaClusterOperator extends AbstractClusterOperator {
         CommonBeanUtils.copyProperties(kafkaRequest, targetEntity, true);
         try {
             KafkaClusterDTO dto = KafkaClusterDTO.getFromRequest(kafkaRequest);
-            dto.setBootstrapServers(kafkaRequest.getUrl());
             targetEntity.setExtParams(objectMapper.writeValueAsString(dto));
-            LOGGER.info("success to set entity for kafka cluster");
+            LOGGER.debug("success to set entity for kafka cluster");
         } catch (Exception e) {
-            throw new BusinessException(ErrorCodeEnum.SOURCE_INFO_INCORRECT.getMessage() + ": " + e.getMessage());
+            throw new BusinessException(ErrorCodeEnum.CLUSTER_INFO_INCORRECT,
+                    String.format("serialize extParams of Kafka Cluster failure: %s", e.getMessage()));
         }
     }
 
     @Override
     public Boolean testConnection(ClusterRequest request) {
         String bootstrapServers = request.getUrl();
-        Preconditions.checkNotNull(bootstrapServers, "connection url cannot be empty");
+        Preconditions.expectNotBlank(bootstrapServers, ErrorCodeEnum.INVALID_PARAMETER,
+                "connection url cannot be empty");
         Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         try (Admin ignored = Admin.create(props)) {
             ListTopicsResult topics = ignored.listTopics(new ListTopicsOptions().timeoutMs(30000));
             topics.names().get();
-            LOGGER.info("kafka connection not null - connection success for bootstrapServers={}", topics);
+            LOGGER.debug("kafka connection not null - connection success for bootstrapServers={}", topics);
             return true;
         } catch (Exception e) {
             String errMsg = String.format("kafka connection failed for bootstrapServers=%s", bootstrapServers);

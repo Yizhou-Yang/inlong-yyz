@@ -18,6 +18,7 @@
 package org.apache.inlong.manager.service.listener.source;
 
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
@@ -40,7 +41,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy;
 import java.util.concurrent.TimeUnit;
+
+import static org.apache.inlong.manager.common.consts.InlongConstants.ALIVE_TIME_MS;
+import static org.apache.inlong.manager.common.consts.InlongConstants.CORE_POOL_SIZE;
+import static org.apache.inlong.manager.common.consts.InlongConstants.MAX_POOL_SIZE;
+import static org.apache.inlong.manager.common.consts.InlongConstants.QUEUE_SIZE;
 
 /**
  * Event listener of operate resources, such as delete, stop, restart sources.
@@ -48,6 +58,17 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Component
 public abstract class AbstractSourceOperateListener implements SourceOperateListener {
+
+    private static Integer MAX_SPLIT_SIZE = 50;
+
+    private static final ExecutorService EXECUTOR_SERVICE = new ThreadPoolExecutor(
+            CORE_POOL_SIZE,
+            MAX_POOL_SIZE,
+            ALIVE_TIME_MS,
+            TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<>(QUEUE_SIZE),
+            new ThreadFactoryBuilder().setNameFormat("source-operate-listener-%s").build(),
+            new CallerRunsPolicy());
 
     @Autowired
     protected InlongStreamService streamService;
@@ -62,7 +83,7 @@ public abstract class AbstractSourceOperateListener implements SourceOperateList
 
     @Override
     public ListenerResult listen(WorkflowContext context) throws Exception {
-        log.info("operate stream source for context={}", context);
+        log.info("operate stream source for context={}", context.getProcessForm().getInlongGroupId());
         InlongGroupInfo groupInfo = getGroupInfo(context.getProcessForm());
         final String groupId = groupInfo.getInlongGroupId();
         List<InlongStreamBriefInfo> streamResponses = streamService.listBriefWithSink(groupId);
@@ -87,11 +108,24 @@ public abstract class AbstractSourceOperateListener implements SourceOperateList
     protected void operateStreamSources(String groupId, String streamId, String operator,
             List<StreamSource> unOperatedSources) {
         List<StreamSource> sources = streamSourceService.listSource(groupId, streamId);
-        sources.forEach(source -> {
-            if (checkIfOp(source, unOperatedSources)) {
-                operateStreamSource(source.genSourceRequest(), operator);
+        if (sources.size() <= MAX_SPLIT_SIZE) {
+            sources.forEach(source -> {
+                if (checkIfOp(source, unOperatedSources)) {
+                    operateStreamSource(source.genSourceRequest(), operator);
+                }
+            });
+        } else {
+            List<List<StreamSource>> subSourcesList = splitList(sources, MAX_SPLIT_SIZE);
+            for (List<StreamSource> subSources : subSourcesList) {
+                EXECUTOR_SERVICE.execute(() -> {
+                    subSources.forEach(source -> {
+                        if (checkIfOp(source, unOperatedSources)) {
+                            operateStreamSource(source.genSourceRequest(), operator);
+                        }
+                    });
+                });
             }
-        });
+        }
     }
 
     /**
@@ -102,9 +136,12 @@ public abstract class AbstractSourceOperateListener implements SourceOperateList
         for (int retry = 0; retry < 60; retry++) {
             int status = streamSource.getStatus();
             SourceStatus sourceStatus = SourceStatus.forCode(status);
+            log.info("test begin to operate source={} for status={}", streamSource, sourceStatus);
             // template sources are filtered and processed in corresponding subclass listeners
             if (sourceStatus == SourceStatus.SOURCE_NORMAL || sourceStatus == SourceStatus.SOURCE_FROZEN
+                    || sourceStatus == SourceStatus.HEARTBEAT_TIMEOUT
                     || CollectionUtils.isNotEmpty(streamSource.getSubSourceList())) {
+                log.info("stream source={} be operated for status={}", streamSource, sourceStatus);
                 return true;
             } else if (sourceStatus == SourceStatus.SOURCE_FAILED || sourceStatus == SourceStatus.SOURCE_DISABLE) {
                 return false;
@@ -118,7 +155,8 @@ public abstract class AbstractSourceOperateListener implements SourceOperateList
         if (sourceStatus != SourceStatus.SOURCE_NORMAL
                 && sourceStatus != SourceStatus.SOURCE_FROZEN
                 && sourceStatus != SourceStatus.SOURCE_DISABLE
-                && sourceStatus != SourceStatus.SOURCE_FAILED) {
+                && sourceStatus != SourceStatus.SOURCE_FAILED
+                && sourceStatus != SourceStatus.HEARTBEAT_TIMEOUT) {
             log.error("stream source ={} cannot be operated for status={}", streamSource, sourceStatus);
             unOperatedSources.add(streamSource);
         }
@@ -147,6 +185,22 @@ public abstract class AbstractSourceOperateListener implements SourceOperateList
             log.error("illegal process form {} to get inlong group info", processForm.getFormName());
             throw new RuntimeException("Unsupported process form " + processForm.getFormName());
         }
+    }
+
+    private List<List<StreamSource>> splitList(List<StreamSource> list, int subListSize) {
+        List<List<StreamSource>> result = Lists.newArrayList();
+        if (list == null || list.isEmpty() || subListSize <= 0) {
+            return result;
+        }
+        int size = list.size();
+        int count = (int) Math.ceil((double) size / subListSize);
+        for (int i = 0; i < count; i++) {
+            int fromIndex = i * subListSize;
+            int toIndex = Math.min((i + 1) * subListSize, size);
+            List<StreamSource> subList = list.subList(fromIndex, toIndex);
+            result.add(subList);
+        }
+        return result;
     }
 
 }

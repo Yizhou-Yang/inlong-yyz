@@ -79,4 +79,12 @@ public interface DataNodeOperator {
      */
     Boolean testConnection(DataNodeRequest request);
 
+    /**
+     * Update related stream source.
+     *
+     * @param request data node request
+     * @param entity data node entity
+     * @param operator operator
+     */
+    void updateRelatedStreamSource(DataNodeRequest request, DataNodeEntity entity, String operator);
 }

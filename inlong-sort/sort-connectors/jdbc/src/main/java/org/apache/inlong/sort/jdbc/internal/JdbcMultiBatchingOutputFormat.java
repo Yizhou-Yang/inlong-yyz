@@ -94,9 +94,9 @@ import java.util.regex.Pattern;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.inlong.sort.base.Constants.DIRTY_BYTES_OUT;
 import static org.apache.inlong.sort.base.Constants.DIRTY_RECORDS_OUT;
-import static org.apache.inlong.sort.base.Constants.INLONG_METRIC_STATE_NAME;
-import static org.apache.inlong.sort.base.Constants.NUM_BYTES_OUT;
 import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_OUT;
+import static org.apache.inlong.sort.base.Constants.NUM_BYTES_OUT;
+import static org.apache.inlong.sort.base.Constants.INLONG_METRIC_STATE_NAME;
 
 /**
  * A JDBC multi-table outputFormat that supports batching records before writing records to databases.
@@ -110,14 +110,6 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     private static final Logger LOG = LoggerFactory.getLogger(JdbcMultiBatchingOutputFormat.class);
     private static final DateTimeFormatter SQL_TIMESTAMP_WITH_LOCAL_TIMEZONE_FORMAT;
     private static final DateTimeFormatter SQL_TIME_FORMAT;
-
-    static {
-        SQL_TIME_FORMAT = (new DateTimeFormatterBuilder()).appendPattern("HH:mm:ss")
-                .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true).toFormatter();
-        SQL_TIMESTAMP_WITH_LOCAL_TIMEZONE_FORMAT =
-                (new DateTimeFormatterBuilder()).append(DateTimeFormatter.ISO_LOCAL_DATE).appendLiteral('T')
-                        .append(SQL_TIME_FORMAT).appendPattern("'Z'").toFormatter();
-    }
 
     private final JdbcExecutionOptions executionOptions;
     private final String inlongMetric;
@@ -145,9 +137,18 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     private transient Map<String, List<GenericRowData>> recordsMap = new HashMap<>();
     private transient Map<String, Exception> tableExceptionMap = new HashMap<>();
     private transient Boolean stopWritingWhenTableException;
+
     private transient ListState<MetricState> metricStateListState;
     private transient MetricState metricState;
     private SinkTableMetricData sinkMetricData;
+
+    static {
+        SQL_TIME_FORMAT = (new DateTimeFormatterBuilder()).appendPattern("HH:mm:ss")
+                .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true).toFormatter();
+        SQL_TIMESTAMP_WITH_LOCAL_TIMEZONE_FORMAT =
+                (new DateTimeFormatterBuilder()).append(DateTimeFormatter.ISO_LOCAL_DATE).appendLiteral('T')
+                        .append(SQL_TIME_FORMAT).appendPattern("'Z'").toFormatter();
+    }
 
     public JdbcMultiBatchingOutputFormat(
             @Nonnull JdbcConnectionProvider connectionProvider,
@@ -628,7 +629,9 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             Exception tableException = null;
             try {
                 jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);
+                Long totalDataSize = 0L;
                 for (GenericRowData record : tableIdRecordList) {
+                    totalDataSize = totalDataSize + record.toString().getBytes(StandardCharsets.UTF_8).length;
                     jdbcStatementExecutor.addToBatch((JdbcIn) record);
                 }
                 if (dirtySinkHelper.getDirtySink() != null) {
@@ -683,6 +686,10 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                             jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);
                             jdbcStatementExecutor.addToBatch((JdbcIn) record);
                             jdbcStatementExecutor.executeBatch();
+                            Long totalDataSize =
+                                    Long.valueOf(record.toString().getBytes(StandardCharsets.UTF_8).length);
+                            outputMetrics(tableIdentifier, 1L, totalDataSize, false);
+                            flushFlag = true;
                             break;
                         } catch (Exception e) {
                             LOG.warn("Flush one record tableIdentifier:{} ,retryTimes:{} get err:",
@@ -696,6 +703,21 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                                 throw new IOException(
                                         "unable to flush; interrupted while doing another attempt", e);
                             }
+                        }
+                    }
+                    if (!flushFlag && null != tableException) {
+                        LOG.info("Put tableIdentifier:{} exception:{}",
+                                tableIdentifier, tableException.getMessage());
+                        if (dirtySinkHelper.getDirtySink() == null &&
+                                !schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.THROW_WITH_STOP)) {
+                            outputMetrics(tableIdentifier, Long.valueOf(tableIdRecordList.size()),
+                                    1L, true);
+                        }
+                        tableExceptionMap.put(tableIdentifier, tableException);
+                        if (stopWritingWhenTableException) {
+                            LOG.info("Stop write table:{} because occur exception",
+                                    tableIdentifier);
+                            break;
                         }
                     }
                 }

@@ -54,6 +54,7 @@ import static org.apache.flink.table.factories.FactoryUtil.PROPERTY_VERSION;
 import static org.apache.flink.table.filesystem.FileSystemOptions.PARTITION_TIME_EXTRACTOR_TIMESTAMP_PATTERN;
 import static org.apache.flink.table.filesystem.FileSystemOptions.STREAMING_SOURCE_ENABLE;
 import static org.apache.flink.table.filesystem.FileSystemOptions.STREAMING_SOURCE_PARTITION_INCLUDE;
+import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_DATABASE_PATTERN;
@@ -93,6 +94,7 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
         options.add(HADOOP_CONF_DIR);
         options.add(INLONG_METRIC);
         options.add(INLONG_AUDIT);
+        options.add(AUDIT_KEYS);
         options.add(SINK_MULTIPLE_ENABLE);
         options.add(SINK_MULTIPLE_DATABASE_PATTERN);
         options.add(SINK_MULTIPLE_TABLE_PATTERN);

@@ -23,7 +23,7 @@
     <parent>
         <groupId>org.apache.inlong</groupId>
         <artifactId>inlong-sort</artifactId>
-        <version>1.5.0-SNAPSHOT</version>
+        <version>1.6.0</version>
     </parent>
 
     <artifactId>sort-dist</artifactId>
@@ -116,19 +116,19 @@
                         </goals>
                         <phase>package</phase>
                         <configuration>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
                             <finalName>${project.artifactId}-${project.version}</finalName>
                             <filters>
                                 <!-- Globally exclude log4j.properties from our JAR files. -->
                                 <filter>
-                                    <artifact>*</artifact>
+                                    <artifact>*:*</artifact>
                                     <excludes>
                                         <exclude>log4j.properties</exclude>
                                         <exclude>log4j-test.properties</exclude>
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>com/google/protobuf/**</exclude>
                                     </excludes>
                                 </filter>
                             </filters>

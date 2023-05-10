@@ -17,6 +17,7 @@
 
 package org.apache.inlong.sort.cdc.mongodb;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope;
 import com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils;
 import com.ververica.cdc.debezium.Validator;

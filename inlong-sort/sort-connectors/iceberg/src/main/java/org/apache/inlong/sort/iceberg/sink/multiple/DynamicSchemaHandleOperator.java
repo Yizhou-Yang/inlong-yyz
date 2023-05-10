@@ -118,6 +118,8 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
     private @Nullable transient SinkTableMetricData metricData;
     private transient ListState<MetricState> metricStateListState;
     private transient MetricState metricState;
+    private final DirtyOptions dirtyOptions;
+    private @Nullable final DirtySink<Object> dirtySink;
 
     public DynamicSchemaHandleOperator(CatalogLoader catalogLoader,
             MultipleSinkOption multipleSinkOption,
@@ -127,6 +129,8 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             String auditHostAndPorts) {
         this.catalogLoader = catalogLoader;
         this.multipleSinkOption = multipleSinkOption;
+        this.dirtyOptions = dirtyOptions;
+        this.dirtySink = dirtySink;
         this.inlongMetric = inlongMetric;
         this.auditHostAndPorts = auditHostAndPorts;
         this.dirtySinkHelper = new DirtySinkHelper<>(dirtyOptions, dirtySink);
@@ -206,6 +210,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         if (blacklist.contains(tableId)) {
             return;
         }
+
         boolean isDDL = dynamicSchemaFormat.extractDDLFlag(jsonNode);
         if (isDDL) {
             execDDL(jsonNode, tableId);
@@ -276,7 +281,6 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
 
     @Override
     public void onProcessingTime(long timestamp) {
-        LOG.info("Black list table: {} at time {}.", blacklist, timestamp);
         processingTimeService.registerTimer(
                 processingTimeService.getCurrentProcessingTime() + HELPER_DEBUG_INTERVEL, this);
     }
@@ -518,4 +522,21 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         return null;
     }
 
+    private boolean canHandleWithSchemaUpdatePolicy(TableIdentifier tableId, List<TableChange> tableChanges) {
+        boolean canHandle = true;
+        for (TableChange tableChange : tableChanges) {
+            canHandle &= MultipleSinkOption.canHandleWithSchemaUpdate(tableId.toString(), tableChange,
+                    multipleSinkOption.getSchemaUpdatePolicy());
+            if (!(tableChange instanceof AddColumn)) {
+                // todo:currently iceberg can only handle addColumn, so always return false
+                LOG.info("Ignore table {} schema change: {} because iceberg can't handle it.",
+                        tableId, tableChange);
+                canHandle = false;
+            }
+            if (!canHandle) {
+                break;
+            }
+        }
+        return canHandle;
+    }
 }

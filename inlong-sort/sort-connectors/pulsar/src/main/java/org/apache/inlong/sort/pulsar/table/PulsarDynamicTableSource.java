@@ -54,7 +54,8 @@ import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.utils.DataTypeUtils;
 import org.apache.flink.util.Preconditions;
-import org.apache.inlong.sort.pulsar.withoutadmin.FlinkPulsarSource;
+import org.apache.inlong.sort.pulsar.internal.FlinkPulsarSource;
+import org.apache.inlong.sort.pulsar.internal.FlinkPulsarSourceWithoutAdmin;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.impl.conf.ClientConfigurationData;
@@ -136,16 +137,12 @@ public class PulsarDynamicTableSource implements ScanTableSource, SupportsReadin
      */
     protected final PulsarTableOptions.StartupOptions startupOptions;
 
-    /**
-     * The default value when startup timestamp is not used.
-     */
-    private static final long DEFAULT_STARTUP_TIMESTAMP_MILLIS = 0L;
-
     /** Flag to determine source mode. In upsert mode, it will keep the tombstone message. **/
     protected final boolean upsertMode;
 
     protected String inlongMetric;
 
+    protected String auditKeys;
     protected String auditHostAndPorts;
 
     public PulsarDynamicTableSource(
@@ -163,7 +160,8 @@ public class PulsarDynamicTableSource implements ScanTableSource, SupportsReadin
             PulsarTableOptions.StartupOptions startupOptions,
             boolean upsertMode,
             String inlongMetric,
-            String auditHostAndPorts) {
+            String auditHostAndPorts,
+            String auditKeys) {
         this.producedDataType = physicalDataType;
         setTopicInfo(properties, topics, topicPattern);
 
@@ -192,6 +190,7 @@ public class PulsarDynamicTableSource implements ScanTableSource, SupportsReadin
         this.upsertMode = upsertMode;
         this.inlongMetric = inlongMetric;
         this.auditHostAndPorts = auditHostAndPorts;
+        this.auditKeys = auditKeys;
     }
 
     private void setTopicInfo(Properties properties, List<String> topics, String topicPattern) {
@@ -269,20 +268,22 @@ public class PulsarDynamicTableSource implements ScanTableSource, SupportsReadin
                 hasMetadata,
                 metadataConverters,
                 producedTypeInfo,
-                upsertMode,
-                inlongMetric,
-                auditHostAndPorts);
+                upsertMode);
     }
 
     private SourceFunction<RowData> createPulsarSource(
             ClientConfigurationData clientConfigurationData,
             PulsarDeserializationSchema<RowData> deserializationSchema) {
-        org.apache.flink.streaming.connectors.pulsar.FlinkPulsarSource source =
-                new org.apache.flink.streaming.connectors.pulsar.FlinkPulsarSource(
+        FlinkPulsarSource source =
+                new FlinkPulsarSource(
                         adminUrl,
+                        serviceUrl,
                         clientConfigurationData,
                         deserializationSchema,
-                        properties);
+                        properties,
+                        inlongMetric,
+                        auditHostAndPorts,
+                        auditKeys);
 
         if (watermarkStrategy != null) {
             source.assignTimestampsAndWatermarks(watermarkStrategy);
@@ -311,13 +312,14 @@ public class PulsarDynamicTableSource implements ScanTableSource, SupportsReadin
     private SourceFunction<RowData> createPulsarSourceWithoutAdmin(
             ClientConfigurationData clientConfigurationData,
             PulsarDeserializationSchema<RowData> deserializationSchema) {
-        FlinkPulsarSource<RowData> source = new FlinkPulsarSource<>(
+        FlinkPulsarSourceWithoutAdmin<RowData> source = new FlinkPulsarSourceWithoutAdmin<>(
                 serviceUrl,
                 clientConfigurationData,
                 deserializationSchema,
                 properties,
                 inlongMetric,
-                auditHostAndPorts);
+                auditHostAndPorts,
+                auditKeys);
 
         if (watermarkStrategy != null) {
             source.assignTimestampsAndWatermarks(watermarkStrategy);
@@ -354,7 +356,8 @@ public class PulsarDynamicTableSource implements ScanTableSource, SupportsReadin
                 startupOptions,
                 false,
                 inlongMetric,
-                auditHostAndPorts);
+                auditHostAndPorts,
+                auditKeys);
         copy.producedDataType = producedDataType;
         copy.metadataKeys = metadataKeys;
         copy.watermarkStrategy = watermarkStrategy;

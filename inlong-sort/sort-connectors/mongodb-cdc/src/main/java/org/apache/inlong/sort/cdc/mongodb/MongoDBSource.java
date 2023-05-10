@@ -18,8 +18,10 @@
 package org.apache.inlong.sort.cdc.mongodb;
 
 import com.mongodb.ConnectionString;
+import com.mongodb.client.model.changestream.FullDocument;
 import com.mongodb.kafka.connect.source.MongoSourceConfig;
 import com.mongodb.kafka.connect.source.MongoSourceConfig.ErrorTolerance;
+import com.mongodb.kafka.connect.source.MongoSourceConfig.OutputFormat;
 import com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceConnector;
 import com.ververica.cdc.debezium.Validator;
 import io.debezium.heartbeat.Heartbeat;
@@ -33,6 +35,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Properties;
 import org.apache.inlong.sort.cdc.mongodb.debezium.DebeziumDeserializationSchema;
 
@@ -113,6 +116,12 @@ public class MongoDBSource {
     // + " {\"name\": \"uid\", \"type\": \"string\"}] }, \"null\"] }"
     // + " ]"
     // + "}";
+    public static final String MONGODB_SCHEME = "mongodb";
+
+    public static final String FULL_DOCUMENT_UPDATE_LOOKUP = FullDocument.UPDATE_LOOKUP.getValue();
+
+    public static final String OUTPUT_FORMAT_SCHEMA =
+            OutputFormat.SCHEMA.name().toLowerCase(Locale.ROOT);
 
     public static <T> Builder<T> builder() {
         return new Builder<>();
@@ -197,7 +206,11 @@ public class MongoDBSource {
         /**
          * batch.size
          *
-         * <p>The cursor batch size. Default: 0
+         * <p>The cursor batch size. Default: 1024
+         *
+         * <p>The change stream cursor batch size. Specifies the maximum number of change events to
+         * return in each batch of the response from the MongoDB cluster. The default is 0 meaning
+         * it uses the server's default value. Default: 0
          */
         public Builder<T> batchSize(int batchSize) {
             checkArgument(batchSize >= 0);
@@ -209,7 +222,7 @@ public class MongoDBSource {
          * poll.await.time.ms
          *
          * <p>The amount of time to wait before checking for new results on the change stream.
-         * Default: 3000
+         * Default: 1000
          */
         public Builder<T> pollAwaitTimeMillis(int pollAwaitTimeMillis) {
             checkArgument(pollAwaitTimeMillis > 0);
@@ -222,11 +235,24 @@ public class MongoDBSource {
          *
          * <p>Maximum number of change stream documents to include in a single batch when polling
          * for new data. This setting can be used to limit the amount of data buffered internally in
-         * the connector. Default: 1000
+         * the connector. Default: 1024
          */
         public Builder<T> pollMaxBatchSize(int pollMaxBatchSize) {
             checkArgument(pollMaxBatchSize > 0);
             this.pollMaxBatchSize = pollMaxBatchSize;
+            return this;
+        }
+
+        /**
+         * change.stream.full.document
+         *
+         * <p>Determines what to return for update operations when using a Change Stream. When set
+         * to true, the change stream for partial updates will include both a delta describing the
+         * changes to the document and a copy of the entire document that was changed from some time
+         * after the change occurred. Default: true
+         */
+        public Builder<T> updateLookup(boolean updateLookup) {
+            this.updateLookup = updateLookup;
             return this;
         }
 
@@ -257,7 +283,7 @@ public class MongoDBSource {
         /**
          * copy.existing.queue.size
          *
-         * <p>The max size of the queue to use when copying data. Default: 16000
+         * <p>The max size of the queue to use when copying data. Default: 10240
          */
         public Builder<T> copyExistingQueueSize(int copyExistingQueueSize) {
             checkArgument(copyExistingQueueSize > 0);
@@ -372,7 +398,7 @@ public class MongoDBSource {
 
             props.setProperty(
                     "connector.class", MongoDBConnectorSourceConnector.class.getCanonicalName());
-            props.setProperty("name", "mongodb_binlog_source");
+            props.setProperty("name", "mongodb_cdc_source");
 
             ConnectionString connectionString = buildConnectionUri();
             props.setProperty(
@@ -386,7 +412,10 @@ public class MongoDBSource {
                 props.setProperty(COLLECTION_INCLUDE_LIST, String.join(",", collectionList));
             }
 
-            props.setProperty(MongoSourceConfig.FULL_DOCUMENT_CONFIG, FULL_DOCUMENT_UPDATE_LOOKUP);
+            if (updateLookup) {
+                props.setProperty(
+                        MongoSourceConfig.FULL_DOCUMENT_CONFIG, FULL_DOCUMENT_UPDATE_LOOKUP);
+            }
             props.setProperty(
                     MongoSourceConfig.PUBLISH_FULL_DOCUMENT_ONLY_CONFIG,
                     String.valueOf(Boolean.FALSE));

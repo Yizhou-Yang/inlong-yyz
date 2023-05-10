@@ -126,6 +126,7 @@ public class IncrementalSource<T, C extends SourceConfig>
                 .build();
 
         sourceReaderMetrics.registerMetrics(metricOption);
+
         Supplier<IncrementalSourceSplitReader<C>> splitReaderSupplier =
                 () -> new IncrementalSourceSplitReader<>(
                         readerContext.getIndexOfSubtask(), dataSourceDialect, sourceConfig);

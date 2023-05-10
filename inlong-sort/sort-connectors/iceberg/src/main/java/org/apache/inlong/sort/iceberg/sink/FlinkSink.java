@@ -158,9 +158,7 @@ public class FlinkSink {
         private ActionsProvider actionProvider;
         private boolean overwrite = false;
         private boolean appendMode = false;
-        private DistributionMode distributionMode = null;
         private Integer writeParallelism = null;
-        private boolean upsert = false;
         private List<String> equalityFieldColumns = null;
         private String uidPrefix = null;
         private ReadableConfig readableConfig = new Configuration();
@@ -170,6 +168,8 @@ public class FlinkSink {
         private String auditHostAndPorts = null;
         private CatalogLoader catalogLoader = null;
         private boolean multipleSink = false;
+        private DistributionMode distributionMode = null;
+        private boolean upsert = false;
         private MultipleSinkOption multipleSinkOption = null;
         private DirtyOptions dirtyOptions;
         private @Nullable DirtySink<Object> dirtySink;
@@ -645,7 +645,6 @@ public class FlinkSink {
                 Schema iSchema,
                 RowType flinkRowType) {
             DistributionMode writeMode = flinkWriteConf.distributionMode();
-
             LOG.info("Write distribution mode is '{}'", writeMode.modeName());
             switch (writeMode) {
                 case NONE:
@@ -736,7 +735,6 @@ public class FlinkSink {
             String auditHostAndPorts,
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink) {
-        // flink A, iceberg a
         Preconditions.checkArgument(table != null, "Iceberg table should't be null");
 
         Table serializableTable = SerializableTable.copyOf(table);

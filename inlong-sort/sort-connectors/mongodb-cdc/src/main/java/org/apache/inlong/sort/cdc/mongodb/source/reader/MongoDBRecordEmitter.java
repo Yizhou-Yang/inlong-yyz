@@ -50,6 +50,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The {@link RecordEmitter} buffers the snapshot records of split and call the stream reader to
  * emit records rather than emit the records directly.
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
  */
 public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitter<T> {
 
@@ -62,7 +63,6 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
         super(deserializationSchema, sourceReaderMetrics, false, offsetFactory);
     }
 
-    @Override
     protected void processElement(
             SourceRecord element, SourceOutput<T> output, SourceSplitState splitState)
             throws Exception {
@@ -124,6 +124,7 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
         if (sourceReaderMetrics != null) {
             sourceReaderMetrics.outputReadPhaseMetrics(ReadPhase.INCREASE_PHASE);
         }
+
     }
 
     @Override

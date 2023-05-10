@@ -19,9 +19,6 @@ package org.apache.inlong.sort.cdc.base.source;
 
 import com.ververica.cdc.connectors.base.options.StartupMode;
 import io.debezium.relational.TableId;
-import java.lang.reflect.Method;
-import java.util.List;
-import java.util.function.Supplier;
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.Boundedness;
@@ -59,6 +56,10 @@ import org.apache.inlong.sort.cdc.base.source.metrics.SourceReaderMetrics;
 import org.apache.inlong.sort.cdc.base.source.reader.IncrementalSourceReader;
 import org.apache.inlong.sort.cdc.base.source.reader.IncrementalSourceRecordEmitter;
 import org.apache.inlong.sort.cdc.base.source.reader.IncrementalSourceSplitReader;
+
+import java.lang.reflect.Method;
+import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * The basic source of Incremental Snapshot framework for datasource, it is based on FLIP-27 and
@@ -126,7 +127,7 @@ public class IncrementalSource<T, C extends SourceConfig>
                 .withRegisterMetric(RegisteredMetric.ALL)
                 .build();
 
-        sourceReaderMetrics.registerMetrics(metricOption, metricConfig.getMetricLabelList());
+        sourceReaderMetrics.registerMetrics(metricOption);
         Supplier<IncrementalSourceSplitReader<C>> splitReaderSupplier =
                 () -> new IncrementalSourceSplitReader<>(
                         readerContext.getIndexOfSubtask(), dataSourceDialect, sourceConfig);

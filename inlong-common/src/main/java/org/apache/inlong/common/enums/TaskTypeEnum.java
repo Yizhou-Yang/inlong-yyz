@@ -76,22 +76,22 @@ public enum TaskTypeEnum {
                 return MONGODB;
             case 10:
                 return TUBEMQ;
-            case 12:
-                return MQTT;
             case 11:
                 return REDIS;
-            case 212:
-                return CKAFKA;
-            case 213:
-                return MYSQL;
+            case 12:
+                return MQTT;
+            case 13:
+                return HUDI;
             case 101:
                 return TDSQL_KAFKA;
             case 102:
                 return TIDB;
-            case 13:
-                return HUDI;
             case 201:
                 return MOCK;
+            case 212:
+                return CKAFKA;
+            case 213:
+                return MYSQL;
             default:
                 throw new RuntimeException("Unsupported task type " + taskType);
         }

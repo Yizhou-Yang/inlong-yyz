@@ -114,7 +114,6 @@ public class IncrementalSourceRecordEmitter<T>
             }
             reportMetrics(element);
             emitElement(element, output);
-
         } else {
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);

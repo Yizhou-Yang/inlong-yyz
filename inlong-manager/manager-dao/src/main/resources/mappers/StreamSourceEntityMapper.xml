@@ -106,6 +106,15 @@
         where id = #{id,jdbcType=INTEGER}
         for update
     </select>
+    <select id="selectOneByTemplatedIdAndAgentIp" resultType="org.apache.inlong.manager.dao.entity.StreamSourceEntity">
+        select
+        <include refid="Base_Column_List"/>
+        from stream_source
+        where template_id = #{templateId,jdbcType=INTEGER}
+        and agent_ip = #{agentIp, jdbcType=VARCHAR}
+        and is_deleted = 0
+        limit 1
+    </select>
     <select id="selectCount" resultType="java.lang.Integer">
         select count(1)
         from stream_source
@@ -127,12 +136,20 @@
         from stream_source
         <where>
             is_deleted = 0
-            and inlong_group_id = #{request.inlongGroupId, jdbcType=VARCHAR}
+            <if test="request.inlongGroupId != null and request.inlongGroupId != ''">
+                and inlong_group_id = #{request.inlongGroupId, jdbcType=VARCHAR}
+            </if>
             <if test="request.inlongStreamId != null and request.inlongStreamId != ''">
                 and inlong_stream_id = #{request.inlongStreamId, jdbcType=VARCHAR}
             </if>
             <if test="request.sourceType != null and request.sourceType != ''">
                 and source_type = #{request.sourceType, jdbcType=VARCHAR}
+            </if>
+            <if test="request.dataNodeName != null and request.dataNodeName != ''">
+                and data_node_name = #{request.dataNodeName, jdbcType=VARCHAR}
+            </if>
+            <if test="request.inlongClusterName != null and request.inlongClusterName != ''">
+                and inlong_cluster_name = #{request.inlongClusterName, jdbcType=VARCHAR}
             </if>
             <if test="request.keyword != null and request.keyword != ''">
                 and (
@@ -143,6 +160,12 @@
             </if>
             <if test="request.status != null and request.status != ''">
                 and status = #{request.status, jdbcType=INTEGER}
+            </if>
+            <if test="request.statusList != null and request.statusList.size() > 0">
+                and status in
+                <foreach collection="request.statusList" item="status" index="index" open="(" close=")" separator=",">
+                    #{status}
+                </foreach>
             </if>
             and template_id is NULL
         </where>
@@ -237,6 +260,30 @@
             and inlong_cluster_name = #{clusterName, jdbcType=VARCHAR}
         </where>
     </select>
+    <select id="selectAllByAgentIpAndCluster" resultType="org.apache.inlong.manager.dao.entity.StreamSourceEntity">
+        select
+        <include refid="Base_Column_List"/>
+        from stream_source
+        <where>
+            and status != 99
+            <if test="statusList != null and statusList.size()>0">
+                and status in
+                <foreach item="item" index="index" collection="statusList" open="(" close=")" separator=",">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="sourceTypeList != null and sourceTypeList.size()>0">
+                and source_type in
+                <foreach item="item" index="index" collection="sourceTypeList" open="(" close=")" separator=",">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="agentIp != null and agentIp != ''">
+                and agent_ip = #{agentIp, jdbcType=VARCHAR}
+            </if>
+            and inlong_cluster_name = #{clusterName, jdbcType=VARCHAR}
+        </where>
+    </select>
     <select id="selectTemplateSourceByCluster" resultType="org.apache.inlong.manager.dao.entity.StreamSourceEntity">
         select
         <include refid="Base_Column_List"/>
@@ -305,7 +352,29 @@
             for update
         </where>
     </select>
-
+    <select id="selectNeedUpdateIdsByClusterAndDataNode" resultType="java.lang.Integer">
+        select source.id
+        from stream_source source, inlong_stream stream, inlong_group inlong_group
+        <where>
+            source.is_deleted = 0
+            and inlong_group.inlong_group_id = source.inlong_group_id
+            and inlong_group.is_deleted = 0
+            and inlong_group.status in (120, 130)
+            and stream.inlong_group_id = source.inlong_group_id
+            and stream.is_deleted = 0
+            and stream.status in (120, 130)
+            and source.status not in (99, 110)
+            <if test="clusterName != null">
+                and source.inlong_cluster_name = #{clusterName, jdbcType=VARCHAR}
+            </if>
+            <if test="nodeName != null">
+                and source.data_node_name = #{nodeName, jdbcType=VARCHAR}
+            </if>
+            <if test="sourceType != null">
+                and source.source_type = #{sourceType, jdbcType=VARCHAR}
+            </if>
+        </where>
+    </select>
     <update id="updateByRelatedId">
         update stream_source
         <set>
@@ -428,6 +497,15 @@
             and source_type != 'AUTO_PUSH'
         </where>
     </update>
+    <update id="updatePreviousStatusByRelatedId">
+        update stream_source
+        set previous_status = #{previousStatus, jdbcType=INTEGER}
+        <where>
+            is_deleted = 0
+            and id = #{id, jdbcType=INTEGER}
+            and source_type != 'AUTO_PUSH'
+        </where>
+    </update>
     <update id="updateIpAndUuid">
         update stream_source
         set agent_ip = #{agentIp,jdbcType=VARCHAR},
@@ -443,6 +521,24 @@
             report_time = #{reportTime,jdbcType=TIMESTAMP},
             modify_time = modify_time
         where id = #{id,jdbcType=INTEGER}
+    </update>
+    <update id="updateStatusByIds">
+        update stream_source
+        <set>
+            previous_status = status,
+            status          = #{status, jdbcType=INTEGER},
+            modifier        = #{operator, jdbcType=VARCHAR},
+            version         = version + 1
+        </set>
+        <where>
+            is_deleted = 0
+            <if test="idList != null and idList.size() > 0">
+                and id in
+                <foreach item="item" index="index" collection="idList" open="(" close=")" separator=",">
+                    #{item}
+                </foreach>
+            </if>
+        </where>
     </update>
 
     <delete id="deleteByRelatedId">

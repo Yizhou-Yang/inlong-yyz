@@ -21,15 +21,17 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.manager.common.consts.InlongConstants;
 import org.apache.inlong.manager.common.consts.SinkType;
+import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
 import org.apache.inlong.manager.common.enums.SinkStatus;
 import org.apache.inlong.manager.common.exceptions.WorkflowException;
 import org.apache.inlong.manager.common.util.CommonBeanUtils;
 import org.apache.inlong.manager.common.util.Preconditions;
 import org.apache.inlong.manager.dao.entity.StreamSinkFieldEntity;
 import org.apache.inlong.manager.dao.mapper.StreamSinkFieldEntityMapper;
+import org.apache.inlong.manager.pojo.node.ck.ClickHouseDataNodeDTO;
 import org.apache.inlong.manager.pojo.node.ck.ClickHouseDataNodeInfo;
 import org.apache.inlong.manager.pojo.sink.SinkInfo;
-import org.apache.inlong.manager.pojo.sink.ck.ClickHouseColumnInfo;
+import org.apache.inlong.manager.pojo.sink.ck.ClickHouseFieldInfo;
 import org.apache.inlong.manager.pojo.sink.ck.ClickHouseSinkDTO;
 import org.apache.inlong.manager.pojo.sink.ck.ClickHouseTableInfo;
 import org.apache.inlong.manager.service.node.DataNodeOperateHelper;
@@ -88,11 +90,12 @@ public class ClickHouseResourceOperator implements SinkResourceOperator {
         // read from data node if not supplied by user
         if (StringUtils.isBlank(ckInfo.getJdbcUrl())) {
             String dataNodeName = sinkInfo.getDataNodeName();
-            Preconditions.checkNotEmpty(dataNodeName, "clickhouse jdbc url not specified and data node is empty");
+            Preconditions.expectNotBlank(dataNodeName, ErrorCodeEnum.INVALID_PARAMETER,
+                    "clickhouse jdbc url not specified and data node is empty");
             ClickHouseDataNodeInfo dataNodeInfo = (ClickHouseDataNodeInfo) dataNodeHelper.getDataNodeInfo(
                     dataNodeName, sinkInfo.getSinkType());
             CommonBeanUtils.copyProperties(dataNodeInfo, ckInfo);
-            ckInfo.setJdbcUrl(dataNodeInfo.getUrl());
+            ckInfo.setJdbcUrl(ClickHouseDataNodeDTO.convertToJdbcUrl(dataNodeInfo.getUrl()));
             ckInfo.setPassword(dataNodeInfo.getToken());
         }
         return ckInfo;
@@ -107,18 +110,11 @@ public class ClickHouseResourceOperator implements SinkResourceOperator {
         }
 
         // set columns
-        List<ClickHouseColumnInfo> columnList = new ArrayList<>();
-        for (StreamSinkFieldEntity field : fieldList) {
-            ClickHouseColumnInfo columnInfo = new ClickHouseColumnInfo();
-            columnInfo.setName(field.getFieldName());
-            columnInfo.setType(field.getFieldType());
-            columnInfo.setDesc(field.getFieldComment());
-            columnList.add(columnInfo);
-        }
+        List<ClickHouseFieldInfo> fieldInfoList = getSClickHouseColumnInfoFromSink(fieldList);
 
         try {
             ClickHouseSinkDTO ckInfo = getClickHouseInfo(sinkInfo);
-            ClickHouseTableInfo tableInfo = ClickHouseSinkDTO.getClickHouseTableInfo(ckInfo, columnList);
+            ClickHouseTableInfo tableInfo = ClickHouseSinkDTO.getClickHouseTableInfo(ckInfo, fieldInfoList);
             String url = ckInfo.getJdbcUrl();
             String user = ckInfo.getUsername();
             String password = ckInfo.getPassword();
@@ -138,9 +134,9 @@ public class ClickHouseResourceOperator implements SinkResourceOperator {
                 ClickHouseJdbcUtils.createTable(url, user, password, tableInfo);
             } else {
                 // 4. table exists, add columns - skip the exists columns
-                List<ClickHouseColumnInfo> existColumns = ClickHouseJdbcUtils.getColumns(url,
+                List<ClickHouseFieldInfo> existColumns = ClickHouseJdbcUtils.getFields(url,
                         user, password, dbName, tableName);
-                List<ClickHouseColumnInfo> needAddColumns = tableInfo.getColumns().stream()
+                List<ClickHouseFieldInfo> needAddColumns = tableInfo.getFieldInfoList().stream()
                         .skip(existColumns.size()).collect(toList());
                 if (CollectionUtils.isNotEmpty(needAddColumns)) {
                     ClickHouseJdbcUtils.addColumns(url, user, password, dbName, tableName, needAddColumns);
@@ -159,6 +155,23 @@ public class ClickHouseResourceOperator implements SinkResourceOperator {
         }
 
         LOGGER.info("success create ClickHouse table for sink id [" + sinkInfo.getId() + "]");
+    }
+
+    public List<ClickHouseFieldInfo> getSClickHouseColumnInfoFromSink(List<StreamSinkFieldEntity> sinkList) {
+        List<ClickHouseFieldInfo> columnInfoList = new ArrayList<>();
+        for (StreamSinkFieldEntity fieldEntity : sinkList) {
+            if (StringUtils.isNotBlank(fieldEntity.getExtParams())) {
+                ClickHouseFieldInfo clickHouseFieldInfo = ClickHouseFieldInfo.getFromJson(
+                        fieldEntity.getExtParams());
+                CommonBeanUtils.copyProperties(fieldEntity, clickHouseFieldInfo, true);
+                columnInfoList.add(clickHouseFieldInfo);
+            } else {
+                ClickHouseFieldInfo clickHouseFieldInfo = new ClickHouseFieldInfo();
+                CommonBeanUtils.copyProperties(fieldEntity, clickHouseFieldInfo, true);
+                columnInfoList.add(clickHouseFieldInfo);
+            }
+        }
+        return columnInfoList;
     }
 
 }

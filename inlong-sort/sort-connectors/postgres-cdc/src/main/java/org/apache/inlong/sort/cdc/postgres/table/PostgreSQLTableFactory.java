@@ -37,6 +37,7 @@ import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProper
 import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkState;
+import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SOURCE_MULTIPLE_ENABLE;
@@ -278,6 +279,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(SOURCE_MULTIPLE_ENABLE);
         options.add(INLONG_METRIC);
         options.add(INLONG_AUDIT);
+        options.add(AUDIT_KEYS);
         options.add(APPEND_MODE);
         options.add(ROW_KINDS_FILTERED);
         options.add(CHANGELOG_MODE);

@@ -85,7 +85,8 @@
         select
         <include refid="Base_Column_List"/>
         from inlong_cluster
-        where id = #{id,jdbcType=INTEGER}
+        where is_deleted = 0
+        and id = #{id,jdbcType=INTEGER}
     </select>
     <select id="selectByKey" resultType="org.apache.inlong.manager.dao.entity.InlongClusterEntity">
         select
@@ -156,6 +157,11 @@
                 and (name like CONCAT('%', #{keyword}, '%')
                 or cluster_tags like CONCAT('%', #{keyword}, '%')
                 or ext_tag like CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+            <if test="isAdminRole == false">
+                and (
+                creator = #{currentUser, jdbcType=VARCHAR} or find_in_set(#{currentUser, jdbcType=VARCHAR}, in_charges)
                 )
             </if>
             <if test="status != null and status != ''">

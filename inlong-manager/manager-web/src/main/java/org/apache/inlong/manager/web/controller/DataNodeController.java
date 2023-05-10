@@ -22,7 +22,10 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.apache.inlong.manager.common.enums.OperationType;
-import org.apache.inlong.manager.common.validation.UpdateValidation;
+import org.apache.inlong.manager.common.enums.UserTypeEnum;
+import org.apache.inlong.manager.common.validation.SaveValidation;
+import org.apache.inlong.manager.common.validation.UpdateByIdValidation;
+import org.apache.inlong.manager.common.validation.UpdateByKeyValidation;
 import org.apache.inlong.manager.pojo.common.PageResult;
 import org.apache.inlong.manager.pojo.common.Response;
 import org.apache.inlong.manager.pojo.common.UpdateResult;
@@ -60,7 +63,7 @@ public class DataNodeController {
     @ApiOperation(value = "Save node")
     @OperationLog(operation = OperationType.CREATE)
     @RequiresRoles(value = UserRoleCode.ADMIN)
-    public Response<Integer> save(@Validated @RequestBody DataNodeRequest request) {
+    public Response<Integer> save(@Validated(SaveValidation.class) @RequestBody DataNodeRequest request) {
         String currentUser = LoginUserUtils.getLoginUser().getName();
         return Response.success(dataNodeService.save(request, currentUser));
     }
@@ -69,19 +72,22 @@ public class DataNodeController {
     @ApiOperation(value = "Get node by id")
     @ApiImplicitParam(name = "id", value = "Data node ID", dataTypeClass = Integer.class, required = true)
     public Response<DataNodeInfo> get(@PathVariable Integer id) {
-        return Response.success(dataNodeService.get(id));
+        String currentUser = LoginUserUtils.getLoginUser().getName();
+        return Response.success(dataNodeService.get(id, currentUser));
     }
 
     @PostMapping(value = "/node/list")
     @ApiOperation(value = "List data node")
     public Response<PageResult<DataNodeInfo>> list(@RequestBody DataNodePageRequest request) {
+        request.setCurrentUser(LoginUserUtils.getLoginUser().getName());
+        request.setIsAdminRole(LoginUserUtils.getLoginUser().getRoles().contains(UserTypeEnum.ADMIN.name()));
         return Response.success(dataNodeService.list(request));
     }
 
     @PostMapping(value = "/node/update")
     @OperationLog(operation = OperationType.UPDATE)
     @ApiOperation(value = "Update data node")
-    public Response<Boolean> update(@Validated(UpdateValidation.class) @RequestBody DataNodeRequest request) {
+    public Response<Boolean> update(@Validated(UpdateByIdValidation.class) @RequestBody DataNodeRequest request) {
         String username = LoginUserUtils.getLoginUser().getName();
         return Response.success(dataNodeService.update(request, username));
     }
@@ -89,7 +95,8 @@ public class DataNodeController {
     @PostMapping(value = "/node/updateByKey")
     @OperationLog(operation = OperationType.UPDATE)
     @ApiOperation(value = "Update data node by key")
-    public Response<UpdateResult> updateByKey(@RequestBody DataNodeRequest request) {
+    public Response<UpdateResult> updateByKey(
+            @Validated(UpdateByKeyValidation.class) @RequestBody DataNodeRequest request) {
         String username = LoginUserUtils.getLoginUser().getName();
         return Response.success(dataNodeService.updateByKey(request, username));
     }

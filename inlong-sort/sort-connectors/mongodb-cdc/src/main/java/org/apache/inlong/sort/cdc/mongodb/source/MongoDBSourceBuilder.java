@@ -27,8 +27,8 @@ import org.apache.inlong.sort.cdc.mongodb.debezium.DebeziumDeserializationSchema
 import org.apache.inlong.sort.cdc.mongodb.source.config.MongoDBSourceConfigFactory;
 
 /**
- * The builder class for {@link com.ververica.cdc.connectors.mongodb.source.MongoDBSource} to make it easier for
- * the users to construct a {@link com.ververica.cdc.connectors.mongodb.source.MongoDBSource}.
+ * The builder class for {@link MongoDBSource} to make it easier for the users to construct a {@link
+ * MongoDBSource}.
  *
  * <pre>{@code
  * MongoDBSource
@@ -43,7 +43,8 @@ import org.apache.inlong.sort.cdc.mongodb.source.config.MongoDBSourceConfigFacto
  * }</pre>
  *
  * <p>Check the Java docs of each individual method to learn more about the settings to build a
- * {@link com.ververica.cdc.connectors.mongodb.source.MongoDBSource}.
+ * {@link MongoDBSource}.
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
  */
 @Experimental
 @PublicEvolving

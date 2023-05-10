@@ -31,6 +31,7 @@ import org.apache.iceberg.util.StructProjection;
 /**
  * Create a {@link KeySelector} to shuffle by equality fields, to ensure same equality fields record
  * will be emitted to same writer in order.
+ * `EqualityFieldKeySelector` is copied from https://github.com/apache/iceberg/blob/e2bb9ad7e792efca419fa7c4a1afde7c4c44fa01/flink/v1.13/flink/src/main/java/org/apache/iceberg/flink/sink/EqualityFieldKeySelector.java#L36
  */
 class EqualityFieldKeySelector implements KeySelector<RowData, Integer> {
 
@@ -59,7 +60,9 @@ class EqualityFieldKeySelector implements KeySelector<RowData, Integer> {
         return rowDataWrapper;
     }
 
-    /** Construct the {@link StructProjection} lazily because it is not serializable. */
+    /**
+     * Construct the {@link StructProjection} lazily because it is not serializable.
+     */
     protected StructProjection lazyStructProjection() {
         if (structProjection == null) {
             structProjection = StructProjection.create(schema, deleteSchema);
@@ -67,7 +70,9 @@ class EqualityFieldKeySelector implements KeySelector<RowData, Integer> {
         return structProjection;
     }
 
-    /** Construct the {@link StructLikeWrapper} lazily because it is not serializable. */
+    /**
+     * Construct the {@link StructLikeWrapper} lazily because it is not serializable.
+     */
     protected StructLikeWrapper lazyStructLikeWrapper() {
         if (structLikeWrapper == null) {
             structLikeWrapper = StructLikeWrapper.forType(deleteSchema.asStruct());

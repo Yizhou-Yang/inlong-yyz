@@ -103,6 +103,7 @@ import static org.apache.flink.streaming.connectors.kafka.table.KafkaOptions.get
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaOptions.validateTableSourceOptions;
 import static org.apache.flink.table.factories.FactoryUtil.FORMAT;
 import static org.apache.flink.table.factories.FactoryUtil.SINK_PARALLELISM;
+import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.DATASOURCE_PARTITION_MAP;
 import static org.apache.inlong.sort.base.Constants.DIRTY_PREFIX;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
@@ -331,6 +332,7 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
         options.add(KAFKA_IGNORE_ALL_CHANGELOG);
         options.add(INLONG_METRIC);
         options.add(INLONG_AUDIT);
+        options.add(AUDIT_KEYS);
         options.add(SINK_MULTIPLE_FORMAT);
         options.add(SINK_MULTIPLE_PARTITION_PATTERN);
         options.add(PATTERN_PARTITION_MAP);
@@ -352,10 +354,13 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
         final DecodingFormat<DeserializationSchema<RowData>> valueDecodingFormat =
                 getValueDecodingFormat(helper);
 
-        helper.validateExcept(PROPERTIES_PREFIX, DIRTY_PREFIX);
+        final String valueFormatPrefix = tableOptions.getOptional(FORMAT)
+                .orElse(tableOptions.get(VALUE_FORMAT));
 
+        // Validate the option data type.
+        helper.validateExcept(PROPERTIES_PREFIX, DIRTY_PREFIX, valueFormatPrefix);
+        // Validate the option values.
         validateTableSourceOptions(tableOptions);
-
         validatePKConstraints(
                 context.getObjectIdentifier(), context.getCatalogTable(), valueDecodingFormat);
 
@@ -384,6 +389,9 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
         final String inlongMetric = tableOptions.getOptional(INLONG_METRIC).orElse(null);
 
         final String auditHostAndPorts = tableOptions.getOptional(INLONG_AUDIT).orElse(null);
+
+        final String auditKeys = tableOptions.getOptional(AUDIT_KEYS).orElse(null);
+
         // Build the dirty data side-output
         final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(tableOptions);
         final DirtySink<String> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
@@ -403,7 +411,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
                 inlongMetric,
                 auditHostAndPorts,
                 dirtyOptions,
-                dirtySink);
+                dirtySink,
+                auditKeys);
     }
 
     @Override
@@ -520,7 +529,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
             String inlongMetric,
             String auditHostAndPorts,
             DirtyOptions dirtyOptions,
-            @Nullable DirtySink<String> dirtySink) {
+            @Nullable DirtySink<String> dirtySink,
+            String auditKeys) {
         return new KafkaDynamicSource(
                 physicalDataType,
                 keyDecodingFormat,
@@ -538,7 +548,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
                 inlongMetric,
                 auditHostAndPorts,
                 dirtyOptions,
-                dirtySink);
+                dirtySink,
+                auditKeys);
     }
 
     protected KafkaDynamicSink createKafkaTableSink(

@@ -17,7 +17,6 @@
 
 package org.apache.inlong.manager.pojo.cluster.agent;
 
-import java.util.List;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -25,20 +24,38 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.inlong.manager.common.enums.ClusterType;
 import org.apache.inlong.manager.common.util.JsonTypeDefine;
-import org.apache.inlong.manager.pojo.cluster.ClusterRequest;
+import org.apache.inlong.manager.pojo.cluster.ClusterNodeRequest;
+
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Pattern;
+import java.util.List;
 
 /**
- * Inlong cluster request for Agent
+ * Inlong cluster node request for Agent
  */
 @Data
 @ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true)
 @JsonTypeDefine(value = ClusterType.AGENT)
-@ApiModel("Inlong agent node request for Agent cluster")
-public class AgentClusterNodeRequest extends ClusterRequest {
+@ApiModel("Inlong cluster node request for Agent")
+public class AgentClusterNodeRequest extends ClusterNodeRequest {
+
+    @ApiModelProperty(value = "Agent group name")
+    private String agentGroup;
+
+    @NotBlank(message = "cluster name cannot be blank")
+    @ApiModelProperty(value = "Cluster name")
+    @Pattern(regexp = "^[a-z0-9_.-]{1,128}$", message = "only supports lowercase letters, numbers, '.', '-', or '_'")
+    private String name;
+
+    @NotBlank(message = "clusterTags cannot be blank")
+    @ApiModelProperty(value = "Cluster tags, separated by commas")
+    private String clusterTags;
 
     private List<DeleteAgentClusterNodeRequest> deleteAgentClusterNodeRequests;
-    @ApiModelProperty(value = "Version number of the server list collected by the cluster")
-    private Integer serverVersion = 1;
+
+    public AgentClusterNodeRequest() {
+        this.setType(ClusterType.AGENT);
+    }
 
 }

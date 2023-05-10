@@ -25,6 +25,8 @@ import org.apache.inlong.manager.common.util.Preconditions;
 import org.apache.inlong.manager.pojo.common.PageResult;
 import org.apache.inlong.manager.pojo.common.Response;
 import org.apache.inlong.manager.pojo.common.UpdateResult;
+import org.apache.inlong.manager.pojo.sink.SinkPageRequest;
+import org.apache.inlong.manager.pojo.sink.SinkField;
 import org.apache.inlong.manager.pojo.sink.SinkRequest;
 import org.apache.inlong.manager.pojo.sink.StreamSink;
 
@@ -51,7 +53,7 @@ public class StreamSinkClient {
      * Delete stream sink info by ID.
      */
     public boolean deleteSink(int id) {
-        Preconditions.checkTrue(id > 0, "sinkId is illegal");
+        Preconditions.expectTrue(id > 0, "sinkId is illegal");
         Response<Boolean> response = ClientUtils.executeHttpCall(streamSinkApi.deleteById(id));
         ClientUtils.assertRespSuccess(response);
         return response.getData();
@@ -77,8 +79,20 @@ public class StreamSinkClient {
      * List stream sinks by the specified sink type.
      */
     public List<StreamSink> listSinks(String groupId, String streamId, String sinkType) {
-        Response<PageResult<StreamSink>> response = ClientUtils.executeHttpCall(
-                streamSinkApi.list(groupId, streamId, sinkType));
+        SinkPageRequest pageRequest = new SinkPageRequest();
+        pageRequest.setInlongGroupId(groupId);
+        pageRequest.setInlongStreamId(streamId);
+        pageRequest.setSinkType(sinkType);
+        Response<PageResult<StreamSink>> response = ClientUtils.executeHttpCall(streamSinkApi.list(pageRequest));
+        ClientUtils.assertRespSuccess(response);
+        return response.getData().getList();
+    }
+
+    /**
+     * Paging query stream sink info based on conditions.
+     */
+    public List<StreamSink> listSinks(SinkPageRequest pageRequest) {
+        Response<PageResult<StreamSink>> response = ClientUtils.executeHttpCall(streamSinkApi.list(pageRequest));
         ClientUtils.assertRespSuccess(response);
         return response.getData().getList();
     }
@@ -116,6 +130,18 @@ public class StreamSinkClient {
      */
     public StreamSink getSinkInfo(Integer sinkId) {
         Response<StreamSink> response = ClientUtils.executeHttpCall(streamSinkApi.get(sinkId));
+        ClientUtils.assertRespSuccess(response);
+        return response.getData();
+    }
+
+    /**
+     * Converts a json string to a sinkFields
+     *
+     * @param fieldsJson JSON string for the field information
+     * @return list of sink field
+     */
+    public List<SinkField> parseFields(String fieldsJson) {
+        Response<List<SinkField>> response = ClientUtils.executeHttpCall(streamSinkApi.parseFields(fieldsJson));
         ClientUtils.assertRespSuccess(response);
         return response.getData();
     }

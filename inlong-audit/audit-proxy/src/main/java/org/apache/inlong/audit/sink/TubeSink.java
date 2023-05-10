@@ -31,7 +31,10 @@ import org.apache.flume.instrumentation.SinkCounter;
 import org.apache.flume.sink.AbstractSink;
 import org.apache.inlong.audit.base.HighPriorityThreadFactory;
 import org.apache.inlong.audit.consts.ConfigConstants;
+import org.apache.inlong.audit.file.ConfigManager;
 import org.apache.inlong.audit.utils.FailoverChannelProcessorHolder;
+import org.apache.inlong.common.constant.MQType;
+import org.apache.inlong.common.pojo.audit.MQInfo;
 import org.apache.inlong.common.util.NetworkUtils;
 import org.apache.inlong.tubemq.client.config.TubeClientConfig;
 import org.apache.inlong.tubemq.client.exception.TubeClientException;
@@ -46,6 +49,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -100,7 +104,7 @@ public class TubeSink extends AbstractSink implements Configurable {
         /*
          * stat tube performance
          */
-        logger.info("tubePerformanceTask!!!!!!");
+        logger.info("init tubePerformanceTask");
         scheduledExecutorService.scheduleWithFixedDelay(tubePerformanceTask, 0L,
                 PRINT_INTERVAL, TimeUnit.SECONDS);
     }
@@ -144,7 +148,7 @@ public class TubeSink extends AbstractSink implements Configurable {
 
     @Override
     public synchronized void start() {
-        logger.info("tube sink starting...");
+        logger.info("tube sink starting");
         try {
             createConnection();
         } catch (FlumeException e) {
@@ -176,7 +180,7 @@ public class TubeSink extends AbstractSink implements Configurable {
 
     @Override
     public synchronized void stop() {
-        logger.info("tubesink stopping");
+        logger.info("tube sink stopping");
         destroyConnection();
         this.canTake = false;
         int waitCount = 0;
@@ -209,7 +213,7 @@ public class TubeSink extends AbstractSink implements Configurable {
 
     @Override
     public Status process() throws EventDeliveryException {
-        logger.debug("process......");
+        logger.info("tube sink processing");
         if (!this.canTake) {
             return Status.BACKOFF;
         }
@@ -256,7 +260,6 @@ public class TubeSink extends AbstractSink implements Configurable {
         topic = context.getString(TOPIC);
         Preconditions.checkState(StringUtils.isNotEmpty(topic), "No topic specified");
 
-        masterHostAndPortList = context.getString(MASTER_HOST_PORT_LIST);
         Preconditions.checkState(masterHostAndPortList != null,
                 "No master and port list specified");
 
@@ -363,7 +366,7 @@ public class TubeSink extends AbstractSink implements Configurable {
         }
 
         try {
-            TubeClientConfig conf = initTubeConfig(masterHostAndPortList);
+            TubeClientConfig conf = initTubeConfig();
             sessionFactory = new TubeMultiSessionFactory(conf);
             logger.info("create tube connection successfully");
         } catch (TubeClientException e) {
@@ -383,7 +386,15 @@ public class TubeSink extends AbstractSink implements Configurable {
         }
     }
 
-    private TubeClientConfig initTubeConfig(String masterHostAndPortList) throws Exception {
+    private TubeClientConfig initTubeConfig() throws Exception {
+        ConfigManager configManager = ConfigManager.getInstance();
+        List<MQInfo> mqInfoList = configManager.getMqInfoList();
+        mqInfoList.forEach(mqClusterInfo -> {
+            if (MQType.TUBEMQ.equals(mqClusterInfo.getMqType())) {
+                masterHostAndPortList = mqClusterInfo.getUrl();
+            }
+        });
+
         final TubeClientConfig tubeClientConfig = new TubeClientConfig(masterHostAndPortList);
         tubeClientConfig.setLinkMaxAllowedDelayedMsgCount(linkMaxAllowedDelayedMsgCount);
         tubeClientConfig.setSessionWarnDelayedMsgCount(sessionWarnDelayedMsgCount);

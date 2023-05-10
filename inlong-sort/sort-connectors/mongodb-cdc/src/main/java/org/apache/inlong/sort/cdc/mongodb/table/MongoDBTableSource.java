@@ -36,6 +36,7 @@ import org.apache.inlong.sort.cdc.mongodb.debezium.DebeziumDeserializationSchema
 import org.apache.inlong.sort.cdc.mongodb.debezium.table.MetadataConverter;
 import org.apache.inlong.sort.cdc.mongodb.debezium.table.MongoDBConnectorDeserializationSchema;
 import org.apache.inlong.sort.cdc.mongodb.source.MongoDBSource;
+
 import org.apache.inlong.sort.cdc.mongodb.table.filter.RowKindValidator;
 
 import javax.annotation.Nullable;
@@ -142,11 +143,11 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
         this.heartbeatIntervalMillis = heartbeatIntervalMillis;
         this.localTimeZone = localTimeZone;
-        this.producedDataType = physicalSchema.toPhysicalRowDataType();
-        this.metadataKeys = Collections.emptyList();
         this.enableParallelRead = enableParallelRead;
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
+        this.producedDataType = physicalSchema.toPhysicalRowDataType();
+        this.metadataKeys = Collections.emptyList();
         this.inlongMetric = inlongMetric;
         this.inlongAudit = inlongAudit;
         this.rowValidator = rowFilter;

@@ -42,7 +42,16 @@ public interface InlongClusterNodeEntityMapper {
     List<InlongClusterNodeEntity> selectByParentId(@Param("parentId") Integer parentId,
             @Param("protocolType") String protocolType);
 
+    List<InlongClusterNodeEntity> selectByIpAndType(@Param("ip") String ip, @Param("type") String type);
+
     int updateById(InlongClusterNodeEntity record);
+
+    int updateByIdSelective(InlongClusterNodeEntity record);
+
+    /**
+     * Update the status to `nextStatus` by the given id.
+     */
+    int updateStatus(@Param("id") Integer id, @Param("nextStatus") Integer nextStatus, @Param("status") Integer status);
 
     int deleteById(Integer id);
 

@@ -48,21 +48,22 @@ import org.apache.inlong.sort.protocol.transformation.operator.AndOperator;
 import org.apache.inlong.sort.protocol.transformation.operator.EmptyOperator;
 import org.apache.inlong.sort.protocol.transformation.operator.EqualOperator;
 import org.apache.inlong.sort.protocol.transformation.relation.InnerJoinNodeRelation;
+import org.apache.inlong.sort.protocol.transformation.relation.IntervalJoinRelation;
 import org.apache.inlong.sort.protocol.transformation.relation.LeftOuterJoinNodeRelation;
+import org.apache.inlong.sort.protocol.transformation.relation.LeftOuterTemporalJoinRelation;
 import org.apache.inlong.sort.protocol.transformation.relation.NodeRelation;
 import org.apache.inlong.sort.protocol.transformation.relation.RightOuterJoinNodeRelation;
 import org.apache.inlong.sort.protocol.transformation.relation.UnionNodeRelation;
 import org.apache.inlong.sort.protocol.transformation.relation.LeftOuterTemporalJoinRelation;
 import org.apache.inlong.sort.protocol.transformation.relation.IntervalJoinRelation;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import java.util.HashMap;
 import java.util.Set;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
 
 /**

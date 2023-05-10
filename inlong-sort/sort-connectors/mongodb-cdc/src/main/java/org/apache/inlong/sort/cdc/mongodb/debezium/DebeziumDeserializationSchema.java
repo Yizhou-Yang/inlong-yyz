@@ -17,11 +17,12 @@
 
 package org.apache.inlong.sort.cdc.mongodb.debezium;
 
-import java.io.Serializable;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.util.Collector;
 import org.apache.kafka.connect.source.SourceRecord;
+
+import java.io.Serializable;
 
 /**
  * The deserialization schema describes how to turn the Debezium SourceRecord into data types

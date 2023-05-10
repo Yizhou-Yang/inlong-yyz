@@ -69,8 +69,6 @@ public class StarRocksDataNodeOperator extends AbstractDataNodeOperator {
             StarRocksDataNodeDTO dto = StarRocksDataNodeDTO.getFromJson(entity.getExtParams());
             CommonBeanUtils.copyProperties(dto, starRocksDataNodeInfo);
         }
-
-        LOGGER.debug("success to get starRocks data node from entity");
         return starRocksDataNodeInfo;
     }
 
@@ -81,10 +79,9 @@ public class StarRocksDataNodeOperator extends AbstractDataNodeOperator {
         try {
             StarRocksDataNodeDTO dto = StarRocksDataNodeDTO.getFromRequest(starRocksDataNodeRequest);
             targetEntity.setExtParams(objectMapper.writeValueAsString(dto));
-            LOGGER.debug("success to set entity for starRocks data node");
         } catch (Exception e) {
-            LOGGER.error("failed to set entity for starRocks data node: ", e);
-            throw new BusinessException(ErrorCodeEnum.SOURCE_INFO_INCORRECT.getMessage());
+            throw new BusinessException(ErrorCodeEnum.SOURCE_INFO_INCORRECT,
+                    String.format("Failed to build extParams for StarRocks node: %s", e.getMessage()));
         }
     }
 
@@ -93,7 +90,7 @@ public class StarRocksDataNodeOperator extends AbstractDataNodeOperator {
         String jdbcUrl = request.getUrl();
         String username = request.getUsername();
         String password = request.getToken();
-        Preconditions.checkNotNull(jdbcUrl, "connection jdbcUrl cannot be empty");
+        Preconditions.expectNotBlank(jdbcUrl, ErrorCodeEnum.INVALID_PARAMETER, "connection jdbcUrl cannot be empty");
         try (Connection ignored = StarRocksJdbcUtils.getConnection(jdbcUrl, username, password)) {
             LOGGER.info("starRocks connection not null - connection success for jdbcUrl={}, username={}, password={}",
                     jdbcUrl, username, password);

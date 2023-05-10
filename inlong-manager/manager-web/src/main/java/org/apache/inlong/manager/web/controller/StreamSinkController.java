@@ -22,10 +22,12 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.apache.inlong.manager.common.enums.OperationType;
-import org.apache.inlong.manager.common.validation.UpdateValidation;
+import org.apache.inlong.manager.common.validation.UpdateByIdValidation;
+import org.apache.inlong.manager.common.validation.UpdateByKeyValidation;
 import org.apache.inlong.manager.pojo.common.PageResult;
 import org.apache.inlong.manager.pojo.common.Response;
 import org.apache.inlong.manager.pojo.common.UpdateResult;
+import org.apache.inlong.manager.pojo.sink.SinkField;
 import org.apache.inlong.manager.pojo.sink.SinkPageRequest;
 import org.apache.inlong.manager.pojo.sink.SinkRequest;
 import org.apache.inlong.manager.pojo.sink.StreamSink;
@@ -40,6 +42,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * Stream sink control layer
@@ -66,23 +70,24 @@ public class StreamSinkController {
         return Response.success(sinkService.get(id));
     }
 
-    @RequestMapping(value = "/sink/list", method = RequestMethod.GET)
+    @RequestMapping(value = "/sink/list", method = RequestMethod.POST)
     @ApiOperation(value = "List stream sinks by paginating")
-    public Response<PageResult<? extends StreamSink>> listByCondition(SinkPageRequest request) {
+    public Response<PageResult<? extends StreamSink>> listByCondition(@RequestBody SinkPageRequest request) {
         return Response.success(sinkService.listByCondition(request));
     }
 
     @RequestMapping(value = "/sink/update", method = RequestMethod.POST)
     @OperationLog(operation = OperationType.UPDATE)
     @ApiOperation(value = "Update stream sink")
-    public Response<Boolean> update(@Validated(UpdateValidation.class) @RequestBody SinkRequest request) {
+    public Response<Boolean> update(@Validated(UpdateByIdValidation.class) @RequestBody SinkRequest request) {
         return Response.success(sinkService.update(request, LoginUserUtils.getLoginUser().getName()));
     }
 
     @RequestMapping(value = "/sink/updateByKey", method = RequestMethod.POST)
     @OperationLog(operation = OperationType.UPDATE)
     @ApiOperation(value = "Update stream sink by key")
-    public Response<UpdateResult> updateByKey(@RequestBody SinkRequest request) {
+    public Response<UpdateResult> updateByKey(
+            @Validated(UpdateByKeyValidation.class) @RequestBody SinkRequest request) {
         return Response.success(sinkService.updateByKey(request, LoginUserUtils.getLoginUser().getName()));
     }
 
@@ -111,6 +116,13 @@ public class StreamSinkController {
             @RequestParam String groupId, @RequestParam String streamId, @RequestParam String name) {
         String username = LoginUserUtils.getLoginUser().getName();
         return Response.success(sinkService.deleteByKey(groupId, streamId, name, startProcess, username));
+    }
+
+    @RequestMapping(value = "/sink/parseFields", method = RequestMethod.POST)
+    @ApiOperation(value = "parse stream sink fields from JSON string")
+    @ApiImplicitParam(name = "fieldsJson", dataTypeClass = String.class, required = true)
+    public Response<List<SinkField>> parseFields(@RequestBody String fieldsJson) {
+        return Response.success(sinkService.parseFields(fieldsJson));
     }
 
 }

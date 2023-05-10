@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.inlong.common.constant.Constants;
 import org.apache.inlong.common.enums.DataTypeEnum;
 import org.apache.inlong.manager.common.consts.SourceType;
 import org.apache.inlong.manager.common.enums.ClusterType;
@@ -77,7 +78,8 @@ public class KafkaSourceOperator extends AbstractSourceOperator {
             KafkaSourceDTO dto = KafkaSourceDTO.getFromRequest(sourceRequest);
             targetEntity.setExtParams(objectMapper.writeValueAsString(dto));
         } catch (Exception e) {
-            throw new BusinessException(ErrorCodeEnum.SOURCE_INFO_INCORRECT.getMessage() + ": " + e.getMessage());
+            throw new BusinessException(ErrorCodeEnum.SOURCE_INFO_INCORRECT,
+                    String.format("serialize extParams of Kafka SourceDTO failure: %s", e.getMessage()));
         }
     }
 
@@ -111,8 +113,18 @@ public class KafkaSourceOperator extends AbstractSourceOperator {
             kafkaSource.setSourceName(streamId);
             kafkaSource.setBootstrapServers(bootstrapServers);
             kafkaSource.setTopic(streamInfo.getMqResource());
-            String serializationType = DataTypeEnum.forType(streamInfo.getDataType()).getType();
-            kafkaSource.setSerializationType(serializationType);
+            if (StringUtils.isNotBlank(streamInfo.getDataType())) {
+                String serializationType = DataTypeEnum.forType(streamInfo.getDataType()).getType();
+                kafkaSource.setSerializationType(serializationType);
+            }
+            String topicName = streamInfo.getMqResource();
+            if (StringUtils.isBlank(topicName) || topicName.equals(streamId)) {
+                // the default mq resource (stream id) is not sufficient to discriminate different kafka topics
+                topicName = String.format(Constants.DEFAULT_KAFKA_TOPIC_FORMAT,
+                        groupInfo.getMqResource(), streamInfo.getMqResource());
+            }
+            kafkaSource.setTopic(topicName);
+
             kafkaSource.setIgnoreParseError(streamInfo.getIgnoreParseError());
 
             for (StreamSource sourceInfo : streamSources) {
@@ -122,6 +134,17 @@ public class KafkaSourceOperator extends AbstractSourceOperator {
                 if (StringUtils.isEmpty(kafkaSource.getSerializationType()) && StringUtils.isNotEmpty(
                         sourceInfo.getSerializationType())) {
                     kafkaSource.setSerializationType(sourceInfo.getSerializationType());
+                }
+            }
+
+            // if the SerializationType is still null, set it to the CSV
+            if (StringUtils.isBlank(kafkaSource.getSerializationType())) {
+                kafkaSource.setSerializationType(DataTypeEnum.CSV.getType());
+            }
+            if (DataTypeEnum.CSV.getType().equalsIgnoreCase(kafkaSource.getSerializationType())) {
+                kafkaSource.setDataSeparator(streamInfo.getDataSeparator());
+                if (StringUtils.isBlank(kafkaSource.getDataSeparator())) {
+                    kafkaSource.setDataSeparator(String.valueOf((int) ','));
                 }
             }
 

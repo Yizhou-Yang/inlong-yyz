@@ -19,6 +19,7 @@ package org.apache.inlong.manager.pojo.sort.util;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
 import org.apache.inlong.manager.common.enums.TransformType;
 import org.apache.inlong.manager.common.util.Preconditions;
 import org.apache.inlong.manager.pojo.sink.StreamSink;
@@ -153,7 +154,7 @@ public class StreamParseUtils {
     }
 
     public static StreamPipeline parseStreamPipeline(String tempView, String inlongStreamId) {
-        Preconditions.checkNotEmpty(tempView,
+        Preconditions.expectNotBlank(tempView, ErrorCodeEnum.INVALID_PARAMETER,
                 String.format(" should not be null for streamId=%s", inlongStreamId));
         return GSON.fromJson(tempView, StreamPipeline.class);
     }

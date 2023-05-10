@@ -21,6 +21,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.manager.common.consts.InlongConstants;
 import org.apache.inlong.manager.common.consts.SinkType;
+import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
 import org.apache.inlong.manager.common.enums.SinkStatus;
 import org.apache.inlong.manager.common.exceptions.WorkflowException;
 import org.apache.inlong.manager.common.util.CommonBeanUtils;
@@ -28,6 +29,7 @@ import org.apache.inlong.manager.common.util.Preconditions;
 import org.apache.inlong.manager.dao.entity.StreamSinkFieldEntity;
 import org.apache.inlong.manager.dao.mapper.StreamSinkFieldEntityMapper;
 import org.apache.inlong.manager.pojo.node.DataNodeInfo;
+import org.apache.inlong.manager.pojo.node.mysql.MySQLDataNodeDTO;
 import org.apache.inlong.manager.pojo.sink.SinkInfo;
 import org.apache.inlong.manager.pojo.sink.mysql.MySQLColumnInfo;
 import org.apache.inlong.manager.pojo.sink.mysql.MySQLSinkDTO;
@@ -127,10 +129,11 @@ public class MySQLResourceOperator implements SinkResourceOperator {
 
         if (StringUtils.isBlank(mysqlInfo.getJdbcUrl())) {
             String dataNodeName = sinkInfo.getDataNodeName();
-            Preconditions.checkNotEmpty(dataNodeName, "mysql jdbc url not specified and data node is empty");
+            Preconditions.expectNotBlank(dataNodeName, ErrorCodeEnum.INVALID_PARAMETER,
+                    "mysql jdbc url not specified and data node is empty");
             DataNodeInfo dataNodeInfo = dataNodeHelper.getDataNodeInfo(dataNodeName, sinkInfo.getSinkType());
             CommonBeanUtils.copyProperties(dataNodeInfo, mysqlInfo);
-            mysqlInfo.setJdbcUrl(dataNodeInfo.getUrl());
+            mysqlInfo.setJdbcUrl(MySQLDataNodeDTO.convertToJdbcurl(dataNodeInfo.getUrl()));
             mysqlInfo.setPassword(dataNodeInfo.getToken());
         }
         return mysqlInfo;

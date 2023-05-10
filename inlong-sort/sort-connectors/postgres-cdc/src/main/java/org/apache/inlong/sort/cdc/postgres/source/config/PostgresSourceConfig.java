@@ -97,7 +97,6 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
         return getDbzConnectorConfig().getTableFilters();
     }
 
-    @Override
     public List<String> getMetricLabelList() {
         return Arrays.asList(AbstractSourceInfo.DATABASE_NAME_KEY,
                 AbstractSourceInfo.SCHEMA_NAME_KEY, AbstractSourceInfo.TABLE_NAME_KEY);

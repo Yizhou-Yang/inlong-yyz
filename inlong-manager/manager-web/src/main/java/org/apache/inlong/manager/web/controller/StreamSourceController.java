@@ -22,6 +22,7 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.apache.inlong.manager.common.enums.OperationType;
+import org.apache.inlong.manager.common.validation.SaveValidation;
 import org.apache.inlong.manager.common.validation.UpdateValidation;
 import org.apache.inlong.manager.pojo.common.PageResult;
 import org.apache.inlong.manager.pojo.common.Response;
@@ -54,7 +55,7 @@ public class StreamSourceController {
     @RequestMapping(value = "/source/save", method = RequestMethod.POST)
     @OperationLog(operation = OperationType.CREATE)
     @ApiOperation(value = "Save stream source")
-    public Response<Integer> save(@Validated @RequestBody SourceRequest request) {
+    public Response<Integer> save(@Validated(SaveValidation.class) @RequestBody SourceRequest request) {
         return Response.success(sourceService.save(request, LoginUserUtils.getLoginUser().getName()));
     }
 
@@ -65,9 +66,9 @@ public class StreamSourceController {
         return Response.success(sourceService.get(id));
     }
 
-    @RequestMapping(value = "/source/list", method = RequestMethod.GET)
+    @RequestMapping(value = "/source/list", method = RequestMethod.POST)
     @ApiOperation(value = "List stream sources by paginating")
-    public Response<PageResult<? extends StreamSource>> listByCondition(SourcePageRequest request) {
+    public Response<PageResult<? extends StreamSource>> listByCondition(@RequestBody SourcePageRequest request) {
         return Response.success(sourceService.listByCondition(request));
     }
 

@@ -21,6 +21,7 @@ import com.google.common.collect.Sets;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.manager.common.consts.InlongConstants;
 import org.apache.inlong.manager.common.conversion.ConversionHandle;
+import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
 import org.apache.inlong.manager.common.exceptions.BusinessException;
 import org.apache.inlong.manager.common.util.Preconditions;
 import org.apache.inlong.manager.pojo.group.pulsar.InlongPulsarInfo;
@@ -48,7 +49,11 @@ import java.util.Map;
 public class PulsarOperator {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(InlongClusterServiceImpl.class);
-    private static final int MAX_PARTITION = 100;
+    /**
+     * The maximum number of partitions, which is an empirical value,
+     * generally does not exceed 1000 in large clusters.
+     */
+    private static final int MAX_PARTITION = 1000;
     private static final int RETRY_TIMES = 3;
     private static final int DELAY_SECONDS = 5;
 
@@ -60,7 +65,7 @@ public class PulsarOperator {
      */
     public void createTenant(PulsarAdmin pulsarAdmin, String tenant) throws PulsarAdminException {
         LOGGER.info("begin to create pulsar tenant={}", tenant);
-        Preconditions.checkNotEmpty(tenant, "Tenant cannot be empty");
+        Preconditions.expectNotBlank(tenant, ErrorCodeEnum.INVALID_PARAMETER, "Tenant cannot be empty");
 
         try {
             List<String> clusters = PulsarUtils.getPulsarClusters(pulsarAdmin);
@@ -85,8 +90,10 @@ public class PulsarOperator {
      */
     public void createNamespace(PulsarAdmin pulsarAdmin, InlongPulsarInfo pulsarInfo, String tenant, String namespace)
             throws PulsarAdminException {
-        Preconditions.checkNotNull(tenant, "pulsar tenant cannot be empty during create namespace");
-        Preconditions.checkNotNull(namespace, "pulsar namespace cannot be empty during create namespace");
+        Preconditions.expectNotBlank(tenant, ErrorCodeEnum.INVALID_PARAMETER,
+                "pulsar tenant cannot be empty during create namespace");
+        Preconditions.expectNotBlank(namespace, ErrorCodeEnum.INVALID_PARAMETER,
+                "pulsar namespace cannot be empty during create namespace");
 
         String namespaceName = tenant + "/" + namespace;
         LOGGER.info("begin to create namespace={}", namespaceName);
@@ -139,7 +146,7 @@ public class PulsarOperator {
      * Create Pulsar topic
      */
     public void createTopic(PulsarAdmin pulsarAdmin, PulsarTopicInfo topicInfo) throws PulsarAdminException {
-        Preconditions.checkNotNull(topicInfo, "pulsar topic info cannot be empty");
+        Preconditions.expectNotNull(topicInfo, "pulsar topic info cannot be empty");
         String tenant = topicInfo.getTenant();
         String namespace = topicInfo.getNamespace();
         String topicName = topicInfo.getTopicName();
@@ -161,7 +168,7 @@ public class PulsarOperator {
                 // The number of brokers as the default value of topic partition
                 List<String> clusters = PulsarUtils.getPulsarClusters(pulsarAdmin);
                 Integer numPartitions = topicInfo.getNumPartitions();
-                if (numPartitions < 0 || numPartitions <= MAX_PARTITION) {
+                if (numPartitions < 0 || numPartitions >= MAX_PARTITION) {
                     List<String> brokers = pulsarAdmin.brokers().getActiveBrokers(clusters.get(0));
                     numPartitions = brokers.size();
                 }
@@ -195,7 +202,7 @@ public class PulsarOperator {
      * Force delete Pulsar topic
      */
     public void forceDeleteTopic(PulsarAdmin pulsarAdmin, PulsarTopicInfo topicInfo) throws PulsarAdminException {
-        Preconditions.checkNotNull(topicInfo, "pulsar topic info cannot be empty");
+        Preconditions.expectNotNull(topicInfo, "pulsar topic info cannot be empty");
 
         String tenant = topicInfo.getTenant();
         String namespace = topicInfo.getNamespace();

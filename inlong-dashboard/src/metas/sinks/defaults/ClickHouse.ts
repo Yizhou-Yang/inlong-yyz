@@ -24,6 +24,7 @@ import i18n from '@/i18n';
 import EditableTable from '@/components/EditableTable';
 import { SinkInfo } from '../common/SinkInfo';
 import { sourceFields } from '../common/sourceFields';
+import NodeSelect from '@/components/NodeSelect';
 
 const { I18n } = DataWithBackend;
 const { FieldDecorator } = RenderRow;
@@ -93,34 +94,14 @@ export default class ClickHouseSink
   enableCreateResource: number;
 
   @FieldDecorator({
-    type: 'select',
+    type: NodeSelect,
     rules: [{ required: true }],
     props: values => ({
-      showSearch: true,
       disabled: [110, 130].includes(values?.status),
-      options: {
-        requestTrigger: ['onOpen', 'onSearch'],
-        requestService: keyword => ({
-          url: '/node/list',
-          method: 'POST',
-          data: {
-            keyword,
-            type: 'CLICKHOUSE',
-            pageNum: 1,
-            pageSize: 20,
-          },
-        }),
-        requestParams: {
-          formatResult: result =>
-            result?.list?.map(item => ({
-              label: item.name,
-              value: item.name,
-            })),
-        },
-      },
+      nodeType: 'CLICKHOUSE',
     }),
   })
-  @I18n('meta.Sinks.ClickHouse.DataNodeName')
+  @I18n('meta.Sinks.DataNodeName')
   dataNodeName: string;
 
   @FieldDecorator({
@@ -257,6 +238,58 @@ export default class ClickHouseSink
   })
   @I18n('meta.Sinks.ClickHouse.PrimaryKey')
   primaryKey: string;
+
+  @FieldDecorator({
+    type: 'inputnumber',
+    suffix: {
+      type: 'select',
+      name: 'ttlUnit',
+      props: values => ({
+        disabled: [110, 130].includes(values?.status),
+        options: [
+          {
+            label: 'Second',
+            value: 'second',
+          },
+          {
+            label: 'Minute',
+            value: 'minute',
+          },
+          {
+            label: 'Hour',
+            value: 'hour',
+          },
+          {
+            label: 'Day',
+            value: 'day',
+          },
+          {
+            label: 'Week',
+            value: 'week',
+          },
+          {
+            label: 'Month',
+            value: 'month',
+          },
+          {
+            label: 'Quarter',
+            value: 'quarter',
+          },
+          {
+            label: 'Year',
+            value: 'year',
+          },
+        ],
+      }),
+    },
+    props: values => ({
+      min: 1,
+      precision: 0,
+      disabled: [110, 130].includes(values?.status),
+    }),
+  })
+  @I18n('Time To Live')
+  ttl: number;
 
   @FieldDecorator({
     type: EditableTable,

@@ -39,6 +39,7 @@ services:
     container_name: pulsar
     ports:
       - "6650:6650"
+      - "8080:8080"
     volumes:
       - ./pulsar/data:/pulsar/data
     command: bin/pulsar standalone
@@ -82,6 +83,7 @@ services:
       - MANAGER_OPENAPI_IP=manager
       - MANAGER_OPENAPI_PORT=8083
       - AUDIT_PROXY_URL=audit:10081
+      # pulsar or kafka
       - MQ_TYPE=pulsar
       - ETH_NAME=eth0
 
@@ -105,6 +107,7 @@ services:
   audit:
     image: inlong/audit:${VERSION_TAG}
     container_name: audit
+    privileged: true
     depends_on:
       mysql:
         condition: service_healthy
@@ -112,7 +115,9 @@ services:
       - JDBC_URL=mysql:3306
       - USERNAME=root
       - PASSWORD=inlong
-      - PULSAR_BROKER_LIST=pulsar:6650
+      - MANAGER_OPENAPI_IP=manager
+      - MANAGER_OPENAPI_PORT=8083
+      # pulsar or kafka
       - MQ_TYPE=pulsar
     ports:
       - "10081:10081"
