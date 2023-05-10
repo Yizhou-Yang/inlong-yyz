@@ -22,7 +22,6 @@ import com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope;
 import com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils;
 import com.ververica.cdc.debezium.Validator;
 import io.debezium.connector.AbstractSourceInfo;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.debezium.data.Envelope;
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
@@ -60,7 +59,7 @@ import org.apache.inlong.sort.base.metric.MetricState;
 import org.apache.inlong.sort.base.metric.SourceMetricData;
 import org.apache.inlong.sort.base.metric.sub.SourceTableMetricData;
 import org.apache.inlong.sort.base.util.MetricStateUtils;
-import org.apache.inlong.sort.cdc.mongodb.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
 import org.apache.inlong.sort.cdc.mongodb.debezium.internal.DebeziumChangeConsumer;
 import org.apache.inlong.sort.cdc.mongodb.debezium.internal.DebeziumChangeFetcher;
 import org.apache.inlong.sort.cdc.mongodb.debezium.internal.DebeziumOffset;
@@ -503,12 +502,6 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                         sourceContext,
                         new DebeziumDeserializationSchema<T>() {
 
-                            /**
-                             * Deserialize the Debezium record, it is represented in Kafka {@link SourceRecord}.
-                             *
-                             * @param record
-                             * @param out
-                             */
                             @Override
                             public void deserialize(SourceRecord record, Collector<T> out) throws Exception {
                                 // do nothing

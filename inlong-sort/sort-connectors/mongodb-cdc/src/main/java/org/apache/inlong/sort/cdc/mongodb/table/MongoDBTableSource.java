@@ -30,14 +30,13 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
+import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
 import org.apache.inlong.sort.cdc.mongodb.DebeziumSourceFunction;
-import org.apache.inlong.sort.cdc.mongodb.source.MongoDBSourceBuilder;
-import org.apache.inlong.sort.cdc.mongodb.debezium.DebeziumDeserializationSchema;
 import org.apache.inlong.sort.cdc.mongodb.debezium.table.MetadataConverter;
 import org.apache.inlong.sort.cdc.mongodb.debezium.table.MongoDBConnectorDeserializationSchema;
 import org.apache.inlong.sort.cdc.mongodb.source.MongoDBSource;
-
-import org.apache.inlong.sort.cdc.mongodb.table.filter.RowKindValidator;
+import org.apache.inlong.sort.cdc.mongodb.source.MongoDBSourceBuilder;
+import org.apache.inlong.sort.cdc.mongodb.table.filter.MongoDBRowKindValidator;
 
 import javax.annotation.Nullable;
 import java.time.ZoneId;
@@ -67,11 +66,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final String password;
     private final String database;
     private final String collection;
-    private final Boolean errorsLogEnable;
-    private final String errorsTolerance;
     private final Boolean copyExisting;
-    private final String copyExistingPipeline;
-    private final Integer copyExistingMaxThreads;
     private final Integer copyExistingQueueSize;
     private final Integer batchSize;
     private final Integer pollMaxBatchSize;
@@ -106,11 +101,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             @Nullable String database,
             @Nullable String collection,
             @Nullable String connectionOptions,
-            @Nullable String errorsTolerance,
-            @Nullable Boolean errorsLogEnable,
             @Nullable Boolean copyExisting,
-            @Nullable String copyExistingPipeline,
-            @Nullable Integer copyExistingMaxThreads,
             @Nullable Integer copyExistingQueueSize,
             @Nullable Integer batchSize,
             @Nullable Integer pollMaxBatchSize,
@@ -132,22 +123,18 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.database = database;
         this.collection = collection;
         this.connectionOptions = connectionOptions;
-        this.errorsTolerance = errorsTolerance;
-        this.errorsLogEnable = errorsLogEnable;
         this.copyExisting = copyExisting;
-        this.copyExistingPipeline = copyExistingPipeline;
-        this.copyExistingMaxThreads = copyExistingMaxThreads;
         this.copyExistingQueueSize = copyExistingQueueSize;
         this.batchSize = batchSize;
         this.pollMaxBatchSize = pollMaxBatchSize;
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
         this.heartbeatIntervalMillis = heartbeatIntervalMillis;
         this.localTimeZone = localTimeZone;
+        this.producedDataType = physicalSchema.toPhysicalRowDataType();
+        this.metadataKeys = Collections.emptyList();
         this.enableParallelRead = enableParallelRead;
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
-        this.producedDataType = physicalSchema.toPhysicalRowDataType();
-        this.metadataKeys = Collections.emptyList();
         this.inlongMetric = inlongMetric;
         this.inlongAudit = inlongAudit;
         this.rowValidator = rowFilter;
@@ -178,7 +165,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         DebeziumDeserializationSchema<RowData> deserializer =
                 new MongoDBConnectorDeserializationSchema(
                         physicalDataType, metadataConverters, typeInfo,
-                        localTimeZone, new RowKindValidator(rowValidator), sourceMultipleEnable);
+                        localTimeZone, new MongoDBRowKindValidator(rowValidator), sourceMultipleEnable);
 
         String databaseList = null;
         String collectionList = null;
@@ -195,7 +182,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 collectionList = collection;
             }
         } else if (StringUtils.isNotEmpty(database)) {
-            databaseList = database;
+            databaseList = collection;
         } else if (StringUtils.isNotEmpty(collection)) {
             collectionList = collection;
         } else {
@@ -233,11 +220,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             Optional.ofNullable(username).ifPresent(builder::username);
             Optional.ofNullable(password).ifPresent(builder::password);
             Optional.ofNullable(connectionOptions).ifPresent(builder::connectionOptions);
-            Optional.ofNullable(errorsLogEnable).ifPresent(builder::errorsLogEnable);
-            Optional.ofNullable(errorsTolerance).ifPresent(builder::errorsTolerance);
             Optional.ofNullable(copyExisting).ifPresent(builder::copyExisting);
-            Optional.ofNullable(copyExistingPipeline).ifPresent(builder::copyExistingPipeline);
-            Optional.ofNullable(copyExistingMaxThreads).ifPresent(builder::copyExistingMaxThreads);
             Optional.ofNullable(copyExistingQueueSize).ifPresent(builder::copyExistingQueueSize);
             Optional.ofNullable(batchSize).ifPresent(builder::batchSize);
             Optional.ofNullable(pollMaxBatchSize).ifPresent(builder::pollMaxBatchSize);
@@ -293,11 +276,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         database,
                         collection,
                         connectionOptions,
-                        errorsTolerance,
-                        errorsLogEnable,
                         copyExisting,
-                        copyExistingPipeline,
-                        copyExistingMaxThreads,
                         copyExistingQueueSize,
                         batchSize,
                         pollMaxBatchSize,
@@ -333,20 +312,12 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(database, that.database)
                 && Objects.equals(collection, that.collection)
                 && Objects.equals(connectionOptions, that.connectionOptions)
-                && Objects.equals(errorsTolerance, that.errorsTolerance)
-                && Objects.equals(errorsLogEnable, that.errorsLogEnable)
                 && Objects.equals(copyExisting, that.copyExisting)
-                && Objects.equals(copyExistingPipeline, that.copyExistingPipeline)
-                && Objects.equals(copyExistingMaxThreads, that.copyExistingMaxThreads)
                 && Objects.equals(copyExistingQueueSize, that.copyExistingQueueSize)
-                && Objects.equals(batchSize, that.batchSize)
                 && Objects.equals(pollMaxBatchSize, that.pollMaxBatchSize)
                 && Objects.equals(pollAwaitTimeMillis, that.pollAwaitTimeMillis)
                 && Objects.equals(heartbeatIntervalMillis, that.heartbeatIntervalMillis)
                 && Objects.equals(localTimeZone, that.localTimeZone)
-                && Objects.equals(enableParallelRead, that.enableParallelRead)
-                && Objects.equals(splitMetaGroupSize, that.splitMetaGroupSize)
-                && Objects.equals(splitSizeMB, that.splitSizeMB)
                 && Objects.equals(producedDataType, that.producedDataType)
                 && Objects.equals(metadataKeys, that.metadataKeys)
                 && Objects.equals(inlongMetric, that.inlongMetric)
@@ -363,20 +334,12 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 database,
                 collection,
                 connectionOptions,
-                errorsTolerance,
-                errorsLogEnable,
                 copyExisting,
-                copyExistingPipeline,
-                copyExistingMaxThreads,
                 copyExistingQueueSize,
-                batchSize,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
                 heartbeatIntervalMillis,
                 localTimeZone,
-                enableParallelRead,
-                splitMetaGroupSize,
-                splitSizeMB,
                 producedDataType,
                 metadataKeys,
                 inlongMetric,

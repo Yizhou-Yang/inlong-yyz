@@ -23,7 +23,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.inlong.sort.cdc.mongodb.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
 import org.apache.inlong.sort.cdc.mongodb.source.config.MongoDBSourceConfigFactory;
 
 /**
@@ -173,6 +173,16 @@ public class MongoDBSourceBuilder<T> {
         return this;
     }
 
+    public MongoDBSourceBuilder<T> inlongMetric(String inlongMetric) {
+        this.configFactory.inlongMetric(inlongMetric);
+        return this;
+    }
+
+    public MongoDBSourceBuilder<T> inlongAudit(String inlongAudit) {
+        this.configFactory.inlongAudit(inlongAudit);
+        return this;
+    }
+
     /**
      * The group size of split meta, if the meta size exceeds the group size, the meta will be
      * divided into multiple groups.
@@ -191,18 +201,8 @@ public class MongoDBSourceBuilder<T> {
         return this;
     }
 
-    public MongoDBSourceBuilder<T> inlongMetric(String inlongMetric) {
-        this.configFactory.inlongMetric(inlongMetric);
-        return this;
-    }
-
-    public MongoDBSourceBuilder<T> inlongAudit(String inlongAudit) {
-        this.configFactory.inlongAudit(inlongAudit);
-        return this;
-    }
-
     /**
-     * Build the {@link com.ververica.cdc.connectors.mongodb.source.MongoDBSource}.
+     * Build the {@link MongoDBSource}.
      *
      * @return a MongoDBParallelSource with the settings made for this builder.
      */

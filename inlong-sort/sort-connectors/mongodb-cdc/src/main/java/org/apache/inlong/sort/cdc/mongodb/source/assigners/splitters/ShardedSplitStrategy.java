@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.cdc.mongodb.source.splitters;
+package org.apache.inlong.sort.cdc.mongodb.source.assigners.splitters;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.DROPPED_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.KEY_FIELD;
@@ -37,7 +37,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.SnapshotSplit;
+import org.apache.inlong.sort.cdc.base.source.meta.split.SnapshotSplit;
 import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
 import org.slf4j.Logger;
@@ -55,6 +55,7 @@ import org.slf4j.LoggerFactory;
  * Key Index Type</a> for details.
  *
  * <p>Split collections by shard and chunk.
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
  */
 @Internal
 public class ShardedSplitStrategy implements SplitStrategy {

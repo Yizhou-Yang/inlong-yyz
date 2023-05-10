@@ -38,13 +38,13 @@ import static com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils
 import static com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils.createWatermarkPartitionMap;
 import static com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils.currentBsonTimestamp;
 import static com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils.getResumeToken;
-import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.FAILED_TO_PARSE_ERROR;
-import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.ILLEGAL_OPERATION_ERROR;
-import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.UNAUTHORIZED_ERROR;
-import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.UNKNOWN_FIELD_ERROR;
-import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.getCurrentClusterTime;
+import static org.apache.inlong.sort.cdc.mongodb.source.utils.MongoUtils.FAILED_TO_PARSE_ERROR;
+import static org.apache.inlong.sort.cdc.mongodb.source.utils.MongoUtils.ILLEGAL_OPERATION_ERROR;
+import static org.apache.inlong.sort.cdc.mongodb.source.utils.MongoUtils.UNAUTHORIZED_ERROR;
+import static org.apache.inlong.sort.cdc.mongodb.source.utils.MongoUtils.UNKNOWN_FIELD_ERROR;
 import static org.apache.inlong.sort.cdc.mongodb.source.utils.MongoUtils.clientFor;
 import static org.apache.inlong.sort.cdc.mongodb.source.utils.MongoUtils.getChangeStreamIterable;
+import static org.apache.inlong.sort.cdc.mongodb.source.utils.MongoUtils.getCurrentClusterTime;
 
 import com.mongodb.MongoCommandException;
 import com.mongodb.MongoNamespace;
@@ -52,19 +52,20 @@ import com.mongodb.client.ChangeStreamIterable;
 import com.mongodb.client.MongoChangeStreamCursor;
 import com.mongodb.client.MongoClient;
 import com.mongodb.kafka.connect.source.heartbeat.HeartbeatManager;
-import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent;
-import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
-import com.ververica.cdc.connectors.mongodb.source.offset.ChangeStreamDescriptor;
-import com.ververica.cdc.connectors.mongodb.source.offset.ChangeStreamOffset;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.DataChangeEvent;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.inlong.sort.cdc.base.source.meta.split.SourceSplitBase;
+import org.apache.inlong.sort.cdc.base.source.meta.split.StreamSplit;
+import org.apache.inlong.sort.cdc.base.source.meta.wartermark.WatermarkEvent;
+import org.apache.inlong.sort.cdc.base.source.meta.wartermark.WatermarkKind;
+import org.apache.inlong.sort.cdc.base.source.reader.external.FetchTask;
 import org.apache.inlong.sort.cdc.mongodb.source.config.MongoDBSourceConfig;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.SourceSplitBase;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.StreamSplit;
-import org.apache.inlong.sort.cdc.mongodb.source.reader.external.FetchTask;
+import org.apache.inlong.sort.cdc.mongodb.source.offset.ChangeStreamDescriptor;
+import org.apache.inlong.sort.cdc.mongodb.source.offset.ChangeStreamOffset;
 import org.apache.kafka.common.utils.SystemTime;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.connect.data.Struct;
@@ -77,10 +78,13 @@ import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** The task to work for fetching data of MongoDB stream split . */
+/** The task to work for fetching data of MongoDB stream split .
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
+ */
 public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MongoDBStreamFetchTask.class);
+    private static final Logger LOG = LoggerFactory.getLogger(
+            com.ververica.cdc.connectors.mongodb.source.reader.fetch.MongoDBStreamFetchTask.class);
 
     private final StreamSplit streamSplit;
     private volatile boolean taskRunning = false;
@@ -204,7 +208,7 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     private MongoChangeStreamCursor<BsonDocument> openChangeStreamCursor(
             ChangeStreamDescriptor changeStreamDescriptor) {
         ChangeStreamOffset offset =
-                new ChangeStreamOffset(streamSplit.getStartingOffset().getOffset());
+                new ChangeStreamOffset((Map<String, String>) streamSplit.getStartingOffset().getOffset());
 
         ChangeStreamIterable<Document> changeStreamIterable =
                 getChangeStreamIterable(sourceConfig, changeStreamDescriptor);

@@ -20,7 +20,6 @@ package org.apache.inlong.sort.cdc.mongodb;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.changestream.FullDocument;
 import com.mongodb.kafka.connect.source.MongoSourceConfig;
-import com.mongodb.kafka.connect.source.MongoSourceConfig.ErrorTolerance;
 import com.mongodb.kafka.connect.source.MongoSourceConfig.OutputFormat;
 import com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceConnector;
 import com.ververica.cdc.debezium.Validator;
@@ -28,7 +27,6 @@ import io.debezium.heartbeat.Heartbeat;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
-import org.apache.inlong.sort.cdc.mongodb.debezium.DebeziumDeserializationSchema;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -37,14 +35,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
-import org.apache.inlong.sort.cdc.mongodb.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
 
-import static com.ververica.cdc.connectors.mongodb.MongoDBSource.FULL_DOCUMENT_UPDATE_LOOKUP;
-import static com.ververica.cdc.connectors.mongodb.MongoDBSource.OUTPUT_FORMAT_SCHEMA;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.COLLECTION_INCLUDE_LIST;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.DATABASE_INCLUDE_LIST;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.HEARTBEAT_TOPIC_NAME;
-import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.OUTPUT_SCHEMA;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COPY_EXISTING;
@@ -61,61 +56,6 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 @PublicEvolving
 public class MongoDBSource {
 
-    // public static final String MONGODB_SCHEME = "mongodb";
-    //
-    public static final String ERROR_TOLERANCE_NONE = ErrorTolerance.NONE.value();
-    //
-    // public static final String ERROR_TOLERANCE_ALL = ErrorTolerance.ALL.value();
-    //
-    // public static final String FULL_DOCUMENT_UPDATE_LOOKUP = FullDocument.UPDATE_LOOKUP.getValue();
-    //
-    public static final int POLL_MAX_BATCH_SIZE_DEFAULT = 1000;
-    //
-    public static final int POLL_AWAIT_TIME_MILLIS_DEFAULT = 1500;
-    //
-    // public static final String HEARTBEAT_TOPIC_NAME_DEFAULT = "__mongodb_heartbeats";
-
-    // public static final String OUTPUT_FORMAT_SCHEMA =
-    // OutputFormat.SCHEMA.name().toLowerCase(Locale.ROOT);
-
-    // // Add "source" field to adapt to debezium SourceRecord
-    // public static final String OUTPUT_SCHEMA_VALUE_DEFAULT =
-    // "{"
-    // + " \"name\": \"ChangeStream\","
-    // + " \"type\": \"record\","
-    // + " \"fields\": ["
-    // + " { \"name\": \"_id\", \"type\": \"string\" },"
-    // + " { \"name\": \"operationType\", \"type\": [\"string\", \"null\"] },"
-    // + " { \"name\": \"fullDocument\", \"type\": [\"string\", \"null\"] },"
-    // + " { \"name\": \"source\","
-    // + " \"type\": [{\"name\": \"source\", \"type\": \"record\", \"fields\": ["
-    // + " {\"name\": \"ts_ms\", \"type\": \"long\"},"
-    // + " {\"name\": \"snapshot\", \"type\": [\"string\", \"null\"] } ]"
-    // + " }, \"null\" ] },"
-    // + " { \"name\": \"ns\","
-    // + " \"type\": [{\"name\": \"ns\", \"type\": \"record\", \"fields\": ["
-    // + " {\"name\": \"db\", \"type\": \"string\"},"
-    // + " {\"name\": \"coll\", \"type\": [\"string\", \"null\"] } ]"
-    // + " }, \"null\" ] },"
-    // + " { \"name\": \"to\","
-    // + " \"type\": [{\"name\": \"to\", \"type\": \"record\", \"fields\": ["
-    // + " {\"name\": \"db\", \"type\": \"string\"},"
-    // + " {\"name\": \"coll\", \"type\": [\"string\", \"null\"] } ]"
-    // + " }, \"null\" ] },"
-    // + " { \"name\": \"documentKey\", \"type\": [\"string\", \"null\"] },"
-    // + " { \"name\": \"updateDescription\","
-    // + " \"type\": [{\"name\": \"updateDescription\", \"type\": \"record\", \"fields\": ["
-    // + " {\"name\": \"updatedFields\", \"type\": [\"string\", \"null\"]},"
-    // + " {\"name\": \"removedFields\","
-    // + " \"type\": [{\"type\": \"array\", \"items\": \"string\"}, \"null\"]"
-    // + " }] }, \"null\"] },"
-    // + " { \"name\": \"clusterTime\", \"type\": [\"string\", \"null\"] },"
-    // + " { \"name\": \"txnNumber\", \"type\": [\"long\", \"null\"]},"
-    // + " { \"name\": \"lsid\", \"type\": [{\"name\": \"lsid\", \"type\": \"record\","
-    // + " \"fields\": [ {\"name\": \"id\", \"type\": \"string\"},"
-    // + " {\"name\": \"uid\", \"type\": \"string\"}] }, \"null\"] }"
-    // + " ]"
-    // + "}";
     public static final String MONGODB_SCHEME = "mongodb";
 
     public static final String FULL_DOCUMENT_UPDATE_LOOKUP = FullDocument.UPDATE_LOOKUP.getValue();
@@ -152,10 +92,10 @@ public class MongoDBSource {
         private Integer copyExistingMaxThreads;
         private Integer copyExistingQueueSize;
         private String copyExistingPipeline;
-        private Integer heartbeatIntervalMillis = HEARTBEAT_INTERVAL_MILLIS.defaultValue();
-        private DebeziumDeserializationSchema<T> deserializer;
         private Boolean errorsLogEnable;
         private String errorsTolerance;
+        private Integer heartbeatIntervalMillis = HEARTBEAT_INTERVAL_MILLIS.defaultValue();
+        private DebeziumDeserializationSchema<T> deserializer;
         private String inlongMetric;
         private String inlongAudit;
         private boolean migrateAll;

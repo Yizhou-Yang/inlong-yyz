@@ -25,20 +25,21 @@ import static com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils
 import static com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils.isDataChangeRecord;
 import static com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils.isHeartbeatEvent;
 
-import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
-import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
-import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
 import com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope;
-import com.ververica.cdc.connectors.mongodb.source.offset.ChangeStreamOffset;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
 import org.apache.inlong.sort.base.enums.ReadPhase;
-import org.apache.inlong.sort.cdc.mongodb.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.base.source.meta.offset.Offset;
+import org.apache.inlong.sort.cdc.base.source.meta.offset.OffsetFactory;
+import org.apache.inlong.sort.cdc.base.source.meta.split.SourceSplitState;
+import org.apache.inlong.sort.cdc.base.source.meta.split.StreamSplitState;
+import org.apache.inlong.sort.cdc.base.source.metrics.SourceReaderMetrics;
+import org.apache.inlong.sort.cdc.base.source.reader.IncrementalSourceReader;
+import org.apache.inlong.sort.cdc.base.source.reader.IncrementalSourceRecordEmitter;
 import org.apache.inlong.sort.cdc.mongodb.debezium.utils.RecordUtils;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.SourceSplitState;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.StreamSplitState;
-import org.apache.inlong.sort.cdc.mongodb.source.metrics.InlongSourceReaderMetrics;
+import org.apache.inlong.sort.cdc.mongodb.source.offset.ChangeStreamOffset;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.bson.BsonDocument;
@@ -54,11 +55,12 @@ import org.slf4j.LoggerFactory;
  */
 public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitter<T> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MongoDBRecordEmitter.class);
+    private static final Logger LOG = LoggerFactory.getLogger(
+            com.ververica.cdc.connectors.mongodb.source.reader.MongoDBRecordEmitter.class);
 
     public MongoDBRecordEmitter(
             DebeziumDeserializationSchema<T> deserializationSchema,
-            InlongSourceReaderMetrics sourceReaderMetrics,
+            SourceReaderMetrics sourceReaderMetrics,
             OffsetFactory offsetFactory) {
         super(deserializationSchema, sourceReaderMetrics, false, offsetFactory);
     }
@@ -80,8 +82,6 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
                 updatePositionForStreamSplit(element, splitState);
             }
             reportMetrics(element);
-            // emitElement(element, output);
-
             debeziumDeserializationSchema.deserialize(
                     element,
                     new Collector<T>() {

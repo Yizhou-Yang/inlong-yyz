@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.sort.cdc.mongodb.source.splitters;
+package org.apache.inlong.sort.cdc.mongodb.source.assigners.splitters;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.ID_FIELD;
 import static com.ververica.cdc.connectors.mongodb.source.dialect.MongoDBDialect.collectionSchema;
@@ -30,12 +30,13 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.flink.annotation.Internal;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.SnapshotSplit;
+import org.apache.inlong.sort.cdc.base.source.meta.split.SnapshotSplit;
 
 /**
  * The Single Partitioner
  *
  * <p>Split collection as a single chunk.
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
  */
 @Internal
 public class SingleSplitStrategy implements SplitStrategy {

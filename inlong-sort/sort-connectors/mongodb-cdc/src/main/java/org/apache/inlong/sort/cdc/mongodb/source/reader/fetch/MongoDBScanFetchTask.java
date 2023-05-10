@@ -39,19 +39,19 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.changestream.OperationType;
-import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent;
-import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
-import com.ververica.cdc.connectors.mongodb.source.offset.ChangeStreamOffset;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.relational.TableId;
 import java.util.ArrayList;
+import org.apache.inlong.sort.cdc.base.source.meta.split.SnapshotSplit;
+import org.apache.inlong.sort.cdc.base.source.meta.split.SourceSplitBase;
+import org.apache.inlong.sort.cdc.base.source.meta.split.StreamSplit;
+import org.apache.inlong.sort.cdc.base.source.meta.wartermark.WatermarkEvent;
+import org.apache.inlong.sort.cdc.base.source.meta.wartermark.WatermarkKind;
+import org.apache.inlong.sort.cdc.base.source.reader.external.FetchTask;
 import org.apache.inlong.sort.cdc.mongodb.source.config.MongoDBSourceConfig;
 import org.apache.inlong.sort.cdc.mongodb.source.dialect.MongoDBDialect;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.SnapshotSplit;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.SourceSplitBase;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.StreamSplit;
-import org.apache.inlong.sort.cdc.mongodb.source.reader.external.FetchTask;
+import org.apache.inlong.sort.cdc.mongodb.source.offset.ChangeStreamOffset;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.bson.BsonDocument;
 import org.bson.BsonInt64;
@@ -60,7 +60,9 @@ import org.bson.RawBsonDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** The task to work for fetching data of MongoDB collection snapshot split . */
+/** The task to work for fetching data of MongoDB collection snapshot split .
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
+ */
 public class MongoDBScanFetchTask implements FetchTask<SourceSplitBase> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoDBScanFetchTask.class);
@@ -116,8 +118,7 @@ public class MongoDBScanFetchTask implements FetchTask<SourceSplitBase> {
                             .noCursorTimeout(true)
                             .cursor();
 
-            BsonDocument keyDocument;
-            BsonDocument valueDocument;
+            BsonDocument keyDocument, valueDocument;
             while (cursor.hasNext()) {
                 if (!taskRunning) {
                     throw new InterruptedException(

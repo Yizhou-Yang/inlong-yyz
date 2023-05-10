@@ -17,19 +17,20 @@
 
 package org.apache.inlong.sort.cdc.mongodb.source;
 
-import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
-import com.ververica.cdc.connectors.mongodb.source.offset.ChangeStreamOffsetFactory;
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.inlong.sort.cdc.mongodb.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.base.config.SourceConfig;
+import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.base.source.IncrementalSource;
+import org.apache.inlong.sort.cdc.base.source.meta.split.SourceRecords;
+import org.apache.inlong.sort.cdc.base.source.meta.split.SourceSplitState;
+import org.apache.inlong.sort.cdc.base.source.metrics.SourceReaderMetrics;
 import org.apache.inlong.sort.cdc.mongodb.source.config.MongoDBSourceConfig;
 import org.apache.inlong.sort.cdc.mongodb.source.config.MongoDBSourceConfigFactory;
-import org.apache.inlong.sort.cdc.mongodb.source.config.SourceConfig;
 import org.apache.inlong.sort.cdc.mongodb.source.dialect.MongoDBDialect;
-import org.apache.inlong.sort.cdc.mongodb.source.meta.split.SourceSplitState;
-import org.apache.inlong.sort.cdc.mongodb.source.metrics.InlongSourceReaderMetrics;
+import org.apache.inlong.sort.cdc.mongodb.source.offset.ChangeStreamOffsetFactory;
 import org.apache.inlong.sort.cdc.mongodb.source.reader.MongoDBRecordEmitter;
 
 /**
@@ -87,7 +88,7 @@ public class MongoDBSource<T> extends IncrementalSource<T, MongoDBSourceConfig> 
 
     @Override
     protected RecordEmitter<SourceRecords, T, SourceSplitState> createRecordEmitter(
-            SourceConfig sourceConfig, InlongSourceReaderMetrics sourceReaderMetrics) {
+            SourceConfig sourceConfig, SourceReaderMetrics sourceReaderMetrics) {
         return new MongoDBRecordEmitter<>(
                 deserializationSchema, sourceReaderMetrics, offsetFactory);
     }

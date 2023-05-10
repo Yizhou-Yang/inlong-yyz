@@ -22,12 +22,18 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.mongodb.source.MongoDBSource;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.inlong.sort.base.Constants;
+import org.apache.inlong.sort.cdc.base.config.MetricConfig;
+import org.apache.inlong.sort.cdc.base.config.SourceConfig;
 
-/** A MongoDB Source configuration which is used by {@link MongoDBSource}. */
-public class MongoDBSourceConfig implements SourceConfig {
+/** A MongoDB Source configuration which is used by {@link MongoDBSource}.
+ * Copy from com.ververica:flink-connector-mongodb-cdc:2.3.0.
+ */
+public class MongoDBSourceConfig implements SourceConfig, MetricConfig {
 
     private static final long serialVersionUID = 1L;
 
@@ -157,18 +163,6 @@ public class MongoDBSourceConfig implements SourceConfig {
         return false;
     }
 
-    public int getSplitSizeMB() {
-        return splitSizeMB;
-    }
-
-    public String getInlongMetric() {
-        return inlongMetric;
-    }
-
-    public String getInlongAudit() {
-        return inlongAudit;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -186,6 +180,8 @@ public class MongoDBSourceConfig implements SourceConfig {
                 && heartbeatIntervalMillis == that.heartbeatIntervalMillis
                 && splitMetaGroupSize == that.splitMetaGroupSize
                 && splitSizeMB == that.splitSizeMB
+                && inlongMetric == that.inlongMetric
+                && inlongAudit == that.inlongAudit
                 && Objects.equals(hosts, that.hosts)
                 && Objects.equals(username, that.username)
                 && Objects.equals(password, that.password)
@@ -210,6 +206,23 @@ public class MongoDBSourceConfig implements SourceConfig {
                 startupOptions,
                 heartbeatIntervalMillis,
                 splitMetaGroupSize,
-                splitSizeMB);
+                splitSizeMB,
+                inlongMetric,
+                inlongAudit);
+    }
+
+    @Override
+    public String getInlongMetric() {
+        return inlongMetric;
+    }
+
+    @Override
+    public String getInlongAudit() {
+        return inlongAudit;
+    }
+
+    @Override
+    public List<String> getMetricLabelList() {
+        return Arrays.asList(Constants.DATABASE_NAME, Constants.COLLECTION_NAME);
     }
 }
