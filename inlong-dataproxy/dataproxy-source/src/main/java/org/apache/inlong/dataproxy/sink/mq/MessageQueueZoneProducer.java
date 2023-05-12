@@ -31,7 +31,6 @@ import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 
  * MessageQueueZoneProducer
  */
 public class MessageQueueZoneProducer {
@@ -52,7 +51,7 @@ public class MessageQueueZoneProducer {
 
     /**
      * Constructor
-     * 
+     *
      * @param workerName
      * @param context
      */
@@ -121,24 +120,66 @@ public class MessageQueueZoneProducer {
             }
             LOG.info("selectedCacheClusters:{}", newConfigList.size());
             newConfigList.forEach(v -> LOG.info("selectedCacheCluster clusterName:{}", v.getClusterName()));
-            // check cluster name change
+            // check if cluster config change
             HashSet<String> newClusterNames = new HashSet<>();
             newConfigList.forEach(v -> newClusterNames.add(v.getClusterName()));
-            if (newClusterNames.equals(currentClusterNames)) {
-                return;
+            List<MessageQueueClusterProducer> newClusterList = new ArrayList<>();
+            List<MessageQueueClusterProducer> outdatedClusterList = new ArrayList<>();
+            for (MessageQueueClusterProducer queueProducer : clusterList) {
+                boolean isUpdate = false;
+                boolean isFound = false;
+                for (CacheClusterConfig config : newConfigList) {
+                    String producerClusterName = queueProducer.getCacheClusterName();
+                    String clusterName = config.getClusterName();
+                    if (!producerClusterName.equals(clusterName)) {
+                        continue;
+                    }
+                    isFound = true;
+                    CacheClusterConfig producerConfig = queueProducer.getConfig();
+                    // if config is change, stop producer and create new one
+                    if (!producerConfig.equals(config) && !isUpdate) {
+                        queueProducer.stop();
+                        queueProducer = new MessageQueueClusterProducer(workerName, config, context);
+                        queueProducer.start();
+                        isUpdate = true;
+                    }
+                }
+                if (isFound) {
+                    newClusterList.add(queueProducer);
+                } else {
+                    outdatedClusterList.add(queueProducer);
+                }
+            }
+            for (CacheClusterConfig config : newConfigList) {
+                boolean isFound = false;
+                for (MessageQueueClusterProducer queueProducer : clusterList) {
+                    String producerClusterName = queueProducer.getCacheClusterName();
+                    if (producerClusterName.equals(config.getClusterName())) {
+                        isFound = true;
+                    }
+                }
+                // if not found in clusterList, create new one
+                if (!isFound) {
+                    MessageQueueClusterProducer cluster = new MessageQueueClusterProducer(workerName, config, context);
+                    cluster.start();
+                    newClusterList.add(cluster);
+                }
             }
 
+//            if (newClusterNames.equals(currentClusterNames)) {
+//                return;
+//            }
+
             // update cluster list
-            List<MessageQueueClusterProducer> newClusterList = new ArrayList<>(newConfigList.size());
-            for (CacheClusterConfig config : newConfigList) {
-                // create
-                MessageQueueClusterProducer cluster = new MessageQueueClusterProducer(workerName, config, context);
-                cluster.start();
-                newClusterList.add(cluster);
-            }
+//            for (CacheClusterConfig config : newConfigList) {
+//                // create
+//                MessageQueueClusterProducer cluster = new MessageQueueClusterProducer(workerName, config, context);
+//                cluster.start();
+//                newClusterList.add(cluster);
+//            }
             // replace
             this.currentClusterNames = newClusterNames;
-            this.deletingClusterList = this.clusterList;
+            this.deletingClusterList = outdatedClusterList;
             this.clusterList = newClusterList;
             if (!ConfigManager.getInstance().isMqClusterReady()) {
                 LOG.info("set mq cluster status ready");
@@ -151,7 +192,7 @@ public class MessageQueueZoneProducer {
 
     /**
      * send
-     * 
+     *
      * @param event
      */
     public boolean send(BatchPackProfile event) {

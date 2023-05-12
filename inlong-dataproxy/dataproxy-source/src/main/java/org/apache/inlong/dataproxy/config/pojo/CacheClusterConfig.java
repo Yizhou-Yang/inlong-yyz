@@ -17,6 +17,8 @@
 
 package org.apache.inlong.dataproxy.config.pojo;
 
+import lombok.EqualsAndHashCode;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -24,6 +26,7 @@ import java.util.Map;
  * 
  * CacheClusterConfig
  */
+@EqualsAndHashCode
 public class CacheClusterConfig {
 
     private String clusterName;
