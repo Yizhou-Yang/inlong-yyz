@@ -17,6 +17,8 @@
 
 package org.apache.inlong.sort.base.format;
 
+import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.formats.common.TimestampFormat;
@@ -72,6 +74,11 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
 
     public static final int DEFAULT_DECIMAL_PRECISION = 15;
     public static final int DEFAULT_DECIMAL_SCALE = 5;
+    /**
+     * dialect sql type pattern such as DECIMAL(38, 10) from mysql or oracle etc
+     */
+    private static final Pattern DIALECT_SQL_TYPE_PATTERN = Pattern.compile("\\w+\\(([\\d,\\s]*)\\)");
+
     /**
      * The first item of array
      */
@@ -318,19 +325,56 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
      */
     public abstract String getOpType(JsonNode root);
 
-    protected RowType extractSchemaNode(JsonNode schema, List<String> pkNames) {
+    protected RowType extractSchemaNode(JsonNode schema, JsonNode dialectSchema, List<String> pkNames) {
         Iterator<Entry<String, JsonNode>> schemaFields = schema.fields();
         List<RowField> fields = new ArrayList<>();
         while (schemaFields.hasNext()) {
             Entry<String, JsonNode> entry = schemaFields.next();
             String name = entry.getKey();
             LogicalType type = sqlType2FlinkType(entry.getValue().asInt());
+            String dialectType = dialectSchema.get(name) != null ? dialectSchema.get(name).asText() : null;
+            type = handleDialectSqlType(type, dialectType);
             if (pkNames.contains(name)) {
                 type = type.copy(false);
             }
             fields.add(new RowField(name, type));
         }
         return new RowType(fields);
+    }
+
+    /**
+     * set precision and scale for decimal and other types
+     * @param type
+     * @param dialectType
+     * @return
+     */
+    public LogicalType handleDialectSqlType(LogicalType type, String dialectType) {
+        if (StringUtils.isBlank(dialectType)) {
+            return type;
+        }
+        if (type instanceof DecimalType) {
+            Matcher matcher = DIALECT_SQL_TYPE_PATTERN.matcher(dialectType);
+            int precision;
+            int scale;
+            DecimalType decimalType = new DecimalType(DecimalType.MAX_PRECISION);
+            if (matcher.matches()) {
+                String[] items = matcher.group(1).split(",");
+                precision = Integer.parseInt(items[0].trim());
+                if (precision < DecimalType.MIN_PRECISION || precision > DecimalType.MAX_PRECISION) {
+                    return decimalType;
+                }
+                if (items.length == 2) {
+                    scale = Integer.parseInt(items[1].trim());
+                    if (scale < DecimalType.MIN_SCALE || scale > precision) {
+                        return new DecimalType(precision);
+                    }
+                    return new DecimalType(precision, scale);
+                }
+                return new DecimalType(precision);
+            }
+            return decimalType;
+        }
+        return type;
     }
 
     public LogicalType sqlType2FlinkType(int jdbcType) {
