@@ -138,6 +138,7 @@ public class MessageQueueZoneProducer {
                     CacheClusterConfig producerConfig = queueProducer.getConfig();
                     // if config is change, stop producer and create new one
                     if (!producerConfig.equals(config) && !isUpdate) {
+                        LOG.info("Update cluster producer for clusterName:{}", clusterName);
                         queueProducer.stop();
                         queueProducer = new MessageQueueClusterProducer(workerName, config, context);
                         queueProducer.start();
@@ -160,6 +161,7 @@ public class MessageQueueZoneProducer {
                 }
                 // if not found in clusterList, create new one
                 if (!isFound) {
+                    LOG.info("Create new cluster producer for clusterName:{}", config.getClusterName());
                     MessageQueueClusterProducer cluster = new MessageQueueClusterProducer(workerName, config, context);
                     cluster.start();
                     newClusterList.add(cluster);
