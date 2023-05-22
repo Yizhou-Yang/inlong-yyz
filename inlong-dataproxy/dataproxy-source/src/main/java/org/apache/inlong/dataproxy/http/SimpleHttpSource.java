@@ -53,7 +53,7 @@ public class SimpleHttpSource extends HttpBaseSource {
     private static final Logger LOG = LoggerFactory.getLogger(HTTPSource.class);
 
     public static final String POOL_SIZE = "poolSize";
-    public static final String IDEL_TIME = "idelTime";
+    public static final String IDLE_TIME = "idleTime";
     public static final String BUFFER_SIZE = "bufferSize";
     public static final String BACKLOG = "backlog";
 
@@ -68,7 +68,7 @@ public class SimpleHttpSource extends HttpBaseSource {
     private volatile Boolean sslEnabled;
 
     private int threadPoolSize = 512;
-    private int maxIdelTime = 600000;
+    private int maxIdleTime = 600000;
     private int requestBufferSize = 10000;
     private int backlog = 2048;
 
@@ -78,7 +78,7 @@ public class SimpleHttpSource extends HttpBaseSource {
         try {
             port = context.getInteger(HTTPSourceConfigurationConstants.CONFIG_PORT);
             threadPoolSize = context.getInteger(POOL_SIZE, 512);
-            maxIdelTime = context.getInteger(IDEL_TIME, 600000);
+            maxIdleTime = context.getInteger(IDLE_TIME, 600000);
             requestBufferSize = context.getInteger(BUFFER_SIZE, 10000);
             backlog = context.getInteger(BACKLOG, 2048);
             LOG.info("http backlog set to {}", backlog);
@@ -146,12 +146,12 @@ public class SimpleHttpSource extends HttpBaseSource {
             } else {
                 ServerConnector connector = new ServerConnector(srv);
                 connector.setReuseAddress(true);
-                connector.setIdleTimeout(maxIdelTime);
+                connector.setIdleTimeout(maxIdleTime);
                 connector.setAcceptedReceiveBufferSize(requestBufferSize);
                 connector.setAcceptQueueSize(backlog);
                 connector.setHost(host);
                 connector.setPort(port);
-                LOG.info("set config maxIdelTime {}, backlog {}", maxIdelTime, backlog);
+                LOG.info("set config maxIdelTime {}, backlog {}", maxIdleTime, backlog);
                 connectors[0] = connector;
             }
 

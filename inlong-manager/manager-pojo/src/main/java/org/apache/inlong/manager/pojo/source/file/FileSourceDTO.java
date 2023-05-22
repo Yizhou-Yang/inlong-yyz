@@ -81,7 +81,7 @@ public class FileSourceDTO {
 
     public static FileSourceDTO getFromRequest(@NotNull FileSourceRequest fileSourceRequest) {
         return FileSourceDTO.builder()
-                .pattern(fileSourceRequest.getPattern())
+                .pattern(fileSourceRequest.getPattern().trim())
                 .blackList(fileSourceRequest.getBlackList())
                 .lineEndPattern(fileSourceRequest.getLineEndPattern())
                 .contentCollectType(fileSourceRequest.getContentCollectType())

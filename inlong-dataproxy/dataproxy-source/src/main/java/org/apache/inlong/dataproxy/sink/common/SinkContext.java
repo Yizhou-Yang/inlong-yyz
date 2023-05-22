@@ -73,7 +73,7 @@ public class SinkContext {
         this.clusterId = CommonPropertiesHolder.getString(CommonPropertiesHolder.KEY_PROXY_CLUSTER_NAME);
         this.maxThreads = sinkContext.getInteger(KEY_MAX_THREADS, 10);
         this.processInterval = sinkContext.getInteger(KEY_PROCESSINTERVAL, 100);
-        this.reloadInterval = sinkContext.getLong(KEY_RELOADINTERVAL, 60000L);
+        this.reloadInterval = sinkContext.getLong(KEY_RELOADINTERVAL, 10000L);
         //
         this.metricItemSet = new DataProxyMetricItemSet(sinkName);
         MetricRegister.register(this.metricItemSet);
