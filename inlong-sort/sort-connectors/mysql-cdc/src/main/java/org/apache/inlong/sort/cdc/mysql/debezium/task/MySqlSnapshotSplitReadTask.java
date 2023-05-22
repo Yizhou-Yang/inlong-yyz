@@ -203,8 +203,12 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         EventDispatcher.SnapshotReceiver snapshotReceiver =
                 dispatcher.getSnapshotChangeEventReceiver();
         LOG.debug("Snapshotting table {}", tableId);
-        createDataEventsForTable(
-                snapshotContext, snapshotReceiver, databaseSchema.tableFor(tableId));
+        Table table = databaseSchema.tableFor(tableId);
+        if (table != null) {
+            createDataEventsForTable(snapshotContext, snapshotReceiver, table);
+        } else {
+            LOG.warn("Debezium doesn't capture {}, ignore this table", tableId);
+        }
         snapshotReceiver.completeSnapshot();
     }
 
