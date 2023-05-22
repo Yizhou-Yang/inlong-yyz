@@ -27,6 +27,8 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -56,6 +58,7 @@ import org.apache.flink.table.catalog.hive.util.HiveReflectionUtils;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.types.AtomicDataType;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
@@ -383,14 +386,18 @@ public class HiveTableUtil {
         if (StringUtils.isBlank(dateStr)) {
             return null;
         }
-        String[] patterns = new String[]{"yyyy-MM-dd['T'][' ']HH:mm:ss[.SSS][X][Z]", "yyyy-MM-dd"};
-        LocalDateTime localDateTime;
-        for (String pattern : patterns) {
-            try {
-                localDateTime = LocalDateTime.parse(dateStr, DateTimeFormatter.ofPattern(pattern));
-                return localDateTime;
-            } catch (DateTimeParseException e) {
-
+        ZonedDateTime zonedDateTime = null;
+        try {
+            zonedDateTime = ZonedDateTime.parse(dateStr,
+                    DateTimeFormatter.ofPattern("yyyy-MM-dd['T'][' ']HH:mm:ss[.SSS][XXX][Z]"));
+            return LocalDateTime.ofInstant(zonedDateTime.toInstant(), ZoneId.systemDefault());
+        } catch (DateTimeParseException ignored) {
+            String[] patterns = new String[]{"yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd", "yyyyMMdd"};
+            for (String pattern : patterns) {
+                try {
+                    return LocalDateTime.parse(dateStr, DateTimeFormatter.ofPattern(pattern));
+                } catch (DateTimeParseException ignored2) {
+                }
             }
         }
         return null;
@@ -417,7 +424,8 @@ public class HiveTableUtil {
             case DOUBLE:
                 return "double";
             case DECIMAL:
-                return "decimal";
+                DecimalType decimalType = (DecimalType) type;
+                return String.format("decimal(%s,%s)", decimalType.getPrecision(), decimalType.getScale());
             case TIMESTAMP_WITH_TIME_ZONE:
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
             case TIMESTAMP_WITHOUT_TIME_ZONE:

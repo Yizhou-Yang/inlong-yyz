@@ -122,7 +122,8 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
                     .get(SINK_MULTIPLE_SCHEMA_UPDATE_POLICY);
             PartitionPolicy partitionPolicy = helper.getOptions().get(SINK_PARTITION_POLICY);
             String partitionField = helper.getOptions().get(SOURCE_PARTITION_FIELD_NAME);
-            String timestampPattern = helper.getOptions().get(PARTITION_TIME_EXTRACTOR_TIMESTAMP_PATTERN);
+            String timestampPattern = helper.getOptions().getOptional(PARTITION_TIME_EXTRACTOR_TIMESTAMP_PATTERN)
+                    .orElse("yyyy-MM-dd");
             boolean sinkMultipleEnable = helper.getOptions().get(SINK_MULTIPLE_ENABLE);
             return new HiveTableSink(
                     context.getConfiguration(),
