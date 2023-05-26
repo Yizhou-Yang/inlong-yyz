@@ -120,17 +120,16 @@ class ChunkSplitter {
             List<MySqlSnapshotSplit> splits = new ArrayList<>();
 
             RowType splitType = ChunkUtils.getSplitType(getSplitColumn(table));
-            for (int i = 0; i < chunks.size(); i++) {
-                ChunkRange chunk = chunks.get(i);
-                MySqlSnapshotSplit split =
-                        createSnapshotSplit(
-                                jdbc,
-                                tableId,
-                                i,
-                                splitType,
-                                chunk.getChunkStart(),
-                                chunk.getChunkEnd());
-                splits.add(split);
+            int chunksSize = chunks.size();
+
+            // When the data volume grows rapidly and the snapshot phase takes a long time,
+            // the data volume of the last chunk may be very large, leading to OOM.
+            // Therefore, it is recommended to read the last chunk first to prevent OOM.
+            ChunkRange lastChunk = chunks.get(chunksSize - 1);
+            addSnapshotSplit(tableId, jdbc, lastChunk, splits, splitType, chunksSize - 1);
+
+            for (int i = 0; i < chunksSize - 1; i++) {
+                addSnapshotSplit(tableId, jdbc, chunks.get(i), splits, splitType, i);
             }
 
             long end = System.currentTimeMillis();
@@ -307,6 +306,19 @@ class ChunkSplitter {
         } else {
             return chunkEnd;
         }
+    }
+
+    private void addSnapshotSplit(TableId tableId, JdbcConnection jdbc, ChunkRange chunk,
+            List<MySqlSnapshotSplit> splits, RowType splitType, int chunkId) {
+        MySqlSnapshotSplit split =
+                createSnapshotSplit(
+                        jdbc,
+                        tableId,
+                        chunkId,
+                        splitType,
+                        chunk.getChunkStart(),
+                        chunk.getChunkEnd());
+        splits.add(split);
     }
 
     private MySqlSnapshotSplit createSnapshotSplit(
