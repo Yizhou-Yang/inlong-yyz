@@ -19,6 +19,7 @@ package org.apache.inlong.sort.base.metric;
 
 import java.util.List;
 import org.apache.flink.metrics.Counter;
+import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Meter;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.SimpleCounter;
@@ -29,6 +30,8 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.inlong.sort.base.Constants.CURRENT_EMIT_EVENT_TIME_LAG;
+import static org.apache.inlong.sort.base.Constants.CURRENT_FETCH_EVENT_TIME_LAG;
 import static org.apache.inlong.sort.base.Constants.NUM_BYTES_IN;
 import static org.apache.inlong.sort.base.Constants.NUM_BYTES_IN_FOR_METER;
 import static org.apache.inlong.sort.base.Constants.NUM_BYTES_IN_PER_SECOND;
@@ -50,6 +53,29 @@ public class SourceMetricData implements MetricData {
     private Counter numBytesInForMeter;
     private Meter numRecordsInPerSecond;
     private Meter numBytesInPerSecond;
+    /**
+     * currentFetchEventTimeLag = FetchTime - messageTimestamp, where the FetchTime is the time the
+     * record fetched into the source operator.
+     */
+    private Gauge currentFetchEventTimeLag;
+    /**
+     * currentEmitEventTimeLag = EmitTime - messageTimestamp, where the EmitTime is the time the record leaves the
+     * source operator.
+     */
+    private Gauge currentEmitEventTimeLag;
+
+    /**
+     * fetchDelay = FetchTime - messageTimestamp, where the FetchTime is the time the
+     * record fetched into the source operator.
+     */
+    private volatile long fetchDelay = 0L;
+
+    /**
+     * emitDelay = EmitTime - messageTimestamp, where the EmitTime is the time the record leaves the
+     * source operator.
+     */
+    private volatile long emitDelay = 0L;
+
     private AuditOperator auditOperator;
     private List<Integer> auditKeys;
 
@@ -69,6 +95,8 @@ public class SourceMetricData implements MetricData {
                 registerMetricsForNumRecordsInForMeter(new ThreadSafeCounter());
                 registerMetricsForNumBytesInPerSecond();
                 registerMetricsForNumRecordsInPerSecond();
+                registerMetricsForCurrentFetchEventTimeLag();
+                registerMetricsForCurrentEmitEventTimeLag();
                 break;
         }
 
@@ -159,6 +187,14 @@ public class SourceMetricData implements MetricData {
         numBytesInPerSecond = registerMeter(NUM_BYTES_IN_PER_SECOND, this.numBytesInForMeter);
     }
 
+    public void registerMetricsForCurrentFetchEventTimeLag() {
+        currentFetchEventTimeLag = registerGauge(CURRENT_FETCH_EVENT_TIME_LAG, (Gauge<Long>) this::getFetchDelay);
+    }
+
+    public void registerMetricsForCurrentEmitEventTimeLag() {
+        currentEmitEventTimeLag = registerGauge(CURRENT_EMIT_EVENT_TIME_LAG, (Gauge<Long>) this::getEmitDelay);
+    }
+
     public Counter getNumRecordsIn() {
         return numRecordsIn;
     }
@@ -183,6 +219,14 @@ public class SourceMetricData implements MetricData {
         return numBytesInForMeter;
     }
 
+    public long getFetchDelay() {
+        return fetchDelay;
+    }
+
+    public long getEmitDelay() {
+        return emitDelay;
+    }
+
     @Override
     public MetricGroup getMetricGroup() {
         return metricGroup;
@@ -198,6 +242,13 @@ public class SourceMetricData implements MetricData {
         outputMetrics(1, size);
     }
 
+    public void outputMetricsWithEstimate(Object data, long fetchDelay, long emitDelay) {
+        long size = data.toString().getBytes(StandardCharsets.UTF_8).length;
+        outputMetrics(1, size);
+        this.fetchDelay = fetchDelay;
+        this.emitDelay = emitDelay;
+    }
+
     public void outputMetricsWithEstimate(Object data, long dataTime) {
         long size = data.toString().getBytes(StandardCharsets.UTF_8).length;
         outputMetrics(1, size, dataTime);
@@ -205,6 +256,23 @@ public class SourceMetricData implements MetricData {
 
     public void outputMetrics(long rowCountSize, long rowDataSize) {
         outputDefaultMetrics(rowCountSize, rowDataSize);
+
+        if (auditOperator != null) {
+            for (Integer key : auditKeys) {
+                auditOperator.add(
+                        key,
+                        getGroupId(),
+                        getStreamId(),
+                        System.currentTimeMillis(),
+                        rowCountSize,
+                        rowDataSize);
+            }
+
+        }
+    }
+
+    public void outputMetrics(long rowCountSize, long rowDataSize, long fetchDelay, long emitDelay) {
+        outputDefaultMetrics(rowCountSize, rowDataSize, fetchDelay, emitDelay);
 
         if (auditOperator != null) {
             for (Integer key : auditKeys) {
@@ -254,6 +322,12 @@ public class SourceMetricData implements MetricData {
         }
     }
 
+    private void outputDefaultMetrics(long rowCountSize, long rowDataSize, long fetchDelay, long emitDelay) {
+        outputDefaultMetrics(rowCountSize, rowDataSize);
+        this.fetchDelay = fetchDelay;
+        this.emitDelay = emitDelay;
+    }
+
     @Override
     public String toString() {
         return "SourceMetricData{"
@@ -265,6 +339,8 @@ public class SourceMetricData implements MetricData {
                 + ", numBytesInForMeter=" + numBytesInForMeter.getCount()
                 + ", numRecordsInPerSecond=" + numRecordsInPerSecond.getRate()
                 + ", numBytesInPerSecond=" + numBytesInPerSecond.getRate()
+                + ", currentFetchEventTimeLag=" + currentFetchEventTimeLag.getValue()
+                + ", currentEmitEventTimeLag=" + currentEmitEventTimeLag.getValue()
                 + ", auditOperator=" + auditOperator
                 + '}';
     }
