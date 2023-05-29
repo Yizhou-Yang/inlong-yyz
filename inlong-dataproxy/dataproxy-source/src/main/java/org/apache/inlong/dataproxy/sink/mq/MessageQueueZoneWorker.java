@@ -18,6 +18,8 @@
 package org.apache.inlong.dataproxy.sink.mq;
 
 import org.apache.flume.lifecycle.LifecycleState;
+import org.apache.inlong.dataproxy.config.ConfigManager;
+import org.apache.inlong.dataproxy.utils.MessageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +58,6 @@ public class MessageQueueZoneWorker extends Thread {
     }
 
     /**
-     * 
      * close
      */
     public void close() {
@@ -84,10 +85,26 @@ public class MessageQueueZoneWorker extends Thread {
             } catch (Throwable e) {
                 LOG.error(e.getMessage(), e);
                 if (event != null) {
-                    context.getDispatchQueue().offer(event);
+                    dealWithFailedEvent(event);
                 }
                 this.sleepOneInterval();
             }
+        }
+    }
+
+    /**
+     * When send event failed, try to put back to dispatch queue or drop event based on different situation.
+     *
+     * @param event BatchPackProfile failed to send
+     */
+    private void dealWithFailedEvent(BatchPackProfile event) {
+        ConfigManager configManager = ConfigManager.getInstance();
+        String groupId = event.getInlongGroupId();
+        String streamId = event.getInlongStreamId();
+        String configTopic = MessageUtils.getTopic(
+                configManager.getTopicProperties(), groupId, streamId);
+        if (configTopic != null) {
+            context.getDispatchQueue().offer(event);
         }
     }
 
