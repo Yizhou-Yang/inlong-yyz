@@ -191,9 +191,13 @@ public class HiveTableUtil {
      * @param schema flink field type
      * @param partitionPolicy policy of partitioning table
      * @param hiveVersion hive version
+     * @param inputFormat the input format of storage descriptor
+     * @param outputFormat the output format of storage descriptor
+     * @param serializationLib the serialization library of storage descriptor
      */
     public static void createTable(String databaseName, String tableName, RowType schema,
-            PartitionPolicy partitionPolicy, String hiveVersion) {
+            PartitionPolicy partitionPolicy, String hiveVersion, String inputFormat, String outputFormat,
+            String serializationLib) {
         HiveConf hiveConf = HiveTableInlongFactory.getHiveConf();
         try (HiveMetastoreClientWrapper client = HiveMetastoreClientFactory.create(hiveConf, hiveVersion)) {
 
@@ -231,10 +235,10 @@ public class HiveTableUtil {
             StorageDescriptor sd = new StorageDescriptor();
             table.setSd(sd);
             sd.setCols(fieldSchemaList);
-            sd.setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
-            sd.setOutputFormat("org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat");
+            sd.setInputFormat(inputFormat);
+            sd.setOutputFormat(outputFormat);
             sd.setSerdeInfo(new SerDeInfo());
-            sd.getSerdeInfo().setSerializationLib("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe");
+            sd.getSerdeInfo().setSerializationLib(serializationLib);
             client.createTable(table);
             LOG.info("create table {}.{}", databaseName, tableName);
         } catch (TException e) {
@@ -454,12 +458,12 @@ public class HiveTableUtil {
      * @param allColumns hive column names
      * @param allTypes hive column types
      * @param replaceLineBreak if replace line break to blank to avoid data corrupt when hive text table
-     * @return generic row data
+     * @return generic row data and byte size of the data
      */
-    public static Pair<GenericRowData, Long> getRowData(Map<String, Object> record, String[] allColumns,
+    public static Pair<GenericRowData, Integer> getRowData(Map<String, Object> record, String[] allColumns,
             DataType[] allTypes, boolean replaceLineBreak) {
         GenericRowData genericRowData = new GenericRowData(RowKind.INSERT, allColumns.length);
-        long byteSize = 0;
+        int byteSize = 0;
         for (int index = 0; index < allColumns.length; index++) {
             String columnName = allColumns[index];
             LogicalType logicalType = allTypes[index].getLogicalType();
