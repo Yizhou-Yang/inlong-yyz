@@ -148,7 +148,8 @@ public class InlongClientImpl implements InlongClient {
                         .inlongGroupId(briefInfo.getInlongGroupId())
                         .originalStatus(briefInfo.getStatus())
                         .simpleGroupStatus(groupStatus)
-                        .streamSources(sources).build();
+                        .streamSources(sources)
+                        .build();
                 groupStatusMap.put(groupId, statusInfo);
             });
         }
