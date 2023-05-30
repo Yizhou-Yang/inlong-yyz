@@ -73,6 +73,7 @@ import org.apache.inlong.sort.protocol.node.format.RawFormat;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -644,6 +645,7 @@ public class ExtractNodeUtils {
      */
     private static Map<String, String> parseProperties(Map<String, Object> properties) {
         return properties.entrySet().stream()
+                .filter(v -> Objects.nonNull(v.getValue()))
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString()));
     }
 
