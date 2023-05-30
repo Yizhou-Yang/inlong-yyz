@@ -83,6 +83,9 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
      * The first item of array
      */
     private static final Integer FIRST = 0;
+
+    private static final Integer ORACLE_TIMESTAMP_TIME_ZONE = -101;
+
     private static final Map<Integer, LogicalType> SQL_TYPE_2_FLINK_TYPE_MAPPING =
             ImmutableMap.<Integer, LogicalType>builder()
                     .put(java.sql.Types.CHAR, new CharType())
@@ -99,6 +102,7 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
                     .put(java.sql.Types.TIME, new TimeType())
                     .put(java.sql.Types.TIME_WITH_TIMEZONE, new TimeType())
                     .put(java.sql.Types.TIMESTAMP_WITH_TIMEZONE, new LocalZonedTimestampType())
+                    .put(ORACLE_TIMESTAMP_TIME_ZONE, new LocalZonedTimestampType())
                     .put(java.sql.Types.TIMESTAMP, new TimestampType())
                     .put(java.sql.Types.BINARY, new BinaryType())
                     .put(java.sql.Types.VARBINARY, new VarBinaryType())
