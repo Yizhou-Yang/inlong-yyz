@@ -66,7 +66,6 @@ public class WeDataFsCosCredentialsProvider extends AbstractCOSCredentialProvide
 
     @Override
     public COSCredentials getCredentials() {
-        LOG.info("WeDataFsCosCredentialsProvider getCredentials");
         if (this.credentials == null || this.credentials.isExpired()) {
             try {
                 this.lock.lock();
