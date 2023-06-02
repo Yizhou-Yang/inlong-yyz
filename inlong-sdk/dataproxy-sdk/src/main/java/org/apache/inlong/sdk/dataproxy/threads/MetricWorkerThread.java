@@ -173,7 +173,7 @@ public class MetricWorkerThread extends Thread implements Closeable {
 
     @Override
     public void close() {
-        bShutdown = false;
+        bShutdown = true;
         flushMetric(true);
     }
 
