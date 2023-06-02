@@ -17,17 +17,19 @@
 
 package org.apache.inlong.sort.base.metric.sub;
 
-import com.google.common.collect.Maps;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.flink.metrics.MetricGroup;
 import org.apache.inlong.sort.base.Constants;
 import org.apache.inlong.sort.base.metric.MetricOption;
 import org.apache.inlong.sort.base.metric.MetricOption.RegisteredMetric;
 import org.apache.inlong.sort.base.metric.MetricState;
 import org.apache.inlong.sort.base.metric.SinkMetricData;
+
+import com.google.common.collect.Maps;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.flink.metrics.MetricGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
@@ -37,6 +39,7 @@ import static org.apache.inlong.sort.base.Constants.DIRTY_BYTES_OUT;
 import static org.apache.inlong.sort.base.Constants.DIRTY_RECORDS_OUT;
 import static org.apache.inlong.sort.base.Constants.NUM_BYTES_OUT;
 import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_OUT;
+import static org.apache.inlong.sort.base.util.CalculateObjectSizeUtils.getDataSize;
 
 /**
  * A collection class for handling sub metrics of table schema type
@@ -163,7 +166,7 @@ public class SinkTableMetricData extends SinkMetricData implements SinkSubMetric
         long rowCountSize = 1L;
         long rowDataSize = 0L;
         if (data != null) {
-            rowDataSize = getDataSize(data);
+            rowDataSize = data.toString().getBytes(StandardCharsets.UTF_8).length;
         }
         outputMetrics(database, schema, table, rowCountSize, rowDataSize);
     }
@@ -216,6 +219,30 @@ public class SinkTableMetricData extends SinkMetricData implements SinkSubMetric
         } else {
             subSinkMetricData = buildSubSinkMetricData(new String[]{database, table}, this);
             subSinkMetricMap.put(identify, subSinkMetricData);
+        }
+        // sink metric and sub sink metric output metrics
+        this.invoke(rowCount, rowSize);
+        subSinkMetricData.invoke(rowCount, rowSize);
+    }
+
+    /**
+     * output metrics
+     *
+     * @param index the index name of record
+     * @param rowCount the row count of records
+     * @param rowSize the row size of records
+     */
+    public void outputMetrics(String index, long rowCount, long rowSize) {
+        if (StringUtils.isBlank(index)) {
+            invoke(rowCount, rowSize);
+            return;
+        }
+        SinkMetricData subSinkMetricData;
+        if (subSinkMetricMap.containsKey(index)) {
+            subSinkMetricData = subSinkMetricMap.get(index);
+        } else {
+            subSinkMetricData = buildSubSinkMetricData(new String[]{index}, this);
+            subSinkMetricMap.put(index, subSinkMetricData);
         }
         // sink metric and sub sink metric output metrics
         this.invoke(rowCount, rowSize);
@@ -278,7 +305,7 @@ public class SinkTableMetricData extends SinkMetricData implements SinkSubMetric
     }
 
     public void outputMetricsWithEstimate(Object data) {
-        long size = getDataSize(data);
+        long size = data.toString().getBytes(StandardCharsets.UTF_8).length;
         invoke(1, size);
     }
 
@@ -336,6 +363,30 @@ public class SinkTableMetricData extends SinkMetricData implements SinkSubMetric
     }
 
     /**
+     * output dirty metrics
+     *
+     * @param index the table name of record
+     * @param rowCount the row count of records
+     * @param rowSize the row size of records
+     */
+    public void outputDirtyMetrics(String index, long rowCount, long rowSize) {
+        if (StringUtils.isBlank(index)) {
+            invokeDirty(rowCount, rowSize);
+            return;
+        }
+        SinkMetricData subSinkMetricData;
+        if (subSinkMetricMap.containsKey(index)) {
+            subSinkMetricData = subSinkMetricMap.get(index);
+        } else {
+            subSinkMetricData = buildSubSinkMetricData(new String[]{index}, this);
+            subSinkMetricMap.put(index, subSinkMetricData);
+        }
+        // sink metric and sub sink metric output metrics
+        this.invokeDirty(rowCount, rowSize);
+        subSinkMetricData.invokeDirty(rowCount, rowSize);
+    }
+
+    /**
      * output dirty metrics with estimate
      *
      * @param database the database name of record
@@ -344,7 +395,7 @@ public class SinkTableMetricData extends SinkMetricData implements SinkSubMetric
      * @param data the dirty data
      */
     public void outputDirtyMetricsWithEstimate(String database, String schema, String table, Object data) {
-        long size = getDataSize(data);
+        long size = data == null ? 0L : data.toString().getBytes(StandardCharsets.UTF_8).length;
         outputDirtyMetrics(database, schema, table, 1, size);
     }
 
@@ -356,13 +407,11 @@ public class SinkTableMetricData extends SinkMetricData implements SinkSubMetric
      * @param data the dirty data
      */
     public void outputDirtyMetricsWithEstimate(String database, String table, Object data) {
-        long size = getDataSize(data);
-        outputDirtyMetrics(database, table, 1, size);
+        outputDirtyMetrics(database, table, 1, getDataSize(data));
     }
 
     public void outputDirtyMetricsWithEstimate(Object data) {
-        long size = getDataSize(data);
-        invokeDirty(1, size);
+        invokeDirty(1, getDataSize(data));
     }
 
     @Override
