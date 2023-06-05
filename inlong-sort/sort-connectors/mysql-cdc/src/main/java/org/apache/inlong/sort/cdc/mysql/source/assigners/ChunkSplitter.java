@@ -47,6 +47,7 @@ import java.util.Objects;
 
 import static java.math.BigDecimal.ROUND_CEILING;
 import static org.apache.inlong.sort.cdc.mysql.debezium.DebeziumUtils.openJdbcConnection;
+import static org.apache.inlong.sort.cdc.mysql.source.utils.ChunkUtils.splitId;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.ObjectUtils.doubleCompare;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.StatementUtils.queryApproximateRowCnt;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.StatementUtils.queryMin;
@@ -86,10 +87,6 @@ class ChunkSplitter {
     // --------------------------------------------------------------------------------------------
     // Utilities
     // --------------------------------------------------------------------------------------------
-
-    private static String splitId(TableId tableId, int chunkId) {
-        return tableId.toString() + ":" + chunkId;
-    }
 
     private static void maySleep(int count, TableId tableId) {
         // every 100 queries to sleep 1s

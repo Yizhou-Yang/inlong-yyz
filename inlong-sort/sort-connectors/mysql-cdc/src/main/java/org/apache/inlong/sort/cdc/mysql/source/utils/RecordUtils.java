@@ -27,6 +27,7 @@ import io.debezium.relational.history.HistoryRecord;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.inlong.sort.cdc.mysql.debezium.dispatcher.SignalEventDispatcher;
+import org.apache.inlong.sort.cdc.mysql.debezium.reader.DebeziumReader;
 import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffset;
 import org.apache.inlong.sort.cdc.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.inlong.sort.cdc.mysql.source.split.MySqlSnapshotSplit;
@@ -445,6 +446,45 @@ public class RecordUtils {
                     && (Arrays.stream(upperBoundRes).anyMatch(value -> value < 0)
                             && Arrays.stream(upperBoundRes).allMatch(value -> value <= 0));
         }
+    }
+
+    /**
+     * Returns a split which contain the specific key.
+     *
+     * @param splitInfos split info list.
+     * @param target the specific key.
+     * @return A split which contain the specific key.
+     */
+    public static FinishedSnapshotSplitInfo splitKeyRangeContainsByBinarySearch(
+            List<FinishedSnapshotSplitInfo> splitInfos, Object[] target) {
+        int left = 0;
+        int right = splitInfos.size() - 1;
+
+        while (left <= right) {
+            int mid = left + (right - left) / 2;
+            FinishedSnapshotSplitInfo splitInfo = splitInfos.get(mid);
+
+            Object[] splitStart = splitInfo.getSplitStart();
+            Object[] splitEnd = splitInfo.getSplitEnd();
+
+            if (splitKeyRangeContains(target, splitStart, splitEnd)) {
+                return splitInfo;
+            } else if (splitStart != null && isLessThanUpperBoundary(target, splitStart)) {
+                right = mid - 1;
+            } else {
+                left = mid + 1;
+            }
+        }
+
+        return null;
+    }
+
+    public static boolean isLessThanUpperBoundary(Object[] key, Object[] upperBoundary) {
+        int[] upperBoundRes = new int[key.length];
+        for (int i = 0; i < key.length; i++) {
+            upperBoundRes[i] = compareObjects(key[i], upperBoundary[i]);
+        }
+        return Arrays.stream(upperBoundRes).allMatch(value -> value < 0);
     }
 
     private static int compareObjects(Object o1, Object o2) {

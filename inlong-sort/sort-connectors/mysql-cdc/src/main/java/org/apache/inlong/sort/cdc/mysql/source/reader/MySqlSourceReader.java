@@ -71,6 +71,7 @@ import java.util.stream.Collectors;
 import static org.apache.inlong.sort.cdc.mysql.source.events.WakeupReaderEvent.WakeUpTarget.SNAPSHOT_READER;
 import static org.apache.inlong.sort.cdc.mysql.source.split.MySqlBinlogSplit.toNormalBinlogSplit;
 import static org.apache.inlong.sort.cdc.mysql.source.split.MySqlBinlogSplit.toSuspendedBinlogSplit;
+import static org.apache.inlong.sort.cdc.mysql.source.utils.ChunkUtils.chunkId;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.ChunkUtils.getNextMetaGroupId;
 
 /**
@@ -227,6 +228,8 @@ public class MySqlSourceReader<T>
                     uncompletedBinlogSplits.remove(split.splitId());
                     MySqlBinlogSplit mySqlBinlogSplit =
                             discoverTableSchemasForBinlogSplit(split.asBinlogSplit());
+                    mySqlBinlogSplit.getFinishedSnapshotSplitInfos()
+                            .sort((a, b) -> chunkId(a.getSplitId()) - chunkId(b.getSplitId()));
                     unfinishedSplits.add(mySqlBinlogSplit);
                 }
             }

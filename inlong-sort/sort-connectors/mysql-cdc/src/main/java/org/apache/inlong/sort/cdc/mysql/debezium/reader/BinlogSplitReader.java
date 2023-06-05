@@ -53,6 +53,7 @@ import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getBinlo
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getSplitKey;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableId;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.isDataChangeRecord;
+import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.splitKeyRangeContainsByBinarySearch;
 
 /**
  * A Debezium binlog reader implementation that also support reads binlog and filter overlapping
@@ -202,6 +203,12 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                                 splitKeyType,
                                 sourceRecord,
                                 statefulTaskContext.getSchemaNameAdjuster());
+                // currently, we only support using binary search algorithm for a single split key.
+                if (key.length == 1) {
+                    FinishedSnapshotSplitInfo splitInfo = splitKeyRangeContainsByBinarySearch(
+                            finishedSplitsInfo.get(tableId), key);
+                    return splitInfo != null && position.isAfter(splitInfo.getHighWatermark());
+                }
                 for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
                     if (RecordUtils.splitKeyRangeContains(
                             key, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
