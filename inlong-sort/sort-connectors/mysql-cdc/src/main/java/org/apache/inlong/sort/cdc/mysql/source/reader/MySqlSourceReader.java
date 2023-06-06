@@ -20,6 +20,7 @@ package org.apache.inlong.sort.cdc.mysql.source.reader;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
+import java.util.Comparator;
 import java.util.Map.Entry;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.configuration.Configuration;
@@ -229,7 +230,7 @@ public class MySqlSourceReader<T>
                     MySqlBinlogSplit mySqlBinlogSplit =
                             discoverTableSchemasForBinlogSplit(split.asBinlogSplit());
                     mySqlBinlogSplit.getFinishedSnapshotSplitInfos()
-                            .sort((a, b) -> chunkId(a.getSplitId()) - chunkId(b.getSplitId()));
+                            .sort(Comparator.comparingInt(splitInfo -> chunkId(splitInfo.getSplitId())));
                     unfinishedSplits.add(mySqlBinlogSplit);
                 }
             }
