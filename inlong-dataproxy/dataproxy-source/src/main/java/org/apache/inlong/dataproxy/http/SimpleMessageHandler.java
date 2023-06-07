@@ -97,9 +97,9 @@ public class SimpleMessageHandler implements MessageHandler {
         streamId = streamId.trim();
         // get topicName
         String topicName = "test";
-        String configedTopicName = getTopic(groupId, streamId);
-        if (StringUtils.isNotBlank(configedTopicName)) {
-            topicName = configedTopicName.trim();
+        String configTopicName = getTopic(groupId, streamId);
+        if (StringUtils.isNotBlank(configTopicName)) {
+            topicName = configTopicName.trim();
         }
         // get message data time
         final long msgRcvTime = System.currentTimeMillis();

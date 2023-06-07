@@ -211,6 +211,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         .setUserDefinedConverterFactory(
                                 MySqlDeserializationConverterFactory.instance())
                         .setMigrateAll(migrateAll)
+                        .setSchemaChange(includeSchemaChange)
                         .build();
         if (enableParallelRead) {
             MySqlSource<RowData> parallelSource =

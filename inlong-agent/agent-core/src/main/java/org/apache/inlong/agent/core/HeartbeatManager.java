@@ -17,35 +17,6 @@
 
 package org.apache.inlong.agent.core;
 
-import com.google.common.collect.Lists;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.inlong.agent.common.AbstractDaemon;
-import org.apache.inlong.agent.conf.AgentConfiguration;
-import org.apache.inlong.agent.conf.JobProfile;
-import org.apache.inlong.agent.core.job.Job;
-import org.apache.inlong.agent.core.job.JobManager;
-import org.apache.inlong.agent.core.job.JobWrapper;
-import org.apache.inlong.agent.state.State;
-import org.apache.inlong.agent.utils.AgentUtils;
-import org.apache.inlong.agent.utils.HttpManager;
-import org.apache.inlong.agent.utils.ThreadUtils;
-import org.apache.inlong.common.enums.ComponentTypeEnum;
-import org.apache.inlong.common.enums.NodeSrvStatus;
-import org.apache.inlong.common.heartbeat.AbstractHeartbeatManager;
-import org.apache.inlong.common.heartbeat.GroupHeartbeat;
-import org.apache.inlong.common.heartbeat.HeartbeatMsg;
-import org.apache.inlong.common.heartbeat.StreamHeartbeat;
-import org.apache.inlong.common.pojo.agent.TaskSnapshotMessage;
-import org.apache.inlong.common.pojo.agent.TaskSnapshotRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Pattern;
-
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.inlong.agent.constant.AgentConstants.AGENT_CLUSTER_IN_CHARGES;
 import static org.apache.inlong.agent.constant.AgentConstants.AGENT_CLUSTER_NAME;
@@ -62,12 +33,42 @@ import static org.apache.inlong.agent.constant.FetcherConstants.DEFAULT_AGENT_MA
 import static org.apache.inlong.agent.constant.JobConstants.JOB_GROUP_ID;
 import static org.apache.inlong.agent.constant.JobConstants.JOB_STREAM_ID;
 
+import com.google.common.collect.Lists;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.inlong.agent.common.AbstractDaemon;
+import org.apache.inlong.agent.conf.AgentConfiguration;
+import org.apache.inlong.agent.conf.JobProfile;
+import org.apache.inlong.agent.core.job.Job;
+import org.apache.inlong.agent.core.job.JobManager;
+import org.apache.inlong.agent.core.job.JobWrapper;
+import org.apache.inlong.agent.core.task.MemoryManager;
+import org.apache.inlong.agent.state.State;
+import org.apache.inlong.agent.utils.AgentUtils;
+import org.apache.inlong.agent.utils.HttpManager;
+import org.apache.inlong.agent.utils.ThreadUtils;
+import org.apache.inlong.common.enums.ComponentTypeEnum;
+import org.apache.inlong.common.enums.NodeSrvStatus;
+import org.apache.inlong.common.heartbeat.AbstractHeartbeatManager;
+import org.apache.inlong.common.heartbeat.GroupHeartbeat;
+import org.apache.inlong.common.heartbeat.HeartbeatMsg;
+import org.apache.inlong.common.heartbeat.StreamHeartbeat;
+import org.apache.inlong.common.pojo.agent.TaskSnapshotMessage;
+import org.apache.inlong.common.pojo.agent.TaskSnapshotRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * report heartbeat to inlong-manager
  */
 public class HeartbeatManager extends AbstractDaemon implements AbstractHeartbeatManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeartbeatManager.class);
+    public static final int PRINT_MEMORY_PERMIT_INTERVAL_SECOND = 60;
     private static HeartbeatManager heartbeatManager = null;
     private final JobManager jobmanager;
     private final AgentConfiguration conf;
@@ -121,6 +122,16 @@ public class HeartbeatManager extends AbstractDaemon implements AbstractHeartbea
     public void start() throws Exception {
         submitWorker(snapshotReportThread());
         submitWorker(heartbeatReportThread());
+        submitWorker(printMemoryPermitThread());
+    }
+
+    private Runnable printMemoryPermitThread() {
+        return () -> {
+            while (isRunnable()) {
+                MemoryManager.getInstance().printAll();
+                AgentUtils.silenceSleepInSeconds(PRINT_MEMORY_PERMIT_INTERVAL_SECOND);
+            }
+        };
     }
 
     private Runnable snapshotReportThread() {

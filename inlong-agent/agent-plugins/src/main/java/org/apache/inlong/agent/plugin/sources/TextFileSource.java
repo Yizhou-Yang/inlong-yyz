@@ -17,6 +17,18 @@
 
 package org.apache.inlong.agent.plugin.sources;
 
+import static org.apache.inlong.agent.constant.CommonConstants.POSITION_SUFFIX;
+import static org.apache.inlong.agent.constant.JobConstants.DEFAULT_JOB_LINE_FILTER;
+import static org.apache.inlong.agent.constant.JobConstants.DEFAULT_JOB_READ_WAIT_TIMEOUT;
+import static org.apache.inlong.agent.constant.JobConstants.JOB_LINE_FILTER_PATTERN;
+import static org.apache.inlong.agent.constant.JobConstants.JOB_READ_WAIT_TIMEOUT;
+import static org.apache.inlong.agent.constant.JobConstants.JOB_TRIGGER;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import org.apache.inlong.agent.conf.JobProfile;
 import org.apache.inlong.agent.plugin.Reader;
 import org.apache.inlong.agent.plugin.sources.reader.file.FileReaderOperator;
@@ -25,19 +37,6 @@ import org.apache.inlong.agent.plugin.utils.FileDataUtils;
 import org.apache.inlong.agent.plugin.utils.PluginUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-
-import static org.apache.inlong.agent.constant.CommonConstants.POSITION_SUFFIX;
-import static org.apache.inlong.agent.constant.JobConstants.DEFAULT_JOB_LINE_FILTER;
-import static org.apache.inlong.agent.constant.JobConstants.DEFAULT_JOB_READ_WAIT_TIMEOUT;
-import static org.apache.inlong.agent.constant.JobConstants.JOB_LINE_FILTER_PATTERN;
-import static org.apache.inlong.agent.constant.JobConstants.JOB_READ_WAIT_TIMEOUT;
-import static org.apache.inlong.agent.constant.JobConstants.JOB_TRIGGER;
 
 /**
  * Read text files
@@ -69,7 +68,6 @@ public class TextFileSource extends AbstractSource {
             FileReaderOperator fileReader = new FileReaderOperator(file, startPosition);
             long waitTimeout = jobConf.getLong(JOB_READ_WAIT_TIMEOUT, DEFAULT_JOB_READ_WAIT_TIMEOUT);
             fileReader.setWaitMillisecond(waitTimeout);
-            addValidator(filterPattern, fileReader);
             result.add(fileReader);
         }
         // increment the count of successful sources
@@ -81,9 +79,5 @@ public class TextFileSource extends AbstractSource {
         int seekPosition;
         seekPosition = jobConf.getInt(file.getAbsolutePath() + POSITION_SUFFIX, 0);
         return seekPosition;
-    }
-
-    private void addValidator(String filterPattern, FileReaderOperator fileReader) {
-        fileReader.addPatternValidator(filterPattern);
     }
 }

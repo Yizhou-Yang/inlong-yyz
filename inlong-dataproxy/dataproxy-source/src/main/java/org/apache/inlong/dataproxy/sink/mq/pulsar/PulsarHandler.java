@@ -372,7 +372,7 @@ public class PulsarHandler implements MessageQueueHandler {
                 sinkContext.getDispatchQueue().release(event.getSize());
                 event.ack();
             }
-        });
+        }).get(1000, TimeUnit.MILLISECONDS);
     }
 
     /**

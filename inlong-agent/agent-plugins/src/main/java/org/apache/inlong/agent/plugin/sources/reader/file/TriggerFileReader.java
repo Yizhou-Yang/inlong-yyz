@@ -30,6 +30,8 @@ public class TriggerFileReader implements Reader {
     @NotNull
     private String triggerId;
 
+    public volatile boolean finished = false;
+
     @Override
     public Message read() {
         try {
@@ -43,7 +45,7 @@ public class TriggerFileReader implements Reader {
 
     @Override
     public boolean isFinished() {
-        return false;
+        return finished;
     }
 
     @Override
@@ -68,7 +70,7 @@ public class TriggerFileReader implements Reader {
 
     @Override
     public void finishRead() {
-
+        finished = true;
     }
 
     @Override
