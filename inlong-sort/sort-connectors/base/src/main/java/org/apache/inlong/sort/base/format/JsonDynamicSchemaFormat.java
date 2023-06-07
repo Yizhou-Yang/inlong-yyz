@@ -83,6 +83,9 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
      * The first item of array
      */
     private static final Integer FIRST = 0;
+
+    private static final Integer ORACLE_TIMESTAMP_TIME_ZONE = -101;
+
     private static final Map<Integer, LogicalType> SQL_TYPE_2_FLINK_TYPE_MAPPING =
             ImmutableMap.<Integer, LogicalType>builder()
                     .put(java.sql.Types.CHAR, new CharType())
@@ -99,6 +102,7 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
                     .put(java.sql.Types.TIME, new TimeType())
                     .put(java.sql.Types.TIME_WITH_TIMEZONE, new TimeType())
                     .put(java.sql.Types.TIMESTAMP_WITH_TIMEZONE, new LocalZonedTimestampType())
+                    .put(ORACLE_TIMESTAMP_TIME_ZONE, new LocalZonedTimestampType())
                     .put(java.sql.Types.TIMESTAMP, new TimestampType())
                     .put(java.sql.Types.BINARY, new BinaryType())
                     .put(java.sql.Types.VARBINARY, new VarBinaryType())
@@ -131,12 +135,21 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
                     .put(java.sql.Types.BIT, new BooleanType())
                     .put(java.sql.Types.TIME, new VarCharType())
                     .put(java.sql.Types.TIMESTAMP_WITH_TIMEZONE, new LocalZonedTimestampType())
+                    .put(ORACLE_TIMESTAMP_TIME_ZONE, new LocalZonedTimestampType())
                     .put(java.sql.Types.TIMESTAMP, new LocalZonedTimestampType())
                     .put(java.sql.Types.BINARY, new BinaryType())
                     .put(java.sql.Types.VARBINARY, new VarBinaryType())
                     .put(java.sql.Types.BLOB, new VarBinaryType())
+                    .put(java.sql.Types.CLOB, new VarBinaryType())
                     .put(java.sql.Types.DATE, new DateType())
                     .put(java.sql.Types.BOOLEAN, new BooleanType())
+                    .put(java.sql.Types.LONGNVARCHAR, new VarCharType())
+                    .put(java.sql.Types.LONGVARBINARY, new VarCharType())
+                    .put(java.sql.Types.LONGVARCHAR, new VarCharType())
+                    .put(java.sql.Types.ARRAY, new VarCharType())
+                    .put(java.sql.Types.NCHAR, new CharType())
+                    .put(java.sql.Types.NCLOB, new VarBinaryType())
+                    .put(java.sql.Types.TINYINT, new TinyIntType())
                     .put(java.sql.Types.OTHER, new VarCharType())
                     .build();
 
