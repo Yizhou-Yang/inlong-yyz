@@ -84,17 +84,19 @@ public class FileSourceOperator extends AbstractSourceOperator {
     @Transactional(rollbackFor = Throwable.class, isolation = Isolation.REPEATABLE_READ)
     public void updateOpt(SourceRequest request, Integer groupStatus, Integer groupMode, String operator) {
         super.updateOpt(request, groupStatus, groupMode, operator);
-        StreamSourceEntity originEntity = sourceMapper.selectByIdForUpdate(request.getId());
-        if (originEntity == null || originEntity.getTemplateId() == null) {
+        StreamSourceEntity originEntity = sourceMapper.selectById(request.getId());
+        LOGGER.warn("Find template streamSourceEntity:{} by request:{}", originEntity, request);
+        if (originEntity == null) {
             return;
         }
 
-        List<StreamSourceEntity> streamSourceEntities = sourceMapper.selectByTemplateId(originEntity.getTemplateId());
+        List<StreamSourceEntity> streamSourceEntities = sourceMapper.selectByTemplateId(originEntity.getId());
         for (StreamSourceEntity entity : streamSourceEntities) {
             if (StringUtils.isEmpty(entity.getAgentIp())) {
                 continue;
             }
             entity.setInlongClusterNodeGroup(request.getInlongClusterNodeGroup());
+            LOGGER.info("Update streamSourceEntity:{} by templateId:{}", entity, originEntity.getTemplateId());
             sourceMapper.updateByPrimaryKeySelective(entity);
         }
     }
