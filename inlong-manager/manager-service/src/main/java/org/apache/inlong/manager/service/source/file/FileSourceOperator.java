@@ -89,11 +89,11 @@ public class FileSourceOperator extends AbstractSourceOperator {
         List<StreamSourceEntity> streamSourceEntities = sourceMapper.selectByGroupIds(
                 Lists.newArrayList(inlongGroupId));
         for (StreamSourceEntity entity : streamSourceEntities) {
-           if (StringUtils.isEmpty(entity.getAgentIp())){
-               continue;
-           }
-           entity.setInlongClusterNodeGroup(request.getInlongClusterNodeGroup());
-           sourceMapper.updateByPrimaryKeySelective(entity);
+            if (StringUtils.isEmpty(entity.getAgentIp())) {
+                continue;
+            }
+            entity.setInlongClusterNodeGroup(request.getInlongClusterNodeGroup());
+            sourceMapper.updateByPrimaryKeySelective(entity);
         }
     }
 
@@ -113,10 +113,10 @@ public class FileSourceOperator extends AbstractSourceOperator {
 
         List<StreamSourceEntity> subSourceList = sourceMapper.selectByTemplateId(entity.getId());
         source.setSubSourceList(subSourceList.stream().map(subEntity -> SubSourceDTO.builder()
-                        .id(subEntity.getId())
-                        .templateId(entity.getId())
-                        .agentIp(subEntity.getAgentIp())
-                        .status(subEntity.getStatus()).build())
+                .id(subEntity.getId())
+                .templateId(entity.getId())
+                .agentIp(subEntity.getAgentIp())
+                .status(subEntity.getStatus()).build())
                 .collect(Collectors.toList()));
         return source;
     }
