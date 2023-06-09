@@ -333,6 +333,12 @@ public class SourceTableMetricData extends SourceMetricData implements SourceSub
         return "SourceTableMetricData{"
                 + "numRecordsIn=" + getNumRecordsIn().getCount()
                 + ", numBytesIn=" + getNumBytesIn().getCount()
+                + ", numRecordsInForMeter=" + getNumRecordsInForMeter().getCount()
+                + ", numBytesInForMeter=" + getNumBytesInForMeter().getCount()
+                + ", numRecordsInPerSecond=" + getNumRecordsInPerSecond().getRate()
+                + ", numBytesInPerSecond=" + getNumBytesInPerSecond().getRate()
+                + ", currentFetchEventTimeLag=" + getFetchDelay()
+                + ", currentEmitEventTimeLag=" + getEmitDelay()
                 + ", readPhaseMetricDataMap=" + readPhaseMetricDataMap
                 + ", subSourceMetricMap=" + subSourceMetricMap
                 + '}';

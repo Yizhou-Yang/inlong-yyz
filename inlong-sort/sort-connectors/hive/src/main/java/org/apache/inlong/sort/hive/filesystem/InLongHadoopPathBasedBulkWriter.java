@@ -23,18 +23,17 @@ import org.apache.flink.formats.hadoop.bulk.HadoopPathBasedBulkWriter;
 import org.apache.flink.table.data.RowData;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.io.Writable;
 
 public class InLongHadoopPathBasedBulkWriter implements HadoopPathBasedBulkWriter<RowData> {
 
-    private FileSinkOperator.RecordWriter recordWriter;
+    private RecordWriter recordWriter;
     private Function<RowData, Writable> rowConverter;
     private FileSystem fs;
     private Path inProgressPath;
 
-    public InLongHadoopPathBasedBulkWriter(FileSinkOperator.RecordWriter recordWriter,
+    public InLongHadoopPathBasedBulkWriter(RecordWriter recordWriter,
             Function<RowData, Writable> rowConverter,
             FileSystem fs,
             Path inProgressPath) {

@@ -132,6 +132,9 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
     private final String partitionField;
     private final String timePattern;
     private final boolean sinkMultipleEnable;
+    private final String inputFormat;
+    private final String outputFormat;
+    private final String serializationLib;
 
     public HiveTableSink(
             ReadableConfig flinkConf,
@@ -147,7 +150,10 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
             PartitionPolicy partitionPolicy,
             String partitionField,
             String timePattern,
-            boolean sinkMultipleEnable) {
+            boolean sinkMultipleEnable,
+            String inputFormat,
+            String outputFormat,
+            String serializationLib) {
         this.flinkConf = flinkConf;
         this.jobConf = jobConf;
         this.identifier = identifier;
@@ -168,6 +174,9 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
         this.partitionField = partitionField;
         this.timePattern = timePattern;
         this.sinkMultipleEnable = sinkMultipleEnable;
+        this.inputFormat = inputFormat;
+        this.outputFormat = outputFormat;
+        this.serializationLib = serializationLib;
     }
 
     @Override
@@ -330,7 +339,10 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
                 getPartitionKeyArray(),
                 partitionPolicy,
                 partitionField,
-                timePattern);
+                timePattern,
+                inputFormat,
+                outputFormat,
+                serializationLib);
 
         TableBucketAssigner assigner = new TableBucketAssigner(partComputer);
         HiveRollingPolicy rollingPolicy =
@@ -450,7 +462,7 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
         HiveBulkWriterFactory hadoopBulkFactory = new HiveBulkWriterFactory(recordWriterFactory);
         return new HadoopPathBasedBulkFormatBuilder<>(new Path(sd.getLocation()), hadoopBulkFactory, jobConf, assigner,
                 dirtyOptions, dirtySink, schemaUpdatePolicy, partitionPolicy, hiveShim, hiveVersion,
-                sinkMultipleEnable)
+                sinkMultipleEnable, inputFormat, outputFormat, serializationLib)
                         .withRollingPolicy(rollingPolicy)
                         .withOutputFileConfig(outputFileConfig);
     }
@@ -562,7 +574,10 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
                         partitionPolicy,
                         partitionField,
                         timePattern,
-                        sinkMultipleEnable);
+                        sinkMultipleEnable,
+                        inputFormat,
+                        outputFormat,
+                        serializationLib);
         sink.staticPartitionSpec = staticPartitionSpec;
         sink.overwrite = overwrite;
         sink.dynamicGrouping = dynamicGrouping;
