@@ -18,7 +18,6 @@
 package org.apache.inlong.manager.service.source.file;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.manager.common.consts.SourceType;
 import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
@@ -28,10 +27,10 @@ import org.apache.inlong.manager.dao.entity.StreamSourceEntity;
 import org.apache.inlong.manager.dao.mapper.StreamSourceEntityMapper;
 import org.apache.inlong.manager.pojo.source.SourceRequest;
 import org.apache.inlong.manager.pojo.source.StreamSource;
+import org.apache.inlong.manager.pojo.source.SubSourceDTO;
 import org.apache.inlong.manager.pojo.source.file.FileSource;
 import org.apache.inlong.manager.pojo.source.file.FileSourceDTO;
 import org.apache.inlong.manager.pojo.source.file.FileSourceRequest;
-import org.apache.inlong.manager.pojo.source.SubSourceDTO;
 import org.apache.inlong.manager.pojo.stream.StreamField;
 import org.apache.inlong.manager.service.source.AbstractSourceOperator;
 import org.slf4j.Logger;
@@ -85,9 +84,12 @@ public class FileSourceOperator extends AbstractSourceOperator {
     @Transactional(rollbackFor = Throwable.class, isolation = Isolation.REPEATABLE_READ)
     public void updateOpt(SourceRequest request, Integer groupStatus, Integer groupMode, String operator) {
         super.updateOpt(request, groupStatus, groupMode, operator);
-        String inlongGroupId = request.getInlongGroupId();
-        List<StreamSourceEntity> streamSourceEntities = sourceMapper.selectByGroupIds(
-                Lists.newArrayList(inlongGroupId));
+        StreamSourceEntity originEntity = sourceMapper.selectByIdForUpdate(request.getId());
+        if (originEntity == null || originEntity.getTemplateId() == null) {
+            return;
+        }
+
+        List<StreamSourceEntity> streamSourceEntities = sourceMapper.selectByTemplateId(originEntity.getTemplateId());
         for (StreamSourceEntity entity : streamSourceEntities) {
             if (StringUtils.isEmpty(entity.getAgentIp())) {
                 continue;
