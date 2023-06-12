@@ -222,7 +222,7 @@ public class PulsarHandler implements MessageQueueHandler {
                     SecureRandom secureRandom = new SecureRandom(
                             (producerTopic + System.currentTimeMillis()).getBytes());
                     String producerName = producerTopic + "-" + secureRandom.nextLong();
-                    LOG.info("try to new a object for topic {} and producerName:{}" + producerTopic, producerName);
+                    LOG.info("try to new a object for topic {} and producerName:{}", producerTopic, producerName);
                     CompletableFuture<Producer<byte[]>> producerFuture = baseBuilder.clone().topic(producerTopic)
                             .producerName(producerName)
                             .createAsync();
