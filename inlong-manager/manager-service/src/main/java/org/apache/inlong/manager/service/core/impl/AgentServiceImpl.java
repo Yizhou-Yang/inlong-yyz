@@ -358,7 +358,7 @@ public class AgentServiceImpl implements AgentService {
                 .forEach(sourceEntity -> {
                     InlongGroupEntity groupEntity = groupMapper.selectByGroupId(sourceEntity.getInlongGroupId());
                     Set<GroupStatus> noNeedAddTask = Sets.newHashSet(
-                            GroupStatus.SUSPENDED, GroupStatus.SUSPENDING);
+                            GroupStatus.SUSPENDED, GroupStatus.SUSPENDING, GroupStatus.DELETING, GroupStatus.DELETED);
                     if (groupEntity != null && noNeedAddTask.contains(GroupStatus.forCode(groupEntity.getStatus()))) {
                         return;
                     }
