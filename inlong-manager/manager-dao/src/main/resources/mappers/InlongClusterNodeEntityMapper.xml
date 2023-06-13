@@ -114,7 +114,7 @@
             </if>
             <if test="keyword != null and keyword != ''">
                 and (
-                ip  = #{keyword, jdbcType=VARCHAR}
+                ip = #{keyword, jdbcType=VARCHAR}
                 or port = #{keyword, jdbcType=VARCHAR}
                 )
             </if>

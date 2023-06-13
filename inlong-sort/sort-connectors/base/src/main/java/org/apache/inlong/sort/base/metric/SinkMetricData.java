@@ -17,16 +17,15 @@
 
 package org.apache.inlong.sort.base.metric;
 
-import org.apache.flink.metrics.Counter;
-import org.apache.flink.metrics.Meter;
-import org.apache.flink.metrics.MetricGroup;
-import org.apache.flink.metrics.SimpleCounter;
-import org.apache.flink.table.data.binary.BinaryRowData;
 import org.apache.inlong.audit.AuditOperator;
 import org.apache.inlong.sort.base.Constants;
 import org.apache.inlong.sort.base.metric.MetricOption.RegisteredMetric;
 
-import java.nio.charset.StandardCharsets;
+import org.apache.flink.metrics.Counter;
+import org.apache.flink.metrics.Meter;
+import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.SimpleCounter;
+
 import java.util.Map;
 
 import static org.apache.inlong.sort.base.Constants.DIRTY_BYTES_OUT;
@@ -37,6 +36,7 @@ import static org.apache.inlong.sort.base.Constants.NUM_BYTES_OUT_PER_SECOND;
 import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_OUT;
 import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_OUT_FOR_METER;
 import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_OUT_PER_SECOND;
+import static org.apache.inlong.sort.base.util.CalculateObjectSizeUtils.getDataSize;
 
 /**
  * A collection class for handling metrics
@@ -259,20 +259,6 @@ public class SinkMetricData implements MetricData {
 
     public void invokeDirtyWithEstimate(Object o) {
         invokeDirty(1, getDataSize(o));
-    }
-
-    public long getDataSize(Object object) {
-        if (object == null) {
-            return 0L;
-        }
-        long size;
-        if (object instanceof BinaryRowData) {
-            BinaryRowData binaryRowData = (BinaryRowData) object;
-            size = binaryRowData.getSizeInBytes();
-        } else {
-            size = object.toString().getBytes(StandardCharsets.UTF_8).length;
-        }
-        return size;
     }
 
     public void invoke(long rowCount, long rowSize) {

@@ -17,18 +17,18 @@
 
 package org.apache.inlong.sort.base.metric;
 
-import java.util.List;
+import org.apache.inlong.audit.AuditOperator;
+
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Meter;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.SimpleCounter;
-import org.apache.inlong.audit.AuditOperator;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.Map;
 
 import static org.apache.inlong.sort.base.Constants.CURRENT_EMIT_EVENT_TIME_LAG;
 import static org.apache.inlong.sort.base.Constants.CURRENT_FETCH_EVENT_TIME_LAG;
@@ -38,6 +38,7 @@ import static org.apache.inlong.sort.base.Constants.NUM_BYTES_IN_PER_SECOND;
 import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_IN;
 import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_IN_FOR_METER;
 import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_IN_PER_SECOND;
+import static org.apache.inlong.sort.base.util.CalculateObjectSizeUtils.getDataSize;
 
 /**
  * A collection class for handling metrics
@@ -238,20 +239,17 @@ public class SourceMetricData implements MetricData {
     }
 
     public void outputMetricsWithEstimate(Object data) {
-        long size = data.toString().getBytes(StandardCharsets.UTF_8).length;
-        outputMetrics(1, size);
+        outputMetrics(1, getDataSize(data));
     }
 
     public void outputMetricsWithEstimate(Object data, long fetchDelay, long emitDelay) {
-        long size = data.toString().getBytes(StandardCharsets.UTF_8).length;
-        outputMetrics(1, size);
+        outputMetrics(1, getDataSize(data));
         this.fetchDelay = fetchDelay;
         this.emitDelay = emitDelay;
     }
 
     public void outputMetricsWithEstimate(Object data, long dataTime) {
-        long size = data.toString().getBytes(StandardCharsets.UTF_8).length;
-        outputMetrics(1, size, dataTime);
+        outputMetrics(1, getDataSize(data), dataTime);
     }
 
     public void outputMetrics(long rowCountSize, long rowDataSize) {

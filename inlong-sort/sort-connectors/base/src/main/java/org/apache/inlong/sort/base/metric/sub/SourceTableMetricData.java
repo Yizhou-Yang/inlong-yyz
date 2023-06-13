@@ -23,7 +23,6 @@ import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_IN;
 import static org.apache.inlong.sort.base.Constants.READ_PHASE;
 
 import com.google.common.collect.Maps;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -38,6 +37,7 @@ import org.apache.inlong.sort.base.metric.MetricOption.RegisteredMetric;
 import org.apache.inlong.sort.base.metric.MetricState;
 import org.apache.inlong.sort.base.metric.SourceMetricData;
 import org.apache.inlong.sort.base.metric.phase.ReadPhaseMetricData;
+import org.apache.inlong.sort.base.util.CalculateObjectSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -243,7 +243,7 @@ public class SourceTableMetricData extends SourceMetricData implements SourceSub
         }
         // source metric and sub source metric output metrics
         long rowCountSize = 1L;
-        long rowDataSize = data.toString().getBytes(StandardCharsets.UTF_8).length;
+        long rowDataSize = CalculateObjectSizeUtils.getDataSize(data);
         this.outputMetrics(rowCountSize, rowDataSize);
         subSourceMetricData.outputMetrics(rowCountSize, rowDataSize);
 
@@ -276,7 +276,7 @@ public class SourceTableMetricData extends SourceMetricData implements SourceSub
         }
         // source metric and sub source metric output metrics
         long rowCountSize = 1L;
-        long rowDataSize = data.toString().getBytes(StandardCharsets.UTF_8).length;
+        long rowDataSize = CalculateObjectSizeUtils.getDataSize(data);
         this.outputMetrics(rowCountSize, rowDataSize, fetchDelay, emitDelay);
         subSourceMetricData.outputMetrics(rowCountSize, rowDataSize, fetchDelay, emitDelay);
 
