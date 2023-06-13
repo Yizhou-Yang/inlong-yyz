@@ -276,7 +276,7 @@ public class SourceTableMetricData extends SourceMetricData implements SourceSub
         }
         // source metric and sub source metric output metrics
         long rowCountSize = 1L;
-        long rowDataSize = data.toString().getBytes(StandardCharsets.UTF_8).length;
+        long rowDataSize = CalculateObjectSizeUtils.getDataSize(data);
         this.outputMetrics(rowCountSize, rowDataSize, fetchDelay, emitDelay);
         subSourceMetricData.outputMetrics(rowCountSize, rowDataSize, fetchDelay, emitDelay);
 
