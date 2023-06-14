@@ -27,6 +27,7 @@ import io.debezium.relational.history.HistoryRecord;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.inlong.sort.cdc.mysql.debezium.dispatcher.SignalEventDispatcher;
+import org.apache.inlong.sort.cdc.mysql.debezium.reader.DebeziumReader;
 import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffset;
 import org.apache.inlong.sort.cdc.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.inlong.sort.cdc.mysql.source.split.MySqlSnapshotSplit;
