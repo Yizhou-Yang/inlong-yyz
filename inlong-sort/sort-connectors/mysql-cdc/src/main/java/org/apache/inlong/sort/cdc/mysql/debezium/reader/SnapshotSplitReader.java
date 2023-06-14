@@ -26,6 +26,7 @@ import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.spi.SnapshotResult;
+import io.debezium.pipeline.spi.SnapshotResult.SnapshotResultStatus;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -110,6 +111,10 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                                 new SnapshotSplitChangeEventSourceContextImpl();
                         SnapshotResult snapshotResult =
                                 splitSnapshotReadTask.execute(sourceContext);
+                        if (SnapshotResultStatus.SKIPPED == snapshotResult.getStatus()) {
+                            LOG.warn("Skip snapshot: {}", snapshotResult);
+                            return;
+                        }
                         final MySqlBinlogSplit backfillBinlogSplit =
                                 createBackfillBinlogSplit(sourceContext);
                         // optimization that skip the binlog read when the low watermark equals high

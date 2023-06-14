@@ -134,6 +134,12 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                         topicSelector.topicNameFor(snapshotSplit.getTableId()),
                         dispatcher.getQueue());
 
+        Table table = databaseSchema.tableFor(snapshotSplit.getTableId());
+        if (table == null) {
+            LOG.warn("Debezium doesn't capture {}, ignore this table", snapshotSplit.getTableId());
+            return SnapshotResult.skipped(ctx.offset);
+        }
+
         final BinlogOffset lowWatermark = currentBinlogOffset(jdbcConnection);
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
@@ -203,12 +209,7 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         EventDispatcher.SnapshotReceiver snapshotReceiver =
                 dispatcher.getSnapshotChangeEventReceiver();
         LOG.debug("Snapshotting table {}", tableId);
-        Table table = databaseSchema.tableFor(tableId);
-        if (table != null) {
-            createDataEventsForTable(snapshotContext, snapshotReceiver, table);
-        } else {
-            LOG.warn("Debezium doesn't capture {}, ignore this table", tableId);
-        }
+        createDataEventsForTable(snapshotContext, snapshotReceiver, databaseSchema.tableFor(tableId));
         snapshotReceiver.completeSnapshot();
     }
 
