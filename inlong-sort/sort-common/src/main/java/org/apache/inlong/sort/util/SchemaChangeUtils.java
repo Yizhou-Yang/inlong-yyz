@@ -24,24 +24,26 @@ import org.apache.inlong.sort.protocol.ddl.operations.AlterOperation;
 import org.apache.inlong.sort.protocol.ddl.operations.Operation;
 import org.apache.inlong.sort.protocol.enums.SchemaChangePolicy;
 import org.apache.inlong.sort.protocol.enums.SchemaChangeType;
+import org.apache.inlong.sort.schema.ColumnSchema;
+import org.apache.inlong.sort.schema.TableChange;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.stream.Collectors;
 
 /**
  * Schema-change Utils
  */
-public final class SchemaChangeUtils {
+public class SchemaChangeUtils {
 
     private final static String DELIMITER = "&";
     private final static String KEY_VALUE_DELIMITER = "=";
-
-    private SchemaChangeUtils() {
-    }
 
     /**
      * deserialize the policies to a Map[{@link SchemaChangeType}, {@link SchemaChangePolicy}]
@@ -213,5 +215,50 @@ public final class SchemaChangeUtils {
         } else {
             types.add(SchemaChangeType.CHANGE_COLUMN_TYPE);
         }
+    }
+
+    /**
+     * Compare two schemas and get the schema changes that happened in them.
+     * TODO: currently only support add column
+     *
+     * @param oldColumnSchemas
+     * @param newColumnSchemas
+     * @return
+     */
+    public static List<TableChange> diffSchema(Map<String, ColumnSchema> oldColumnSchemas,
+            Map<String, ColumnSchema> newColumnSchemas) {
+        List<String> oldFields = oldColumnSchemas.values().stream()
+                .map(ColumnSchema::getName).collect(Collectors.toList());
+        List<String> newFields = newColumnSchemas.values().stream()
+                .map(ColumnSchema::getName).collect(Collectors.toList());
+        int oi = 0;
+        int ni = 0;
+        List<TableChange> tableChanges = new ArrayList<>();
+        while (ni < newFields.size()) {
+            if (oi < oldFields.size() && oldFields.get(oi).equals(newFields.get(ni))) {
+                oi++;
+                ni++;
+            } else {
+                ColumnSchema columnSchema = newColumnSchemas.get(newFields.get(ni));
+                tableChanges.add(
+                        new TableChange.AddColumn(
+                                new String[]{columnSchema.getName()},
+                                columnSchema.getType(),
+                                columnSchema.isNullable(),
+                                columnSchema.getComment(),
+                                columnSchema.getPosition()));
+                ni++;
+            }
+        }
+
+        if (oi != oldFields.size()) {
+            tableChanges.clear();
+            tableChanges.add(
+                    new TableChange.UnknownColumnChange(
+                            String.format("Unsupported schema update.\n"
+                                    + "oldSchema:\n%s\n, newSchema:\n %s", oldColumnSchemas, newColumnSchemas)));
+        }
+
+        return tableChanges;
     }
 }

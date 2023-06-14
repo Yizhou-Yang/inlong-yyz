@@ -18,6 +18,7 @@
 package org.apache.inlong.sort.base.sink;
 
 import org.apache.flink.shaded.guava18.com.google.common.collect.ImmutableMap;
+import org.apache.inlong.sort.schema.TableChange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

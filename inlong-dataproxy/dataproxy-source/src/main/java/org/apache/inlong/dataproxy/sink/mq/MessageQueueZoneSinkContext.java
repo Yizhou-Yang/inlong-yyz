@@ -294,7 +294,6 @@ public class MessageQueueZoneSinkContext extends SinkContext {
         }
     }
 
-
     /**
      * createCacheClusterSelector
      */

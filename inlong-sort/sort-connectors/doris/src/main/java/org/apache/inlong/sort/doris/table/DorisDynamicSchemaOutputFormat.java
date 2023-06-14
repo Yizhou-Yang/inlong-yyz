@@ -53,6 +53,7 @@ import org.apache.inlong.sort.base.metric.MetricOption;
 import org.apache.inlong.sort.base.metric.MetricState;
 import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
+import org.apache.inlong.sort.base.util.CalculateObjectSizeUtils;
 import org.apache.inlong.sort.base.util.MetricStateUtils;
 import org.apache.inlong.sort.doris.model.RespContent;
 import org.apache.inlong.sort.doris.schema.SchemaChangeHelper;
@@ -589,9 +590,9 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
 
         try {
             metricData.outputDirtyMetricsWithEstimate(database, table, 1,
-                    content.getBytes(StandardCharsets.UTF_8).length);
+                    CalculateObjectSizeUtils.getDataSize(content));
         } catch (Exception ex) {
-            metricData.invokeDirty(1, dirtyData.toString().getBytes(StandardCharsets.UTF_8).length);
+            metricData.invokeDirtyWithEstimate(dirtyData);
         }
     }
 

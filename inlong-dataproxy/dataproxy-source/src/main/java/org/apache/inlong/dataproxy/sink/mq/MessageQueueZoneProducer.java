@@ -168,17 +168,17 @@ public class MessageQueueZoneProducer {
                 }
             }
 
-//            if (newClusterNames.equals(currentClusterNames)) {
-//                return;
-//            }
+            // if (newClusterNames.equals(currentClusterNames)) {
+            // return;
+            // }
 
             // update cluster list
-//            for (CacheClusterConfig config : newConfigList) {
-//                // create
-//                MessageQueueClusterProducer cluster = new MessageQueueClusterProducer(workerName, config, context);
-//                cluster.start();
-//                newClusterList.add(cluster);
-//            }
+            // for (CacheClusterConfig config : newConfigList) {
+            // // create
+            // MessageQueueClusterProducer cluster = new MessageQueueClusterProducer(workerName, config, context);
+            // cluster.start();
+            // newClusterList.add(cluster);
+            // }
             // replace
             this.currentClusterNames = newClusterNames;
             this.deletingClusterList = outdatedClusterList;
