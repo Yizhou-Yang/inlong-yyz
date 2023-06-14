@@ -17,7 +17,12 @@
 
 package org.apache.inlong.sort.hive.filesystem;
 
-import javax.annotation.Nullable;
+import org.apache.inlong.sort.base.dirty.DirtyOptions;
+import org.apache.inlong.sort.base.dirty.sink.DirtySink;
+import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
+import org.apache.inlong.sort.base.sink.PartitionPolicy;
+import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
+
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.formats.hadoop.bulk.HadoopFileCommitterFactory;
 import org.apache.flink.formats.hadoop.bulk.HadoopPathBasedBulkWriter;
@@ -33,15 +38,11 @@ import org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.
 import org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.OnCheckpointRollingPolicy;
 import org.apache.flink.table.catalog.hive.client.HiveShim;
 import org.apache.flink.util.Preconditions;
-
 import org.apache.hadoop.conf.Configuration;
 
+import javax.annotation.Nullable;
+
 import java.io.IOException;
-import org.apache.inlong.sort.base.dirty.DirtyOptions;
-import org.apache.inlong.sort.base.dirty.sink.DirtySink;
-import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
-import org.apache.inlong.sort.base.sink.PartitionPolicy;
-import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 
 /** Buckets builder to create buckets that use {@link HadoopPathBasedPartFileWriter}. */
 public class HadoopPathBasedBulkFormatBuilder<IN, BucketID, T extends HadoopPathBasedBulkFormatBuilder<IN, BucketID, T>>

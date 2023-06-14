@@ -17,14 +17,15 @@
 
 package org.apache.inlong.sort.hive.filesystem;
 
-import java.io.IOException;
-import java.util.function.Function;
 import org.apache.flink.formats.hadoop.bulk.HadoopPathBasedBulkWriter;
 import org.apache.flink.table.data.RowData;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.io.Writable;
+
+import java.io.IOException;
+import java.util.function.Function;
 
 public class InLongHadoopPathBasedBulkWriter implements HadoopPathBasedBulkWriter<RowData> {
 

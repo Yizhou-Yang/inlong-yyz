@@ -17,6 +17,13 @@
 
 package org.apache.inlong.sort.hive;
 
+import org.apache.inlong.sort.base.dirty.DirtyOptions;
+import org.apache.inlong.sort.base.dirty.sink.DirtySink;
+import org.apache.inlong.sort.base.sink.PartitionPolicy;
+import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
+import org.apache.inlong.sort.hive.filesystem.HadoopPathBasedBulkFormatBuilder;
+import org.apache.inlong.sort.hive.filesystem.StreamingSink;
+
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.serialization.BulkWriter;
 import org.apache.flink.configuration.ReadableConfig;
@@ -74,18 +81,13 @@ import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.inlong.sort.base.dirty.DirtyOptions;
-import org.apache.inlong.sort.base.dirty.sink.DirtySink;
-import org.apache.inlong.sort.base.sink.PartitionPolicy;
-import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
-import org.apache.inlong.sort.hive.filesystem.HadoopPathBasedBulkFormatBuilder;
-import org.apache.inlong.sort.hive.filesystem.StreamingSink;
 import org.apache.orc.TypeDescription;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.LinkedHashMap;
@@ -100,7 +102,6 @@ import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_ROLLING_P
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_ROLLING_POLICY_FILE_SIZE;
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_ROLLING_POLICY_ROLLOVER_INTERVAL;
 import static org.apache.flink.table.filesystem.stream.compact.CompactOperator.convertToUncompacted;
-import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
 import static org.apache.inlong.sort.hive.HiveOptions.HIVE_IGNORE_ALL_CHANGELOG;
 
 /**
@@ -200,46 +201,32 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
             StorageDescriptor sd;
             Properties tableProps = new Properties();
             Class hiveOutputFormatClz;
-            HiveWriterFactory writerFactory;
-            boolean sinkMultipleEnable = Boolean.parseBoolean(
-                    catalogTable.getOptions().getOrDefault(SINK_MULTIPLE_ENABLE.key(), "false"));
             boolean isCompressed =
                     jobConf.getBoolean(HiveConf.ConfVars.COMPRESSRESULT.varname, false);
             if (sinkMultipleEnable) {
                 sd = new StorageDescriptor();
                 SerDeInfo serDeInfo = new SerDeInfo();
-                serDeInfo.setSerializationLib("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe");
+                serDeInfo.setSerializationLib(this.serializationLib);
                 sd.setSerdeInfo(serDeInfo);
                 String defaultFs = jobConf.get("fs.defaultFS", "");
                 sd.setLocation(defaultFs + "/tmp");
                 hiveOutputFormatClz = hiveShim.getHiveOutputFormatClass(HiveIgnoreKeyTextOutputFormat.class);
-
-                writerFactory = new HiveWriterFactory(
-                        jobConf,
-                        hiveOutputFormatClz,
-                        sd,
-                        tableSchema,
-                        getPartitionKeyArray(),
-                        tableProps,
-                        hiveShim,
-                        isCompressed,
-                        sinkMultipleEnable);
             } else {
                 Table table = client.getTable(dbName, identifier.getObjectName());
                 sd = table.getSd();
                 tableProps = HiveReflectionUtils.getTableMetadata(hiveShim, table);
                 hiveOutputFormatClz = hiveShim.getHiveOutputFormatClass(Class.forName(sd.getOutputFormat()));
-                writerFactory = new HiveWriterFactory(
-                        jobConf,
-                        hiveOutputFormatClz,
-                        sd,
-                        tableSchema,
-                        getPartitionKeyArray(),
-                        tableProps,
-                        hiveShim,
-                        isCompressed,
-                        sinkMultipleEnable);
             }
+            HiveWriterFactory writerFactory = new HiveWriterFactory(
+                    jobConf,
+                    hiveOutputFormatClz,
+                    sd,
+                    tableSchema,
+                    getPartitionKeyArray(),
+                    tableProps,
+                    hiveShim,
+                    isCompressed,
+                    sinkMultipleEnable);
 
             String extension =
                     Utilities.getFileExtension(

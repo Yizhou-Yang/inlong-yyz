@@ -17,15 +17,11 @@
 
 package org.apache.inlong.sort.hive;
 
-import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
-
-import java.util.HashMap;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.fs.hdfs.HadoopFileSystem;
 import org.apache.flink.table.filesystem.OutputFormatFactory;
 import org.apache.flink.types.Row;
-
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.io.Writable;
 
@@ -37,15 +33,10 @@ public class HiveOutputFormatFactory implements OutputFormatFactory<Row> {
 
     private static final long serialVersionUID = 2L;
 
-    private final HashMap<Path, HiveWriterFactory> factoryMap = new HashMap<>(16);
-
     private final HiveWriterFactory factory;
-
-    private final boolean sinkMultipleEnable;
 
     public HiveOutputFormatFactory(HiveWriterFactory factory) {
         this.factory = factory;
-        this.sinkMultipleEnable = Boolean.parseBoolean(factory.getJobConf().get(SINK_MULTIPLE_ENABLE.key(), "false"));
     }
 
     @Override

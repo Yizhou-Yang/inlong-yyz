@@ -19,7 +19,6 @@ package org.apache.inlong.sort.hive.filesystem;
 
 import org.apache.flink.formats.hadoop.bulk.HadoopFileCommitter;
 import org.apache.flink.formats.hadoop.bulk.HadoopFileCommitterFactory;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 

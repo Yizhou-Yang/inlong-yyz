@@ -17,19 +17,20 @@
 
 package org.apache.inlong.sort.hive.filesystem;
 
-import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_DATABASE_PATTERN;
-import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
-import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
-import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
-import static org.apache.inlong.sort.hive.HiveOptions.HIVE_SCHEMA_SCAN_INTERVAL;
+import org.apache.inlong.sort.base.dirty.DirtyOptions;
+import org.apache.inlong.sort.base.dirty.DirtySinkHelper;
+import org.apache.inlong.sort.base.dirty.DirtyType;
+import org.apache.inlong.sort.base.dirty.sink.DirtySink;
+import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
+import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
+import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
+import org.apache.inlong.sort.base.sink.PartitionPolicy;
+import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
+import org.apache.inlong.sort.hive.HiveBulkWriterFactory;
+import org.apache.inlong.sort.hive.HiveWriterFactory;
+import org.apache.inlong.sort.hive.util.CacheHolder;
+import org.apache.inlong.sort.hive.util.HiveTableUtil;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.ImmutableTriple;
 import org.apache.commons.lang3.tuple.Pair;
@@ -45,7 +46,6 @@ import org.apache.flink.streaming.api.functions.sink.filesystem.AbstractPartFile
 import org.apache.flink.streaming.api.functions.sink.filesystem.BucketWriter;
 import org.apache.flink.streaming.api.functions.sink.filesystem.InProgressFileWriter;
 import org.apache.flink.streaming.api.functions.sink.filesystem.WriterProperties;
-
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.hive.client.HiveShim;
 import org.apache.flink.table.data.GenericRowData;
@@ -54,31 +54,32 @@ import org.apache.flink.table.data.binary.BinaryRowData;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.mapred.JobConf;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
-import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.inlong.sort.base.dirty.DirtyOptions;
-import org.apache.inlong.sort.base.dirty.DirtySinkHelper;
-import org.apache.inlong.sort.base.dirty.DirtyType;
-import org.apache.inlong.sort.base.dirty.sink.DirtySink;
-import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
-import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
-import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
-import org.apache.inlong.sort.base.sink.PartitionPolicy;
-import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
-import org.apache.inlong.sort.hive.HiveBulkWriterFactory;
-import org.apache.inlong.sort.hive.util.CacheHolder;
-import org.apache.inlong.sort.hive.util.HiveTableUtil;
-import org.apache.inlong.sort.hive.HiveWriterFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_DATABASE_PATTERN;
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
+import static org.apache.inlong.sort.hive.HiveOptions.HIVE_SCHEMA_SCAN_INTERVAL;
 
 /**
  * The part-file writer that writes to the specified hadoop path.

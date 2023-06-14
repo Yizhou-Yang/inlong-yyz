@@ -17,18 +17,18 @@
 
 package org.apache.inlong.sort.hive.filesystem;
 
-import java.util.Iterator;
-import org.apache.flink.formats.hadoop.bulk.HadoopFileCommitter;
+import org.apache.inlong.sort.hive.util.CacheHolder;
 
+import org.apache.flink.formats.hadoop.bulk.HadoopFileCommitter;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-
-import java.io.IOException;
-import java.util.UUID;
-import org.apache.inlong.sort.hive.util.CacheHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.UUID;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 
@@ -153,7 +153,7 @@ public class HadoopRenameFileCommitter implements HadoopFileCommitter {
 
         while (true) {
             Path candidate =
-                    new Path(parent, "." + name + ".inprogress." + UUID.randomUUID().toString());
+                    new Path(parent, "." + name + ".inprogress." + UUID.randomUUID());
             if (!fileSystem.exists(candidate)) {
                 return candidate;
             }
