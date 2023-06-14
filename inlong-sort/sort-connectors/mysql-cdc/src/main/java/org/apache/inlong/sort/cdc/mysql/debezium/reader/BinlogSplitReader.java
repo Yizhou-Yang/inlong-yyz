@@ -17,6 +17,19 @@
 
 package org.apache.inlong.sort.cdc.mysql.debezium.reader;
 
+import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.EventType;
+import java.util.function.Predicate;
+import org.apache.inlong.sort.cdc.mysql.debezium.task.MySqlBinlogSplitReadTask;
+import org.apache.inlong.sort.cdc.mysql.debezium.task.context.StatefulTaskContext;
+import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffset;
+import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffsetKind;
+import org.apache.inlong.sort.cdc.mysql.source.split.FinishedSnapshotSplitInfo;
+import org.apache.inlong.sort.cdc.mysql.source.split.MySqlBinlogSplit;
+import org.apache.inlong.sort.cdc.mysql.source.split.MySqlSplit;
+import org.apache.inlong.sort.cdc.mysql.source.utils.ChunkUtils;
+import org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils;
+
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
@@ -27,19 +40,12 @@ import io.debezium.relational.Tables;
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
-import org.apache.inlong.sort.cdc.mysql.debezium.task.MySqlBinlogSplitReadTask;
-import org.apache.inlong.sort.cdc.mysql.debezium.task.context.StatefulTaskContext;
-import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffset;
-import org.apache.inlong.sort.cdc.mysql.source.split.FinishedSnapshotSplitInfo;
-import org.apache.inlong.sort.cdc.mysql.source.split.MySqlBinlogSplit;
-import org.apache.inlong.sort.cdc.mysql.source.split.MySqlSplit;
-import org.apache.inlong.sort.cdc.mysql.source.utils.ChunkUtils;
-import org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -50,6 +56,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getBinlogPosition;
+import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getSplitInfoByBinarySearch;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getSplitKey;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableId;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.isDataChangeRecord;
@@ -104,7 +111,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                         (MySqlStreamingChangeEventSourceMetrics) statefulTaskContext
                                 .getStreamingChangeEventSourceMetrics(),
                         statefulTaskContext.getTopicSelector().getPrimaryTopic(),
-                        currentBinlogSplit);
+                        currentBinlogSplit,
+                        createEventFilter(currentBinlogSplit.getStartingOffset()));
 
         executor.submit(
                 () -> {
@@ -202,6 +210,12 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                                 splitKeyType,
                                 sourceRecord,
                                 statefulTaskContext.getSchemaNameAdjuster());
+                // currently, we only support using binary search algorithm for a single split key.
+                if (key.length == 1) {
+                    FinishedSnapshotSplitInfo splitInfo = getSplitInfoByBinarySearch(
+                            finishedSplitsInfo.get(tableId), key);
+                    return splitInfo != null && position.isAfter(splitInfo.getHighWatermark());
+                }
                 for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
                     if (RecordUtils.splitKeyRangeContains(
                             key, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
@@ -238,7 +252,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                 currentBinlogSplit.getFinishedSnapshotSplitInfos();
         Map<TableId, List<FinishedSnapshotSplitInfo>> splitsInfoMap = new HashMap<>();
         Map<TableId, BinlogOffset> tableIdBinlogPositionMap = new HashMap<>();
-        // latest-offset mode
+        // specific offset mode
         if (finishedSplitInfos.isEmpty()) {
             for (TableId tableId : currentBinlogSplit.getTableSchemas().keySet()) {
                 tableIdBinlogPositionMap.put(tableId, currentBinlogSplit.getStartingOffset());
@@ -260,6 +274,21 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         }
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;
+    }
+
+    private Predicate<Event> createEventFilter(BinlogOffset startingOffset) {
+        // If the startup mode is set as TIMESTAMP, we need to apply a filter on event to drop
+        // events earlier than the specified timestamp.
+        if (BinlogOffsetKind.TIMESTAMP.equals(startingOffset.getOffsetKind())) {
+            long startTimestampSec = startingOffset.getTimestampSec();
+            // Notes:
+            // 1. Heartbeat event doesn't contain timestamp, so we just keep it
+            // 2. Timestamp of event is in epoch millisecond
+            return event ->
+                    EventType.HEARTBEAT.equals(event.getHeader().getEventType())
+                            || event.getHeader().getTimestamp() >= startTimestampSec * 1000;
+        }
+        return event -> true;
     }
 
     public void stopBinlogReadTask() {

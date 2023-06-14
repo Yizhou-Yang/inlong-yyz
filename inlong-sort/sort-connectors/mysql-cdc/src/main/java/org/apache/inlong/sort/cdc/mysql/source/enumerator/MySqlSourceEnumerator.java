@@ -133,6 +133,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
     @Override
     public void handleSourceEvent(int subtaskId, SourceEvent sourceEvent) {
+        // OnFinished 时候调用
         if (sourceEvent instanceof FinishedSnapshotSplitsReportEvent) {
             LOG.info(
                     "The enumerator receives finished split offsets {} from subtask {}.",
@@ -150,6 +151,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             FinishedSnapshotSplitsAckEvent ackEvent =
                     new FinishedSnapshotSplitsAckEvent(new ArrayList<>(finishedOffsets.keySet()));
             context.sendEventToSourceReader(subtaskId, ackEvent);
+            // snapshot split 数量大于 meta 的时候，需要进行分组，反复调用这个发送 binlog meta
         } else if (sourceEvent instanceof BinlogSplitMetaRequestEvent) {
             LOG.debug(
                     "The enumerator receives request for binlog split meta from subtask {}.",
