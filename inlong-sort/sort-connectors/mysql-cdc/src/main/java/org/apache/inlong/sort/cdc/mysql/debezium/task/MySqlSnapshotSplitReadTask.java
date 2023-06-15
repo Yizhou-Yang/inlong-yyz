@@ -134,12 +134,6 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                         topicSelector.topicNameFor(snapshotSplit.getTableId()),
                         dispatcher.getQueue());
 
-        Table table = databaseSchema.tableFor(snapshotSplit.getTableId());
-        if (table == null) {
-            LOG.warn("Debezium doesn't capture {}, ignore this table", snapshotSplit.getTableId());
-            return SnapshotResult.skipped(ctx.offset);
-        }
-
         final BinlogOffset lowWatermark = currentBinlogOffset(jdbcConnection);
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
@@ -154,7 +148,6 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         createDataEvents(ctx, snapshotSplit.getTableId());
 
         BinlogOffset highWatermark = determineHighWatermark(lowWatermark);
-
         LOG.info(
                 "Snapshot step 3 - Determining high watermark {} for split {}",
                 highWatermark,
@@ -209,7 +202,12 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         EventDispatcher.SnapshotReceiver snapshotReceiver =
                 dispatcher.getSnapshotChangeEventReceiver();
         LOG.debug("Snapshotting table {}", tableId);
-        createDataEventsForTable(snapshotContext, snapshotReceiver, databaseSchema.tableFor(tableId));
+        Table table = databaseSchema.tableFor(tableId);
+        if (table != null) {
+            createDataEventsForTable(snapshotContext, snapshotReceiver, table);
+        } else {
+            LOG.warn("Debezium doesn't capture {}, ignore this table", snapshotSplit.getTableId());
+        }
         snapshotReceiver.completeSnapshot();
     }
 

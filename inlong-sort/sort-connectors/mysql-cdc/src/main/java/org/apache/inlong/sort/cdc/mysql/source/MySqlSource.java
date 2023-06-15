@@ -232,7 +232,6 @@ public class MySqlSource<T>
                     List<MySqlSchemalessSnapshotSplit> snapshotSplits = splitsState.getRemainingSplits().stream()
                             .filter(it -> tables.contains(it.getTableId())).collect(Collectors.toList());
                     splitsState.getRemainingSplits().removeAll(snapshotSplits);
-                    snapshotSplits.forEach(it -> splitsState.getAssignedSplits().put(it.splitId(), it));
                     LOG.info("Remaining splits: {}", Arrays.deepToString(splitsState.getRemainingSplits().toArray()));
                 }
             } catch (Exception e) {
