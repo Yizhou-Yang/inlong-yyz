@@ -130,6 +130,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
                         if (SnapshotResultStatus.SKIPPED == snapshotResult.getStatus()) {
                             LOG.info("Skip binlog split: {}", backfillBinlogSplit);
+                            currentTaskRunning = false;
+                            hasNextElement.set(false);
                             return;
                         }
 
