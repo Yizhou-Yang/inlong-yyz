@@ -157,6 +157,11 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         ((SnapshotSplitReader.SnapshotSplitChangeEventSourceContextImpl) (context))
                 .setHighWatermark(highWatermark);
 
+        Table table = databaseSchema.tableFor(snapshotSplit.getTableId());
+        if (table == null) {
+            return SnapshotResult.skipped(ctx.offset);
+        }
+
         return SnapshotResult.completed(ctx.offset);
     }
 

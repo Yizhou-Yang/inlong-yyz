@@ -26,6 +26,7 @@ import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.spi.SnapshotResult;
+import io.debezium.pipeline.spi.SnapshotResult.SnapshotResultStatus;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -124,6 +125,11 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         if (!binlogBackfillRequired) {
                             dispatchBinlogEndEvent(backfillBinlogSplit);
                             currentTaskRunning = false;
+                            return;
+                        }
+
+                        if (SnapshotResultStatus.SKIPPED == snapshotResult.getStatus()) {
+                            LOG.info("Skip binlog split: {}", backfillBinlogSplit);
                             return;
                         }
 
