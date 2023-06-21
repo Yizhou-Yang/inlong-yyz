@@ -17,7 +17,6 @@
 
 package org.apache.inlong.sort.iceberg.sink.multiple;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.Gson;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
@@ -34,35 +33,33 @@ import org.apache.flink.streaming.runtime.tasks.ProcessingTimeCallback;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.flink.CatalogLoader;
 import org.apache.iceberg.flink.FlinkSchemaUtil;
-import org.apache.iceberg.types.Types;
+import org.apache.iceberg.relocated.com.google.common.collect.ImmutableMap;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
 import org.apache.inlong.sort.base.dirty.DirtySinkHelper;
 import org.apache.inlong.sort.base.dirty.DirtyType;
 import org.apache.inlong.sort.base.dirty.sink.DirtySink;
+import org.apache.inlong.sort.base.format.AbstractDynamicSchemaFormat;
 import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
-import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
 import org.apache.inlong.sort.base.metric.MetricOption;
 import org.apache.inlong.sort.base.metric.MetricOption.RegisteredMetric;
 import org.apache.inlong.sort.base.metric.MetricState;
 import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
 import org.apache.inlong.sort.base.sink.MultipleSinkOption;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
-import org.apache.inlong.sort.iceberg.schema.IcebergSchemaChangeHelper;
-import org.apache.inlong.sort.schema.ColumnSchema;
-import org.apache.inlong.sort.schema.TableChange;
-import org.apache.inlong.sort.schema.TableChange.AddColumn;
+import org.apache.inlong.sort.base.sink.TableChange;
+import org.apache.inlong.sort.base.sink.TableChange.AddColumn;
 import org.apache.inlong.sort.base.util.MetricStateUtils;
-import org.apache.inlong.sort.base.schema.SchemaChangeHelper;
-import org.apache.inlong.sort.util.SchemaChangeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,7 +71,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -103,7 +99,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
 
     private transient Catalog catalog;
     private transient SupportsNamespaces asNamespaceCatalog;
-    private transient JsonDynamicSchemaFormat dynamicSchemaFormat;
+    private transient AbstractDynamicSchemaFormat<JsonNode> dynamicSchemaFormat;
     private transient ProcessingTimeService processingTimeService;
 
     // record cache, wait schema to consume record
@@ -123,9 +119,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
     private @Nullable transient SinkTableMetricData metricData;
     private transient ListState<MetricState> metricStateListState;
     private transient MetricState metricState;
-    private SchemaChangeHelper schemaChangeHelper;
-    private String schemaChangePolicies;
-    private boolean enableSchemaChange;
+
     private transient Gson gson;
 
     public DynamicSchemaHandleOperator(CatalogLoader catalogLoader,
@@ -133,16 +127,12 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
             String inlongMetric,
-            String auditHostAndPorts,
-            boolean enableSchemaChange,
-            String schemaChangePolicies) {
+            String auditHostAndPorts) {
         this.catalogLoader = catalogLoader;
         this.multipleSinkOption = multipleSinkOption;
         this.inlongMetric = inlongMetric;
         this.auditHostAndPorts = auditHostAndPorts;
         this.dirtySinkHelper = new DirtySinkHelper<>(dirtyOptions, dirtySink);
-        this.schemaChangePolicies = schemaChangePolicies;
-        this.enableSchemaChange = enableSchemaChange;
     }
 
     @SuppressWarnings("unchecked")
@@ -153,7 +143,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         this.asNamespaceCatalog =
                 catalog instanceof SupportsNamespaces ? (SupportsNamespaces) catalog : null;
 
-        this.dynamicSchemaFormat = (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(
+        this.dynamicSchemaFormat = DynamicSchemaFormatFactory.getFormat(
                 multipleSinkOption.getFormat(), multipleSinkOption.getFormatOption());
 
         this.processingTimeService = getRuntimeContext().getProcessingTimeService();
@@ -179,12 +169,6 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         }
         this.dirtySinkHelper.open(new Configuration());
 
-        this.schemaChangeHelper = new IcebergSchemaChangeHelper(dynamicSchemaFormat,
-                enableSchemaChange,
-                enableSchemaChange ? SchemaChangeUtils.deserialize(schemaChangePolicies) : Collections.emptyMap(),
-                multipleSinkOption.getDatabasePattern(), multipleSinkOption.getTablePattern(),
-                multipleSinkOption.getSchemaUpdatePolicy(), metricData, dirtySinkHelper,
-                catalog, asNamespaceCatalog);
         gson = new Gson();
     }
 
@@ -231,7 +215,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         }
         boolean isDDL = dynamicSchemaFormat.extractDDLFlag(jsonNode);
         if (isDDL) {
-            execDDL(element.getValue().getBinary(0), jsonNode);
+            execDDL(jsonNode, tableId);
         } else {
             execDML(jsonNode, tableId);
         }
@@ -327,8 +311,8 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         }
     }
 
-    private void execDDL(byte[] originData, JsonNode jsonNode) {
-        schemaChangeHelper.process(originData, jsonNode);
+    private void execDDL(JsonNode jsonNode, TableIdentifier tableId) {
+        // todo:parse ddl sql
     }
 
     private void execDML(JsonNode jsonNode, TableIdentifier tableId) {
@@ -458,27 +442,31 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
 
     // ================================ All coordinator handle method ==============================================
     private void handleTableCreateEventFromOperator(TableIdentifier tableId, Schema schema) {
-        IcebergSchemaChangeUtils.createTable(catalog, tableId, asNamespaceCatalog, schema);
-        handleSchemaInfoEvent(tableId, catalog.loadTable(tableId).schema());
-    }
-
-    @VisibleForTesting
-    public static Map<String, ColumnSchema> extractColumnSchema(Schema schema) {
-        Map<String, ColumnSchema> columnSchemaMap = new LinkedHashMap<>();
-        List<Types.NestedField> nestedFieldList = schema.columns();
-        int n = nestedFieldList.size();
-        for (int i = 0; i < n; i++) {
-            Types.NestedField nestedField = nestedFieldList.get(i);
-            ColumnSchema columnSchema = new ColumnSchema();
-            columnSchema.setName(nestedField.name());
-            columnSchema.setType(FlinkSchemaUtil.convert(nestedField.type()));
-            columnSchema.setNullable(nestedField.isOptional());
-            columnSchema.setComment(nestedField.doc());
-            columnSchema.setPosition(i == 0 ? TableChange.ColumnPosition.first()
-                    : TableChange.ColumnPosition.after(nestedFieldList.get(i - 1).name()));
-            columnSchemaMap.put(nestedField.name(), columnSchema);
+        if (!catalog.tableExists(tableId)) {
+            if (asNamespaceCatalog != null && !asNamespaceCatalog.namespaceExists(tableId.namespace())) {
+                try {
+                    asNamespaceCatalog.createNamespace(tableId.namespace());
+                    LOG.info("Auto create Database({}) in Catalog({}).", tableId.namespace(), catalog.name());
+                } catch (AlreadyExistsException e) {
+                    LOG.warn("Database({}) already exist in Catalog({})!", tableId.namespace(), catalog.name());
+                }
+            }
+            ImmutableMap.Builder<String, String> properties = ImmutableMap.builder();
+            properties.put("format-version", "2");
+            properties.put("write.upsert.enabled", "true");
+            properties.put("write.metadata.metrics.default", "full");
+            // for hive visible
+            properties.put("engine.hive.enabled", "true");
+            try {
+                catalog.createTable(tableId, schema, PartitionSpec.unpartitioned(), properties.build());
+                LOG.info("Auto create Table({}) in Database({}) in Catalog({})!",
+                        tableId.name(), tableId.namespace(), catalog.name());
+            } catch (AlreadyExistsException e) {
+                LOG.warn("Table({}) already exist in Database({}) in Catalog({})!",
+                        tableId.name(), tableId.namespace(), catalog.name());
+            }
         }
-        return columnSchemaMap;
+        handleSchemaInfoEvent(tableId, catalog.loadTable(tableId).schema());
     }
 
     private void handldAlterSchemaEventFromOperator(TableIdentifier tableId, Schema oldSchema, Schema newSchema) {
@@ -489,9 +477,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         // for scenarios that cannot be changed, it is always considered that there is a problem with the data.
         Transaction transaction = table.newTransaction();
         if (table.schema().sameSchema(oldSchema)) {
-            Map<String, ColumnSchema> oldColumnSchemas = extractColumnSchema(oldSchema);
-            Map<String, ColumnSchema> newColumnSchemas = extractColumnSchema(newSchema);
-            List<TableChange> tableChanges = IcebergSchemaChangeUtils.diffSchema(oldColumnSchemas, newColumnSchemas);
+            List<TableChange> tableChanges = SchemaChangeUtils.diffSchema(oldSchema, newSchema);
             for (TableChange tableChange : tableChanges) {
                 if (!(tableChange instanceof AddColumn)) {
                     // todo:currently iceberg can only handle addColumn, so always return false
@@ -499,7 +485,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
                             String.format("Unsupported table %s schema change: %s.", tableId.toString(), tableChange));
                 }
             }
-            IcebergSchemaChangeUtils.applySchemaChanges(transaction.updateSchema(), tableChanges);
+            SchemaChangeUtils.applySchemaChanges(transaction.updateSchema(), tableChanges);
             LOG.info("Schema evolution in table({}) for table change: {}", tableId, tableChanges);
         }
         transaction.commitTransaction();

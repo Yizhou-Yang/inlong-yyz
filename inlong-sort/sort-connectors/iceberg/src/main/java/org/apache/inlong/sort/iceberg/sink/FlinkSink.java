@@ -175,9 +175,6 @@ public class FlinkSink {
         private @Nullable DirtySink<Object> dirtySink;
         private ReadableConfig tableOptions;
 
-        private boolean enableSchemaChange;
-        private String schemaChangePolicies;
-
         private Builder() {
         }
 
@@ -276,16 +273,6 @@ public class FlinkSink {
         public Builder overwrite(boolean newOverwrite) {
             this.overwrite = newOverwrite;
             writeOptions.put(FlinkWriteOptions.OVERWRITE_MODE.key(), Boolean.toString(newOverwrite));
-            return this;
-        }
-
-        public Builder enableSchemaChange(boolean schemaChange) {
-            this.enableSchemaChange = schemaChange;
-            return this;
-        }
-
-        public Builder schemaChangePolicies(String schemaChangePolicies) {
-            this.schemaChangePolicies = schemaChangePolicies;
             return this;
         }
 
@@ -629,8 +616,7 @@ public class FlinkSink {
 
             int parallelism = writeParallelism == null ? input.getParallelism() : writeParallelism;
             DynamicSchemaHandleOperator routeOperator = new DynamicSchemaHandleOperator(
-                    catalogLoader, multipleSinkOption, dirtyOptions, dirtySink, inlongMetric, auditHostAndPorts,
-                    enableSchemaChange, schemaChangePolicies);
+                    catalogLoader, multipleSinkOption, dirtyOptions, dirtySink, inlongMetric, auditHostAndPorts);
             SingleOutputStreamOperator<RecordWithSchema> routeStream = input
                     .transform(operatorName(ICEBERG_WHOLE_DATABASE_MIGRATION_NAME),
                             TypeInformation.of(RecordWithSchema.class),
