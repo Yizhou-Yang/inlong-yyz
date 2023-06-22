@@ -36,10 +36,10 @@ public class GtidUtils {
      * server's GTID set, it will be directly added to the new GTID set.
      */
     public static GtidSet fixRestoredGtidSet(GtidSet serverGtidSet, GtidSet restoredGtidSet) {
-        Map<String, GtidSet.UUIDSet> newSet = new HashMap<>();
+        Map<String, UUIDSet> newSet = new HashMap<>();
         serverGtidSet.getUUIDSets().forEach(uuidSet -> newSet.put(uuidSet.getUUID(), uuidSet));
-        for (GtidSet.UUIDSet uuidSet : restoredGtidSet.getUUIDSets()) {
-            GtidSet.UUIDSet serverUuidSet = newSet.get(uuidSet.getUUID());
+        for (UUIDSet uuidSet : restoredGtidSet.getUUIDSets()) {
+            UUIDSet serverUuidSet = newSet.get(uuidSet.getUUID());
             if (serverUuidSet != null) {
                 long restoredIntervalEnd = getIntervalEnd(uuidSet);
                 List<com.github.shyiko.mysql.binlog.GtidSet.Interval> newIntervals =
@@ -60,7 +60,7 @@ public class GtidUtils {
                         uuidSet.getUUID(), newIntervals)));
                 newSet.put(
                         uuidSet.getUUID(),
-                        new GtidSet.UUIDSet(
+                        new UUIDSet(
                                 new com.github.shyiko.mysql.binlog.GtidSet.UUIDSet(
                                         uuidSet.getUUID(), newIntervals)));
             } else {
@@ -75,9 +75,9 @@ public class GtidUtils {
      * existing elements in the base GTID set.
      */
     public static GtidSet mergeGtidSetInto(GtidSet base, GtidSet toMerge) {
-        Map<String, GtidSet.UUIDSet> newSet = new HashMap<>();
+        Map<String, UUIDSet> newSet = new HashMap<>();
         base.getUUIDSets().forEach(uuidSet -> newSet.put(uuidSet.getUUID(), uuidSet));
-        for (GtidSet.UUIDSet uuidSet : toMerge.getUUIDSets()) {
+        for (UUIDSet uuidSet : toMerge.getUUIDSets()) {
             if (!newSet.containsKey(uuidSet.getUUID())) {
                 newSet.put(uuidSet.getUUID(), uuidSet);
             }
@@ -85,7 +85,7 @@ public class GtidUtils {
         return new GtidSet(newSet);
     }
 
-    private static long getIntervalEnd(GtidSet.UUIDSet uuidSet) {
+    private static long getIntervalEnd(UUIDSet uuidSet) {
         return uuidSet.getIntervals().stream()
                 .mapToLong(GtidSet.Interval::getEnd)
                 .max()
