@@ -358,26 +358,29 @@ public class AgentServiceImpl implements AgentService {
                 .forEach(sourceEntity -> {
                     InlongGroupEntity groupEntity = groupMapper.selectByGroupId(sourceEntity.getInlongGroupId());
                     Set<GroupStatus> noNeedAddTask = Sets.newHashSet(
-                            GroupStatus.SUSPENDED, GroupStatus.SUSPENDING);
+                            GroupStatus.SUSPENDED, GroupStatus.SUSPENDING, GroupStatus.DELETING, GroupStatus.DELETED);
                     if (groupEntity != null && noNeedAddTask.contains(GroupStatus.forCode(groupEntity.getStatus()))) {
                         return;
                     }
                     List<StreamSourceEntity> subSources = sourceMapper.selectByTemplateIdAndIp(sourceEntity.getId(),
                             agentIp);
                     if (CollectionUtils.isEmpty(subSources)) {
-                        // if not, clone a subtask for this Agent.
+                        InlongClusterNodeEntity clusterNodeEntity = selectByIpAndCluster(agentClusterName, agentIp);
+                        // if stream_source match node_group with node, clone a subtask for this Agent.
                         // note: a new source name with random suffix is generated to adhere to the unique constraint
-                        StreamSourceEntity fileEntity =
-                                CommonBeanUtils.copyProperties(sourceEntity, StreamSourceEntity::new);
-                        fileEntity.setSourceName(fileEntity.getSourceName() + "-"
-                                + RandomStringUtils.randomAlphanumeric(10).toLowerCase(Locale.ROOT));
-                        fileEntity.setTemplateId(sourceEntity.getId());
-                        fileEntity.setAgentIp(agentIp);
-                        fileEntity.setStatus(SourceStatus.TO_BE_ISSUED_ADD.getCode());
-                        // create new sub source task
-                        sourceMapper.insert(fileEntity);
-                        LOGGER.info("Transform new template task({}) for agent({}) in cluster({}).",
-                                fileEntity.getId(), taskRequest.getAgentIp(), taskRequest.getClusterName());
+                        if (matchGroup(sourceEntity, clusterNodeEntity)) {
+                            StreamSourceEntity fileEntity =
+                                    CommonBeanUtils.copyProperties(sourceEntity, StreamSourceEntity::new);
+                            fileEntity.setSourceName(fileEntity.getSourceName() + "-"
+                                    + RandomStringUtils.randomAlphanumeric(10).toLowerCase(Locale.ROOT));
+                            fileEntity.setTemplateId(sourceEntity.getId());
+                            fileEntity.setAgentIp(agentIp);
+                            fileEntity.setStatus(SourceStatus.TO_BE_ISSUED_ADD.getCode());
+                            // create new sub source task
+                            sourceMapper.insert(fileEntity);
+                            LOGGER.info("Transform new template task({}) for agent({}) in cluster({}).",
+                                    fileEntity.getId(), taskRequest.getAgentIp(), taskRequest.getClusterName());
+                        }
                     }
                 });
     }

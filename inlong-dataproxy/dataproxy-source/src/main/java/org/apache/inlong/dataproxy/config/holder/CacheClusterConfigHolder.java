@@ -57,7 +57,7 @@ public class CacheClusterConfigHolder implements Configurable {
     @Override
     public void configure(Context context) {
         this.context = context;
-        this.reloadInterval = context.getLong(RELOAD_INTERVAL, 60000L);
+        this.reloadInterval = context.getLong(RELOAD_INTERVAL, 30000L);
         String loaderType = context.getString(CACHE_CLUSTER_CONFIG_TYPE,
                 ContextCacheClusterConfigLoader.class.getName());
         LOG.info("Init CacheClusterConfigLoader,loaderType:{}", loaderType);

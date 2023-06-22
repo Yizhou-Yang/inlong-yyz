@@ -22,6 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.flume.Channel;
 import org.apache.flume.Context;
 import org.apache.flume.conf.Configurable;
+import org.apache.inlong.dataproxy.config.ConfigManager;
 import org.apache.inlong.dataproxy.config.holder.CacheClusterConfigHolder;
 import org.apache.inlong.dataproxy.config.holder.CommonPropertiesHolder;
 import org.apache.inlong.dataproxy.config.holder.IdTopicConfigHolder;
@@ -29,13 +30,13 @@ import org.apache.inlong.dataproxy.metrics.DataProxyMetricItem;
 import org.apache.inlong.dataproxy.metrics.audit.AuditUtils;
 import org.apache.inlong.dataproxy.sink.common.SinkContext;
 import org.apache.inlong.dataproxy.utils.BufferQueue;
+import org.apache.inlong.dataproxy.utils.MessageUtils;
 import org.apache.inlong.sdk.commons.protocol.ProxySdk.INLONG_COMPRESSED_TYPE;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 
  * MessageQueueZoneSinkContext
  */
 public class MessageQueueZoneSinkContext extends SinkContext {
@@ -102,7 +103,7 @@ public class MessageQueueZoneSinkContext extends SinkContext {
 
     /**
      * get proxyClusterId
-     * 
+     *
      * @return the proxyClusterId
      */
     public String getProxyClusterId() {
@@ -111,7 +112,7 @@ public class MessageQueueZoneSinkContext extends SinkContext {
 
     /**
      * get dispatchQueue
-     * 
+     *
      * @return the dispatchQueue
      */
     public BufferQueue<BatchPackProfile> getDispatchQueue() {
@@ -120,7 +121,7 @@ public class MessageQueueZoneSinkContext extends SinkContext {
 
     /**
      * get producerContext
-     * 
+     *
      * @return the producerContext
      */
     public Context getProducerContext() {
@@ -129,7 +130,7 @@ public class MessageQueueZoneSinkContext extends SinkContext {
 
     /**
      * get idTopicHolder
-     * 
+     *
      * @return the idTopicHolder
      */
     public IdTopicConfigHolder getIdTopicHolder() {
@@ -138,7 +139,7 @@ public class MessageQueueZoneSinkContext extends SinkContext {
 
     /**
      * get cacheHolder
-     * 
+     *
      * @return the cacheHolder
      */
     public CacheClusterConfigHolder getCacheHolder() {
@@ -147,7 +148,7 @@ public class MessageQueueZoneSinkContext extends SinkContext {
 
     /**
      * get compressType
-     * 
+     *
      * @return the compressType
      */
     public INLONG_COMPRESSED_TYPE getCompressType() {
@@ -156,7 +157,7 @@ public class MessageQueueZoneSinkContext extends SinkContext {
 
     /**
      * get nodeId
-     * 
+     *
      * @return the nodeId
      */
     public String getNodeId() {
@@ -268,6 +269,24 @@ public class MessageQueueZoneSinkContext extends SinkContext {
      */
     public void processSendFail(BatchPackProfile currentRecord, String mqName, String topic, long sendTime) {
         if (currentRecord.isResend()) {
+            dealWithFailedEvent(currentRecord, mqName, topic, sendTime);
+        } else {
+            currentRecord.fail();
+        }
+    }
+
+    /**
+     * When send event failed, try to put back to dispatch queue or drop event based on different situation.
+     *
+     * @param currentRecord BatchPackProfile failed to send
+     */
+    private void dealWithFailedEvent(BatchPackProfile currentRecord, String mqName, String topic, long sendTime) {
+        ConfigManager configManager = ConfigManager.getInstance();
+        String groupId = currentRecord.getInlongGroupId();
+        String streamId = currentRecord.getInlongStreamId();
+        String configTopic = MessageUtils.getTopic(
+                configManager.getTopicProperties(), groupId, streamId);
+        if (configTopic != null) {
             dispatchQueue.offer(currentRecord);
             this.addSendResultMetric(currentRecord, mqName, topic, false, sendTime);
         } else {

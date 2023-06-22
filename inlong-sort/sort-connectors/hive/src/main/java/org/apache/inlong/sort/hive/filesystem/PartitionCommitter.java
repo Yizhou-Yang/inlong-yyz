@@ -17,7 +17,9 @@
 
 package org.apache.inlong.sort.hive.filesystem;
 
-import java.util.stream.Collectors;
+import org.apache.inlong.sort.hive.HiveTableMetaStoreFactory;
+import org.apache.inlong.sort.hive.table.HiveTableInlongFactory;
+
 import org.apache.commons.lang.time.StopWatch;
 import org.apache.flink.api.common.state.CheckpointListener;
 import org.apache.flink.configuration.Configuration;
@@ -32,8 +34,6 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.hive.client.HiveMetastoreClientFactory;
 import org.apache.flink.table.catalog.hive.client.HiveMetastoreClientWrapper;
-import org.apache.flink.table.catalog.hive.client.HiveShim;
-import org.apache.flink.table.catalog.hive.client.HiveShimLoader;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.table.filesystem.EmptyMetaStoreFactory;
 import org.apache.flink.table.filesystem.FileSystemFactory;
@@ -41,11 +41,6 @@ import org.apache.flink.table.filesystem.MetastoreCommitPolicy;
 import org.apache.flink.table.filesystem.PartitionCommitPolicy;
 import org.apache.flink.table.filesystem.SuccessFileCommitPolicy;
 import org.apache.flink.table.filesystem.TableMetaStoreFactory;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
 import org.apache.flink.table.filesystem.stream.PartitionCommitInfo;
 import org.apache.flink.table.filesystem.stream.PartitionCommitTrigger;
 import org.apache.flink.table.filesystem.stream.TaskTracker;
@@ -54,8 +49,12 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.inlong.sort.hive.HiveTableMetaStoreFactory;
-import org.apache.inlong.sort.hive.table.HiveTableInlongFactory;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_PARTITION_COMMIT_POLICY_CLASS;
 import static org.apache.flink.table.filesystem.FileSystemOptions.SINK_PARTITION_COMMIT_POLICY_KIND;
@@ -108,8 +107,6 @@ public class PartitionCommitter extends AbstractStreamOperator<Void>
 
     private transient List<PartitionCommitPolicy> policies;
 
-    private final HiveShim hiveShim;
-
     private final String hiveVersion;
 
     private final boolean sinkMultipleEnable;
@@ -131,7 +128,6 @@ public class PartitionCommitter extends AbstractStreamOperator<Void>
                 metaStoreFactory instanceof EmptyMetaStoreFactory,
                 conf.get(SINK_PARTITION_COMMIT_POLICY_KIND));
         this.hiveVersion = conf.get(HiveCatalogFactoryOptions.HIVE_VERSION);
-        this.hiveShim = HiveShimLoader.loadHiveShim(this.hiveVersion);
         this.sinkMultipleEnable = conf.get(SINK_MULTIPLE_ENABLE);
     }
 

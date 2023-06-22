@@ -18,6 +18,7 @@
 package org.apache.inlong.manager.service.source.file;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.manager.common.consts.SourceType;
 import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
 import org.apache.inlong.manager.common.exceptions.BusinessException;
@@ -26,14 +27,18 @@ import org.apache.inlong.manager.dao.entity.StreamSourceEntity;
 import org.apache.inlong.manager.dao.mapper.StreamSourceEntityMapper;
 import org.apache.inlong.manager.pojo.source.SourceRequest;
 import org.apache.inlong.manager.pojo.source.StreamSource;
+import org.apache.inlong.manager.pojo.source.SubSourceDTO;
 import org.apache.inlong.manager.pojo.source.file.FileSource;
 import org.apache.inlong.manager.pojo.source.file.FileSourceDTO;
 import org.apache.inlong.manager.pojo.source.file.FileSourceRequest;
-import org.apache.inlong.manager.pojo.source.SubSourceDTO;
 import org.apache.inlong.manager.pojo.stream.StreamField;
 import org.apache.inlong.manager.service.source.AbstractSourceOperator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -43,6 +48,8 @@ import java.util.stream.Collectors;
  */
 @Service
 public class FileSourceOperator extends AbstractSourceOperator {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileSourceOperator.class);
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -70,6 +77,27 @@ public class FileSourceOperator extends AbstractSourceOperator {
         } catch (Exception e) {
             throw new BusinessException(ErrorCodeEnum.SOURCE_INFO_INCORRECT,
                     String.format("serialize extParams of File SourceDTO failure: %s", e.getMessage()));
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Throwable.class, isolation = Isolation.REPEATABLE_READ)
+    public void updateOpt(SourceRequest request, Integer groupStatus, Integer groupMode, String operator) {
+        super.updateOpt(request, groupStatus, groupMode, operator);
+        StreamSourceEntity originEntity = sourceMapper.selectById(request.getId());
+        LOGGER.warn("Find template streamSourceEntity:{} by request:{}", originEntity, request);
+        if (originEntity == null) {
+            return;
+        }
+
+        List<StreamSourceEntity> streamSourceEntities = sourceMapper.selectByTemplateId(originEntity.getId());
+        for (StreamSourceEntity entity : streamSourceEntities) {
+            if (StringUtils.isEmpty(entity.getAgentIp())) {
+                continue;
+            }
+            entity.setInlongClusterNodeGroup(request.getInlongClusterNodeGroup());
+            LOGGER.info("Update streamSourceEntity:{} by templateId:{}", entity, originEntity.getTemplateId());
+            sourceMapper.updateByPrimaryKeySelective(entity);
         }
     }
 

@@ -17,6 +17,13 @@
 
 package org.apache.inlong.sort.hive.table;
 
+import org.apache.inlong.sort.base.dirty.DirtyOptions;
+import org.apache.inlong.sort.base.dirty.sink.DirtySink;
+import org.apache.inlong.sort.base.dirty.utils.DirtySinkFactoryUtils;
+import org.apache.inlong.sort.base.sink.PartitionPolicy;
+import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
+import org.apache.inlong.sort.hive.HiveTableSink;
+
 import com.google.common.base.Preconditions;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
@@ -34,12 +41,6 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.filesystem.FileSystemOptions;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.inlong.sort.base.dirty.DirtyOptions;
-import org.apache.inlong.sort.base.dirty.sink.DirtySink;
-import org.apache.inlong.sort.base.dirty.utils.DirtySinkFactoryUtils;
-import org.apache.inlong.sort.base.sink.PartitionPolicy;
-import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
-import org.apache.inlong.sort.hive.HiveTableSink;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -65,6 +66,9 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
 import static org.apache.inlong.sort.base.Constants.SINK_PARTITION_POLICY;
 import static org.apache.inlong.sort.base.Constants.SOURCE_PARTITION_FIELD_NAME;
 import static org.apache.inlong.sort.hive.HiveOptions.HIVE_DATABASE;
+import static org.apache.inlong.sort.hive.HiveOptions.HIVE_STORAGE_INPUT_FORMAT;
+import static org.apache.inlong.sort.hive.HiveOptions.HIVE_STORAGE_OUTPUT_FORMAT;
+import static org.apache.inlong.sort.hive.HiveOptions.HIVE_STORAGE_SERIALIZATION_LIB;
 
 /**
  * DynamicTableSourceFactory for hive table source
@@ -125,6 +129,9 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
             String timestampPattern = helper.getOptions().getOptional(PARTITION_TIME_EXTRACTOR_TIMESTAMP_PATTERN)
                     .orElse("yyyy-MM-dd");
             boolean sinkMultipleEnable = helper.getOptions().get(SINK_MULTIPLE_ENABLE);
+            String inputFormat = helper.getOptions().get(HIVE_STORAGE_INPUT_FORMAT);
+            String outputFormat = helper.getOptions().get(HIVE_STORAGE_OUTPUT_FORMAT);
+            String serializationLib = helper.getOptions().get(HIVE_STORAGE_SERIALIZATION_LIB);
             return new HiveTableSink(
                     context.getConfiguration(),
                     new JobConf(hiveConf),
@@ -139,7 +146,10 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
                     partitionPolicy,
                     partitionField,
                     timestampPattern,
-                    sinkMultipleEnable);
+                    sinkMultipleEnable,
+                    inputFormat,
+                    outputFormat,
+                    serializationLib);
         } else {
             return FactoryUtil.createTableSink(
                     null, // we already in the factory of catalog

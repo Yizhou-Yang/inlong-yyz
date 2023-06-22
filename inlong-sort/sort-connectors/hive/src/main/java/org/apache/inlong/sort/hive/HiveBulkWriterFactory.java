@@ -17,9 +17,10 @@
 
 package org.apache.inlong.sort.hive;
 
+import org.apache.inlong.sort.hive.filesystem.InLongHadoopPathBasedBulkWriter;
+
 import org.apache.flink.formats.hadoop.bulk.HadoopPathBasedBulkWriter;
 import org.apache.flink.table.data.RowData;
-
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
@@ -27,7 +28,6 @@ import org.apache.hadoop.io.Writable;
 
 import java.io.IOException;
 import java.util.function.Function;
-import org.apache.inlong.sort.hive.filesystem.InLongHadoopPathBasedBulkWriter;
 
 /**
  * Hive bulk writer factory for path-based bulk file writer that writes to the specific hadoop path.

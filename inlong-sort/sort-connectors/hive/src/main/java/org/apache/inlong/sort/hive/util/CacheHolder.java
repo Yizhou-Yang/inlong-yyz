@@ -17,16 +17,17 @@
 
 package org.apache.inlong.sort.hive.util;
 
-import java.util.HashMap;
-import java.util.function.Function;
+import org.apache.inlong.sort.hive.HiveWriterFactory;
+import org.apache.inlong.sort.hive.filesystem.HadoopRenameFileCommitter;
+
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.data.RowData;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.io.Writable;
-import org.apache.inlong.sort.hive.HiveWriterFactory;
-import org.apache.inlong.sort.hive.filesystem.HadoopRenameFileCommitter;
+
+import java.util.HashMap;
+import java.util.function.Function;
 
 public class CacheHolder {
 
@@ -37,7 +38,7 @@ public class CacheHolder {
     /**
      * hive record writer cache
      */
-    private static final HashMap<Path, FileSinkOperator.RecordWriter> recordWriterHashMap = new HashMap<>(16);
+    private static final HashMap<Path, RecordWriter> recordWriterHashMap = new HashMap<>(16);
     /**
      * hive hdfs file committer cache
      */

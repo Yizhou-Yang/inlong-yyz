@@ -22,7 +22,7 @@ package org.apache.inlong.common.pojo.dataproxy;
  */
 public interface IRepository {
 
-    long DEFAULT_HEARTBEAT_INTERVAL_MS = 60000;
+    long DEFAULT_HEARTBEAT_INTERVAL_MS = 30000;
     String SEPARATOR = "&";
     String KEY_VALUE_SEPARATOR = "=";
 

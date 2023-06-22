@@ -163,6 +163,28 @@ public class SourceTableMetricData extends SourceMetricData implements SourceSub
      * output metrics with estimate
      *
      * @param database the database name of record
+     * @param table the table name of record
+     * @param isSnapshotRecord is it snapshot record
+     * @param data the data of record
+     * @param fetchDelay fetchDelay = FetchTime - messageTimestamp, where the FetchTime is the time the record fetched into the source operator.
+     * @param emitDelay emitDelay = EmitTime - messageTimestamp, where the EmitTime is the time the record leaves the source operator.
+     */
+    public void outputMetricsWithEstimate(String database, String table, boolean isSnapshotRecord, Object data,
+            long fetchDelay, long emitDelay) {
+        if (StringUtils.isBlank(database) || StringUtils.isBlank(table)) {
+            outputMetricsWithEstimate(data, fetchDelay, emitDelay);
+            // output read phase metric
+            outputReadPhaseMetrics((isSnapshotRecord) ? ReadPhase.SNAPSHOT_PHASE : ReadPhase.INCREASE_PHASE);
+            return;
+        }
+        // output sub source metric
+        outputMetricsWithEstimate(new String[]{database, table}, isSnapshotRecord, data, fetchDelay, emitDelay);
+    }
+
+    /**
+     * output metrics with estimate
+     *
+     * @param database the database name of record
      * @param schema the schema name of record
      * @param table the table name of record
      * @param isSnapshotRecord is it snapshot record
@@ -172,6 +194,27 @@ public class SourceTableMetricData extends SourceMetricData implements SourceSub
             boolean isSnapshotRecord, Object data) {
         if (StringUtils.isBlank(database) || StringUtils.isBlank(schema) || StringUtils.isBlank(table)) {
             outputMetricsWithEstimate(data);
+            return;
+        }
+        // output sub source metric
+        outputMetricsWithEstimate(new String[]{database, schema, table}, isSnapshotRecord, data);
+    }
+
+    /**
+     * output metrics with estimate
+     *
+     * @param database the database name of record
+     * @param schema the schema name of record
+     * @param table the table name of record
+     * @param isSnapshotRecord is it snapshot record
+     * @param data the data of record
+     * @param fetchDelay fetchDelay = FetchTime - messageTimestamp, where the FetchTime is the time the record fetched into the source operator.
+     * @param emitDelay emitDelay = EmitTime - messageTimestamp, where the EmitTime is the time the record leaves the source operator.
+     */
+    public void outputMetricsWithEstimate(String database, String schema, String table,
+            boolean isSnapshotRecord, Object data, long fetchDelay, long emitDelay) {
+        if (StringUtils.isBlank(database) || StringUtils.isBlank(schema) || StringUtils.isBlank(table)) {
+            outputMetricsWithEstimate(data, fetchDelay, emitDelay);
             return;
         }
         // output sub source metric
@@ -203,6 +246,39 @@ public class SourceTableMetricData extends SourceMetricData implements SourceSub
         long rowDataSize = CalculateObjectSizeUtils.getDataSize(data);
         this.outputMetrics(rowCountSize, rowDataSize);
         subSourceMetricData.outputMetrics(rowCountSize, rowDataSize);
+
+        // output read phase metric
+        outputReadPhaseMetrics((isSnapshotRecord) ? ReadPhase.SNAPSHOT_PHASE : ReadPhase.INCREASE_PHASE);
+    }
+
+    /**
+     * output metrics with estimate
+     *
+     * @param recordSchemaInfoArray the schema info of record
+     * @param isSnapshotRecord is it snapshot record
+     * @param data the data of record
+     * @param fetchDelay fetchDelay = FetchTime - messageTimestamp, where the FetchTime is the time the record fetched into the source operator.
+     * @param emitDelay emitDelay = EmitTime - messageTimestamp, where the EmitTime is the time the record leaves the source operator.
+     */
+    public void outputMetricsWithEstimate(String[] recordSchemaInfoArray, boolean isSnapshotRecord, Object data,
+            long fetchDelay, long emitDelay) {
+        if (recordSchemaInfoArray == null) {
+            outputMetricsWithEstimate(data, fetchDelay, emitDelay);
+            return;
+        }
+        String identify = String.join(Constants.SEMICOLON, recordSchemaInfoArray);
+        SourceMetricData subSourceMetricData;
+        if (subSourceMetricMap.containsKey(identify)) {
+            subSourceMetricData = subSourceMetricMap.get(identify);
+        } else {
+            subSourceMetricData = buildSubSourceMetricData(recordSchemaInfoArray, this);
+            subSourceMetricMap.put(identify, subSourceMetricData);
+        }
+        // source metric and sub source metric output metrics
+        long rowCountSize = 1L;
+        long rowDataSize = CalculateObjectSizeUtils.getDataSize(data);
+        this.outputMetrics(rowCountSize, rowDataSize, fetchDelay, emitDelay);
+        subSourceMetricData.outputMetrics(rowCountSize, rowDataSize, fetchDelay, emitDelay);
 
         // output read phase metric
         outputReadPhaseMetrics((isSnapshotRecord) ? ReadPhase.SNAPSHOT_PHASE : ReadPhase.INCREASE_PHASE);
@@ -257,6 +333,12 @@ public class SourceTableMetricData extends SourceMetricData implements SourceSub
         return "SourceTableMetricData{"
                 + "numRecordsIn=" + getNumRecordsIn().getCount()
                 + ", numBytesIn=" + getNumBytesIn().getCount()
+                + ", numRecordsInForMeter=" + getNumRecordsInForMeter().getCount()
+                + ", numBytesInForMeter=" + getNumBytesInForMeter().getCount()
+                + ", numRecordsInPerSecond=" + getNumRecordsInPerSecond().getRate()
+                + ", numBytesInPerSecond=" + getNumBytesInPerSecond().getRate()
+                + ", currentFetchEventTimeLag=" + getFetchDelay()
+                + ", currentEmitEventTimeLag=" + getEmitDelay()
                 + ", readPhaseMetricDataMap=" + readPhaseMetricDataMap
                 + ", subSourceMetricMap=" + subSourceMetricMap
                 + '}';

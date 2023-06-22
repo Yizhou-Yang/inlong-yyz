@@ -99,6 +99,7 @@ public class PulsarHandler implements MessageQueueHandler {
 
     /**
      * init
+     *
      * @param config
      * @param sinkContext
      */
@@ -172,19 +173,20 @@ public class PulsarHandler implements MessageQueueHandler {
             try {
                 entry.getValue().close();
             } catch (PulsarClientException e) {
-                LOG.error(e.getMessage(), e);
+                LOG.error("Stop pulsarHandler throw e for:{}", e.getMessage(), e);
             }
         }
         try {
             this.client.close();
         } catch (PulsarClientException e) {
-            LOG.error(e.getMessage(), e);
+            LOG.error("Stop pulsarHandler throw e for:{}", e.getMessage(), e);
         }
         LOG.info("pulsar handler stopped");
     }
 
     /**
      * send
+     *
      * @param event
      * @return
      */
@@ -214,30 +216,38 @@ public class PulsarHandler implements MessageQueueHandler {
             }
             // get producer
             Producer<byte[]> producer = this.producerMap.get(producerTopic);
-            if (producer == null) {
+            int retryIndex = 3;
+            while (producer == null && retryIndex > 0) {
                 try {
-                    LOG.info("try to new a object for topic " + producerTopic);
                     SecureRandom secureRandom = new SecureRandom(
                             (producerTopic + System.currentTimeMillis()).getBytes());
                     String producerName = producerTopic + "-" + secureRandom.nextLong();
-                    producer = baseBuilder.clone().topic(producerTopic)
+                    LOG.info("try to new a object for topic {} and producerName:{}", producerTopic, producerName);
+                    CompletableFuture<Producer<byte[]>> producerFuture = baseBuilder.clone().topic(producerTopic)
                             .producerName(producerName)
-                            .create();
-                    LOG.info("create new producer success:{}", producer.getProducerName());
-                    Producer<byte[]> oldProducer = this.producerMap.putIfAbsent(producerTopic, producer);
-                    if (oldProducer != null) {
-                        producer.close();
-                        LOG.info("close producer success:{}", producer.getProducerName());
-                        producer = oldProducer;
+                            .createAsync();
+                    producer = producerFuture.get(1000, TimeUnit.MILLISECONDS);
+                    if (producer != null) {
+                        LOG.info("create new producer success:{}", producer.getProducerName());
                     }
                 } catch (Throwable ex) {
                     LOG.error("create new producer failed", ex);
+                    Thread.sleep(500);
                 }
+                retryIndex--;
             }
             // create producer failed
             if (producer == null) {
                 sinkContext.processSendFail(event, clusterName, producerTopic, 0);
                 return false;
+            }
+            Producer<byte[]> finalProducer = producer;
+            Producer<byte[]> oldProducer = this.producerMap.computeIfAbsent(producerTopic,
+                    topic -> finalProducer);
+            if (oldProducer != null && !oldProducer.getProducerName().equals(producer.getProducerName())) {
+                producer.close();
+                LOG.info("close producer success:{}", producer.getProducerName());
+                producer = oldProducer;
             }
             // send
             if (event instanceof SimpleBatchPackProfileV0) {
@@ -276,7 +286,7 @@ public class PulsarHandler implements MessageQueueHandler {
 
     /**
      * getPulsarCompressionType
-     * 
+     *
      * @return CompressionType
      */
     private CompressionType getPulsarCompressionType() {
@@ -362,7 +372,7 @@ public class PulsarHandler implements MessageQueueHandler {
                 sinkContext.getDispatchQueue().release(event.getSize());
                 event.ack();
             }
-        });
+        }).get(1000, TimeUnit.MILLISECONDS);
     }
 
     /**

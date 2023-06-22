@@ -17,14 +17,12 @@
 
 package org.apache.inlong.sort.hive;
 
-import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_DATABASE_PATTERN;
-import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
-import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
-import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
+import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
+import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
+import org.apache.inlong.sort.base.sink.PartitionPolicy;
+import org.apache.inlong.sort.hive.util.CacheHolder;
+import org.apache.inlong.sort.hive.util.HiveTableUtil;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
@@ -40,17 +38,20 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.utils.TypeConversions;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-
-import java.util.Arrays;
-import java.util.LinkedHashMap;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
-import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
-import org.apache.inlong.sort.base.sink.PartitionPolicy;
-import org.apache.inlong.sort.hive.util.CacheHolder;
-import org.apache.inlong.sort.hive.util.HiveTableUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_DATABASE_PATTERN;
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
 
 /**
  * A {@link RowDataPartitionComputer} that converts Flink objects to Hive objects before computing
@@ -71,6 +72,9 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
     private final HiveShim hiveShim;
 
     private final String hiveVersion;
+    private final String inputFormat;
+    private final String outputFormat;
+    private final String serializationLib;
 
     private final PartitionPolicy partitionPolicy;
 
@@ -88,7 +92,10 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
             String[] partitionColumns,
             PartitionPolicy partitionPolicy,
             String partitionField,
-            String timePattern) {
+            String timePattern,
+            String inputFormat,
+            String outputFormat,
+            String serializationLib) {
         super(defaultPartValue, columnNames, columnTypes, partitionColumns);
         this.hiveShim = hiveShim;
         this.hiveVersion = hiveVersion;
@@ -112,6 +119,9 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
         this.partitionPolicy = partitionPolicy;
         this.partitionField = partitionField;
         this.timePattern = timePattern;
+        this.inputFormat = inputFormat;
+        this.outputFormat = outputFormat;
+        this.serializationLib = serializationLib;
     }
 
     @Override
@@ -146,7 +156,8 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
 
                 HiveWriterFactory hiveWriterFactory = HiveTableUtil.getWriterFactory(hiveShim, hiveVersion, identifier);
                 if (hiveWriterFactory == null) {
-                    HiveTableUtil.createTable(databaseName, tableName, schema, partitionPolicy, hiveVersion);
+                    HiveTableUtil.createTable(databaseName, tableName, schema, partitionPolicy, hiveVersion,
+                            inputFormat, outputFormat, serializationLib);
                     hiveWriterFactory = HiveTableUtil.getWriterFactory(hiveShim, hiveVersion, identifier);
                 }
 
@@ -163,7 +174,7 @@ public class HiveRowDataPartitionComputer extends RowDataPartitionComputer {
 
                 boolean replaceLineBreak = hiveWriterFactory.getStorageDescriptor().getInputFormat()
                         .contains("TextInputFormat");
-                Pair<GenericRowData, Long> pair = HiveTableUtil.getRowData(rawData, columnNames, allTypes,
+                Pair<GenericRowData, Integer> pair = HiveTableUtil.getRowData(rawData, columnNames, allTypes,
                         replaceLineBreak);
                 GenericRowData genericRowData = pair.getLeft();
 

@@ -490,7 +490,7 @@ public class ClientMgr {
     }
 
     public void shutDown() {
-        // bootstrap.shutdown();
+        bootstrap.config().group().shutdownGracefully();
 
         ipManager.shutDown();
 

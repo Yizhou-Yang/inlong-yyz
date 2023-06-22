@@ -20,6 +20,7 @@ package org.apache.inlong.sort.cdc.mysql.source.reader;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
+import java.util.Comparator;
 import java.util.Map.Entry;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.configuration.Configuration;
@@ -62,6 +63,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +73,7 @@ import java.util.stream.Collectors;
 import static org.apache.inlong.sort.cdc.mysql.source.events.WakeupReaderEvent.WakeUpTarget.SNAPSHOT_READER;
 import static org.apache.inlong.sort.cdc.mysql.source.split.MySqlBinlogSplit.toNormalBinlogSplit;
 import static org.apache.inlong.sort.cdc.mysql.source.split.MySqlBinlogSplit.toSuspendedBinlogSplit;
+import static org.apache.inlong.sort.cdc.mysql.source.utils.ChunkUtils.chunkId;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.ChunkUtils.getNextMetaGroupId;
 
 /**
@@ -220,6 +223,8 @@ public class MySqlSourceReader<T>
                     uncompletedBinlogSplits.remove(split.splitId());
                     MySqlBinlogSplit mySqlBinlogSplit =
                             discoverTableSchemasForBinlogSplit(split.asBinlogSplit());
+                    mySqlBinlogSplit.getFinishedSnapshotSplitInfos()
+                            .sort(Comparator.comparingInt(splitInfo -> chunkId(splitInfo.getSplitId())));
                     unfinishedSplits.add(mySqlBinlogSplit);
                 }
             }
@@ -412,4 +417,5 @@ public class MySqlSourceReader<T>
     protected MySqlSplit toSplitType(String splitId, MySqlSplitState splitState) {
         return splitState.toMySqlSplit();
     }
+
 }

@@ -61,11 +61,8 @@ public class CommonConstants {
     // the same task must have the same Partition Key if choose sync
     public static final String PROXY_SEND_PARTITION_KEY = "proxy.partitionKey";
 
-    // max size of single batch in bytes, default is 200KB.
+    // max size of single batch in bytes, default is 800KB.
     public static final int DEFAULT_PROXY_PACKAGE_MAX_SIZE = 800000;
-
-    public static final String PROXY_MESSAGE_SEMAPHORE = "proxy.semaphore";
-    public static final int DEFAULT_PROXY_MESSAGE_SEMAPHORE = 20000;
 
     public static final String PROXY_INLONG_STREAM_ID_QUEUE_MAX_NUMBER = "proxy.group.queue.maxNumber";
     public static final int DEFAULT_PROXY_INLONG_STREAM_ID_QUEUE_MAX_NUMBER = 10000;
@@ -74,7 +71,7 @@ public class CommonConstants {
     public static final int DEFAULT_PROXY_PACKAGE_MAX_TIMEOUT_MS = 4 * 1000;
 
     public static final String PROXY_BATCH_FLUSH_INTERVAL = "proxy.batch.flush.interval";
-    public static final int DEFAULT_PROXY_BATCH_FLUSH_INTERVAL = 1000;
+    public static final int DEFAULT_PROXY_BATCH_FLUSH_INTERVAL = 100;
 
     public static final String PROXY_SENDER_MAX_TIMEOUT = "proxy.sender.maxTimeout";
     // max timeout in seconds.

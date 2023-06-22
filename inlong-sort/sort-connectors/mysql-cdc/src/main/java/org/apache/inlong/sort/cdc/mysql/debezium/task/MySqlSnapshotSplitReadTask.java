@@ -148,7 +148,6 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         createDataEvents(ctx, snapshotSplit.getTableId());
 
         BinlogOffset highWatermark = determineHighWatermark(lowWatermark);
-
         LOG.info(
                 "Snapshot step 3 - Determining high watermark {} for split {}",
                 highWatermark,
@@ -157,6 +156,11 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                 snapshotSplit, highWatermark, SignalEventDispatcher.WatermarkKind.HIGH);
         ((SnapshotSplitReader.SnapshotSplitChangeEventSourceContextImpl) (context))
                 .setHighWatermark(highWatermark);
+
+        Table table = databaseSchema.tableFor(snapshotSplit.getTableId());
+        if (table == null) {
+            return SnapshotResult.skipped(ctx.offset);
+        }
 
         return SnapshotResult.completed(ctx.offset);
     }
@@ -203,8 +207,12 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         EventDispatcher.SnapshotReceiver snapshotReceiver =
                 dispatcher.getSnapshotChangeEventReceiver();
         LOG.debug("Snapshotting table {}", tableId);
-        createDataEventsForTable(
-                snapshotContext, snapshotReceiver, databaseSchema.tableFor(tableId));
+        Table table = databaseSchema.tableFor(tableId);
+        if (table != null) {
+            createDataEventsForTable(snapshotContext, snapshotReceiver, table);
+        } else {
+            LOG.warn("Debezium doesn't capture {}, ignore this table", snapshotSplit.getTableId());
+        }
         snapshotReceiver.completeSnapshot();
     }
 
