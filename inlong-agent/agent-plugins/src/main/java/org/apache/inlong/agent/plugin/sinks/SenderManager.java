@@ -55,6 +55,7 @@ import org.apache.inlong.agent.utils.AgentUtils;
 import org.apache.inlong.agent.utils.ThreadUtils;
 import org.apache.inlong.common.constant.ProtocolType;
 import org.apache.inlong.common.metric.MetricRegister;
+import org.apache.inlong.common.msg.AttributeConstants;
 import org.apache.inlong.sdk.dataproxy.DefaultMessageSender;
 import org.apache.inlong.sdk.dataproxy.ProxyClientConfig;
 import org.apache.inlong.sdk.dataproxy.SendMessageCallback;
@@ -220,6 +221,8 @@ public class SenderManager {
         boolean suc = false;
         while (!suc) {
             try {
+                // Remove MESSAGE_PROXY_SEND when retry
+                batchMessage.getExtraMap().remove(AttributeConstants.MESSAGE_PROXY_SEND);
                 sender.asyncSendMessage(new AgentSenderCallback(batchMessage, retry),
                         batchMessage.getDataList(), batchMessage.getGroupId(), batchMessage.getStreamId(),
                         batchMessage.getDataTime(), SEQUENTIAL_ID.getNextUuid(), maxSenderTimeout, TimeUnit.SECONDS,
