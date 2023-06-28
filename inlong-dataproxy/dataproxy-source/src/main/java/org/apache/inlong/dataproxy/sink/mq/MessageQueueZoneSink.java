@@ -162,6 +162,15 @@ public class MessageQueueZoneSink extends AbstractSink implements Configurable {
                 tx.commit();
                 return Status.READY;
             }
+            // FlumeEvent, transfer to SimpleEvent
+            if (event instanceof Event) {
+                SimpleEvent simpleEvent = new SimpleEvent();
+                simpleEvent.setHeaders(event.getHeaders());
+                simpleEvent.setBody(event.getBody());
+                this.dispatchManager.addSimpleEvent(simpleEvent);
+                tx.commit();
+                return Status.READY;
+            }
             tx.commit();
             this.context.addSendFailMetric();
             return Status.READY;
