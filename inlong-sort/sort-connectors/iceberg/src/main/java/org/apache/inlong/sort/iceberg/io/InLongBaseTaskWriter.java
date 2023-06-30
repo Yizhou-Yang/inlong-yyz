@@ -282,8 +282,6 @@ public abstract class InLongBaseTaskWriter<T> implements TaskWriter<T> {
 
         abstract void write(W writer, T record);
 
-        abstract void complete(W closedWriter);
-
         public void write(T record) throws IOException {
             write(currentWriter, record);
             this.currentRows++;
@@ -293,6 +291,8 @@ public abstract class InLongBaseTaskWriter<T> implements TaskWriter<T> {
                 openCurrent();
             }
         }
+
+        abstract void complete(W closedWriter);
 
         public CharSequence currentPath() {
             Preconditions.checkNotNull(currentFile, "The currentFile shouldn't be null");
