@@ -19,6 +19,7 @@ package org.apache.inlong.sort.base.dirty;
 
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 
 import java.io.Serializable;
 import static org.apache.inlong.sort.base.Constants.DIRTY_IDENTIFIER;
@@ -28,6 +29,7 @@ import static org.apache.inlong.sort.base.Constants.DIRTY_SIDE_OUTPUT_ENABLE;
 import static org.apache.inlong.sort.base.Constants.DIRTY_SIDE_OUTPUT_IGNORE_ERRORS;
 import static org.apache.inlong.sort.base.Constants.DIRTY_SIDE_OUTPUT_LABELS;
 import static org.apache.inlong.sort.base.Constants.DIRTY_SIDE_OUTPUT_LOG_TAG;
+import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_SCHEMA_UPDATE_POLICY;
 
 /**
  * Dirty common options
@@ -63,6 +65,9 @@ public class DirtyOptions implements Serializable {
      */
     public static DirtyOptions fromConfig(ReadableConfig config) {
         boolean ignoreDirty = config.get(DIRTY_IGNORE);
+        if (config.get(SINK_MULTIPLE_SCHEMA_UPDATE_POLICY) == SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE) {
+            ignoreDirty = true;
+        }
         boolean enableDirtySink = config.get(DIRTY_SIDE_OUTPUT_ENABLE);
         boolean ignoreSinkError = config.get(DIRTY_SIDE_OUTPUT_IGNORE_ERRORS);
         String dirtyConnector = config.getOptional(DIRTY_SIDE_OUTPUT_CONNECTOR).orElse(null);
