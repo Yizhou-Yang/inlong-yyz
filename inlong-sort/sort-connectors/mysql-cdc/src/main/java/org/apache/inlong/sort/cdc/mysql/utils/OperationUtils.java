@@ -112,6 +112,10 @@ public class OperationUtils {
         statement.getAlterExpressions().forEach(alterExpression -> {
             switch (alterExpression.getOperation()) {
                 case DROP:
+                    if (alterExpression.getIndex() != null) {
+                        LOG.error("unsupported statement {}", statement);
+                        throw new IllegalStateException("drop index not supported now");
+                    }
                     alterColumns.add(new AlterColumn(AlterType.DROP_COLUMN,
                             null,
                             Column.builder().name(reformatName(alterExpression.getColumnName()))
