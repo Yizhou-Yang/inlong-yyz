@@ -21,9 +21,7 @@ import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.rowToArr
 import static org.apache.flink.table.api.DataTypes.FIELD;
 import static org.apache.flink.table.api.DataTypes.ROW;
 
-import com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils;
 import com.ververica.cdc.connectors.oracle.source.utils.OracleTypeUtils;
-import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
@@ -265,37 +263,13 @@ public class OracleUtils {
 
     /** Creates a new {@link OracleDatabaseSchema} to monitor the latest oracle database schemas. */
     public static OracleDatabaseSchema createOracleDatabaseSchema(
-            OracleConnectorConfig dbzOracleConfig) {
+            OracleConnectorConfig dbzOracleConfig, OracleConnection oracleConnection) {
         TopicSelector<TableId> topicSelector = OracleTopicSelector.defaultSelector(dbzOracleConfig);
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
-        OracleConnection oracleConnection =
-                OracleConnectionUtils.createOracleConnection(dbzOracleConfig.getJdbcConfig());
-        // OracleConnectionUtils.createOracleConnection((Configuration) dbzOracleConfig);
         OracleValueConverters oracleValueConverters =
                 new OracleValueConverters(dbzOracleConfig, oracleConnection);
         StreamingAdapter.TableNameCaseSensitivity tableNameCaseSensitivity =
                 dbzOracleConfig.getAdapter().getTableNameCaseSensitivity(oracleConnection);
-        return new OracleDatabaseSchema(
-                dbzOracleConfig,
-                oracleValueConverters,
-                schemaNameAdjuster,
-                topicSelector,
-                tableNameCaseSensitivity);
-    }
-
-    /** Creates a new {@link OracleDatabaseSchema} to monitor the latest oracle database schemas. */
-    public static OracleDatabaseSchema createOracleDatabaseSchema(
-            OracleConnectorConfig dbzOracleConfig, boolean tableIdCaseInsensitive) {
-        TopicSelector<TableId> topicSelector = OracleTopicSelector.defaultSelector(dbzOracleConfig);
-        SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
-        OracleConnection oracleConnection =
-                OracleConnectionUtils.createOracleConnection((Configuration) dbzOracleConfig);
-        OracleValueConverters oracleValueConverters =
-                new OracleValueConverters(dbzOracleConfig, oracleConnection);
-        StreamingAdapter.TableNameCaseSensitivity tableNameCaseSensitivity =
-                tableIdCaseInsensitive
-                        ? StreamingAdapter.TableNameCaseSensitivity.SENSITIVE
-                        : StreamingAdapter.TableNameCaseSensitivity.INSENSITIVE;
         return new OracleDatabaseSchema(
                 dbzOracleConfig,
                 oracleValueConverters,

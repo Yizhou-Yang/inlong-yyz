@@ -40,8 +40,7 @@ import org.slf4j.LoggerFactory;
  */
 public class OracleConnectionUtils {
 
-    private static final Logger LOG = LoggerFactory.getLogger(
-            com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils.class);
+    private static final Logger LOG = LoggerFactory.getLogger(OracleConnectionUtils.class);
 
     /** Returned by column metadata in Oracle if no scale is set. */
     private static final int ORACLE_UNSET_SCALE = -127;
@@ -54,7 +53,7 @@ public class OracleConnectionUtils {
         Configuration configuration = dbzConfiguration.subset(DATABASE_CONFIG_PREFIX, true);
         return new OracleConnection(
                 configuration.isEmpty() ? dbzConfiguration : configuration,
-                com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils.class::getClassLoader);
+                OracleConnectionUtils.class::getClassLoader);
     }
 
     /** Fetch current redoLog offsets in Oracle Server. */

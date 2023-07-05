@@ -60,6 +60,11 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
+import java.util.Map;
+
+import static org.apache.inlong.sort.cdc.oracle.source.utils.OracleConnectionUtils.createOracleConnection;
+
 /** The context for fetch task that fetching data of snapshot split from Oracle data source.
  *  Copy from com.ververica:flink-connector-oracle-cdc:2.3.0
  */
@@ -81,11 +86,9 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private OracleErrorHandler errorHandler;
 
     public OracleSourceFetchTaskContext(
-            JdbcSourceConfig sourceConfig,
-            JdbcDataSourceDialect dataSourceDialect,
-            OracleConnection connection) {
+            JdbcSourceConfig sourceConfig, JdbcDataSourceDialect dataSourceDialect) {
         super(sourceConfig, dataSourceDialect);
-        this.connection = connection;
+        this.connection = createOracleConnection(sourceConfig.getDbzConfiguration());
         this.metadataProvider = new OracleEventMetadataProvider();
     }
 
@@ -99,7 +102,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         .getDbzConfiguration()
                         .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
                 sourceSplitBase.getTableSchemas().values());
-        this.databaseSchema = OracleUtils.createOracleDatabaseSchema(connectorConfig);
+        this.databaseSchema = OracleUtils.createOracleDatabaseSchema(connectorConfig, connection);
         // todo logMiner or xStream
         this.offsetContext =
                 loadStartingOffsetState(
