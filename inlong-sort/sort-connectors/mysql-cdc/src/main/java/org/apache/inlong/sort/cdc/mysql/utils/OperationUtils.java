@@ -47,6 +47,7 @@ import org.apache.inlong.sort.protocol.ddl.operations.DropTableOperation;
 import org.apache.inlong.sort.protocol.ddl.operations.Operation;
 import org.apache.inlong.sort.protocol.ddl.operations.RenameTableOperation;
 import org.apache.inlong.sort.protocol.ddl.operations.TruncateTableOperation;
+import org.apache.inlong.sort.protocol.ddl.operations.UnsupportedOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,12 +89,12 @@ public class OperationUtils {
             } else if (statement instanceof RenameTableStatement) {
                 return new RenameTableOperation();
             } else {
-                LOG.warn("doesn't support sql {}, statement {}", sql, statement);
+                LOG.error("doesn't support sql {}, statement {}", sql, statement);
             }
         } catch (Exception e) {
-            LOG.error("parse ddl error: {}， set ddl to null", sql, e);
+            LOG.error("parse ddl in sql {} error", sql, e);
         }
-        return null;
+        return new UnsupportedOperation();
     }
 
     /**
@@ -111,6 +112,10 @@ public class OperationUtils {
         statement.getAlterExpressions().forEach(alterExpression -> {
             switch (alterExpression.getOperation()) {
                 case DROP:
+                    if (alterExpression.getIndex() != null) {
+                        LOG.error("unsupported statement {}", statement);
+                        throw new IllegalStateException("drop index not supported now");
+                    }
                     alterColumns.add(new AlterColumn(AlterType.DROP_COLUMN,
                             null,
                             Column.builder().name(reformatName(alterExpression.getColumnName()))

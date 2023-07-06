@@ -87,7 +87,6 @@
         <dependency>
             <groupId>com.qcloud</groupId>
             <artifactId>chdfs_hadoop_plugin_network</artifactId>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.tencentcloudapi</groupId>

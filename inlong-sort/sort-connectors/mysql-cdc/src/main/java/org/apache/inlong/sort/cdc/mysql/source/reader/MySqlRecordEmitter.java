@@ -260,6 +260,7 @@ public final class MySqlRecordEmitter<T>
             TableChange tableChange) throws Exception {
         BinlogOffset position = getBinlogPosition(element);
         splitState.asBinlogSplitState().setStartingOffset(position);
+        LOG.info("output ddl record {}", element);
         outputElement(element, output, tableChange);
     }
 

@@ -17,8 +17,15 @@
 
 package org.apache.inlong.sort.cdc.mysql;
 
+import static org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
+
 import io.debezium.config.Configuration;
 import io.debezium.jdbc.JdbcConnection;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
+import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -70,6 +77,7 @@ public class MySqlValidator implements Validator {
             checkVersion(connection);
             checkBinlogFormat(connection);
             checkBinlogRowImage(connection);
+            checkTimeZone(connection);
         } catch (SQLException ex) {
             throw new TableException(
                     "Unexpected error while connecting to MySQL and validating", ex);
@@ -83,6 +91,57 @@ public class MySqlValidator implements Validator {
             }
         }
         LOG.info("MySQL validation passed.");
+    }
+
+    /** Check whether the server timezone matches the configured timezone. */
+    private void checkTimeZone(JdbcConnection connection) throws SQLException {
+        String timeZoneProperty = dbzProperties.getProperty("database.serverTimezone");
+        if (timeZoneProperty == null) {
+            LOG.warn(
+                    "{} is not set, which might cause data inconsistencies for time-related fields.",
+                    SERVER_TIME_ZONE.key());
+            return;
+        }
+
+        int timeDiffInSeconds =
+                connection.queryAndMap(
+                        "SELECT TIME_TO_SEC(TIMEDIFF(NOW(), UTC_TIMESTAMP()))",
+                        rs -> rs.next() ? rs.getInt(1) : -1);
+
+        ZoneId zoneId = ZoneId.of(timeZoneProperty);
+        boolean inDayLightTime = TimeZone.getTimeZone(zoneId).inDaylightTime(new Date());
+        int timeZoneOffsetInSeconds =
+                zoneId.getRules().getOffset(LocalDateTime.now()).getTotalSeconds();
+
+        if (!timeDiffMatchesZoneOffset(
+                timeDiffInSeconds, timeZoneOffsetInSeconds, inDayLightTime)) {
+            throw new ValidationException(
+                    String.format(
+                            "The MySQL server has a timezone offset (%d seconds %s UTC) which does not match "
+                                    + "the configured timezone %s. Specify the right %s to avoid inconsistencies "
+                                    + "for time-related fields.",
+                            Math.abs(timeDiffInSeconds),
+                            timeDiffInSeconds >= 0 ? "ahead of" : "behind",
+                            zoneId.getId(),
+                            SERVER_TIME_ZONE.key()));
+        }
+    }
+
+    private boolean timeDiffMatchesZoneOffset(
+            int timeDiffInSeconds, int timeZoneOffsetInSeconds, boolean inDayLightTime) {
+        // Trivial case for non-DST timezone
+        if (!inDayLightTime) {
+            return timeDiffInSeconds == timeZoneOffsetInSeconds;
+        }
+
+        // There are two cases when Daylight Saving Time is in effect,
+        // 1) MySQL timezone has been adjusted to DST, like using 'Pacific Daylight Time' when DST
+        // starts.
+        // 2) MySQL timezone has been fixed to non-DST, like using 'Pacific Standard Time' all year
+        // long.
+        // thus we need to accept both.
+        return timeDiffInSeconds == timeZoneOffsetInSeconds
+                || timeDiffInSeconds == timeZoneOffsetInSeconds - TimeUnit.HOURS.toSeconds(1);
     }
 
     private void checkVersion(JdbcConnection connection) throws SQLException {

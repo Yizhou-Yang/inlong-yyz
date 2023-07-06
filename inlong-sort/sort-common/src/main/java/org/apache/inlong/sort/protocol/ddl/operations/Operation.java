@@ -30,7 +30,8 @@ import org.apache.inlong.sort.protocol.ddl.enums.OperationType;
         @JsonSubTypes.Type(value = CreateTableOperation.class, name = "createTableOperation"),
         @JsonSubTypes.Type(value = DropTableOperation.class, name = "dropTableOperation"),
         @JsonSubTypes.Type(value = TruncateTableOperation.class, name = "truncateTableOperation"),
-        @JsonSubTypes.Type(value = RenameTableOperation.class, name = "renameTableOperation")
+        @JsonSubTypes.Type(value = RenameTableOperation.class, name = "renameTableOperation"),
+        @JsonSubTypes.Type(value = UnsupportedOperation.class, name = "unsupportedOperation")
 })
 @Data
 @NoArgsConstructor

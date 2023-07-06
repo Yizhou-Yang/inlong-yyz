@@ -40,6 +40,7 @@ public class MaskDataUtilsTest {
                 + "  \"secret_key\": \"inlong\",\n"
                 + "  \"secretKey\": \"inlong\",\n"
                 + "  \"public_key\": \"inlong\",\n"
+                + "  \"service.jwt.secret\": \"inlong\",\n"
                 + "  \"publicKey\": \"inlong\"\n"
                 + "}";
         String masked = "{\n"
@@ -54,6 +55,7 @@ public class MaskDataUtilsTest {
                 + "  \"secret_key\": \"******\",\n"
                 + "  \"secretKey\": \"******\",\n"
                 + "  \"public_key\": \"******\",\n"
+                + "  \"service.jwt.secret\": \"******\",\n"
                 + "  \"publicKey\": \"******\"\n"
                 + "}";
         StringBuilder buffer = new StringBuilder(unmasked);
