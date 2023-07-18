@@ -282,4 +282,17 @@
             <url>https://mirrors.tencent.com/repository/maven/tencent_public_snapshots/</url>
         </repository>
     </repositories>
+
+    <distributionManagement>
+        <repository>
+            <id>snapshots</id>
+            <name>snapshot</name>
+            <url>https://mirrors.tencent.com/repository/maven/dlc</url>
+        </repository>
+        <snapshotRepository>
+            <id>dlc-snapshot</id>
+            <name>dlc_snapshot_mirror</name>
+            <url>https://mirrors.tencent.com/repository/maven/dlc-snapshot</url>
+        </snapshotRepository>
+    </distributionManagement>
 </project>
