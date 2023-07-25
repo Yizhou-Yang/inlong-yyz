@@ -88,23 +88,20 @@ public class PostgresDialect extends AbstractJdbcDialect {
                 Arrays.stream(uniqueKeyFields)
                         .map(this::quoteIdentifier)
                         .collect(Collectors.joining(", "));
-        String insertClause =
-                Arrays.stream(fieldNames)
-                        .map(this::quoteIdentifier)
-                        .collect(Collectors.joining(", ", "(", ")"));
-        String valuesClause =
-                Arrays.stream(fieldNames)
-                        .map(f -> "EXCLUDED." + quoteIdentifier(f))
-                        .collect(Collectors.joining(", ", "(", ")"));
+        List<String> uniqueKeyFieldList = Arrays.asList(uniqueKeyFields);
         String updateClause =
-                Arrays.stream(fieldNames)
-                        .filter(f -> !Arrays.asList(uniqueKeyFields).contains(f))
+                Arrays.stream(fieldNames).filter(f -> !uniqueKeyFieldList.contains(f))
                         .map(f -> quoteIdentifier(f) + "=EXCLUDED." + quoteIdentifier(f))
                         .collect(Collectors.joining(", "));
-
-        return Optional.of(
-                "INSERT INTO " + quoteIdentifier(tableName) + insertClause + " VALUES " + valuesClause +
-                        " ON CONFLICT (" + uniqueColumns + ") DO UPDATE SET " + updateClause);
+        String upsertCause = getInsertIntoStatement(tableName, fieldNames);
+        if (StringUtils.isNotEmpty(updateClause)) {
+            upsertCause = upsertCause + " ON CONFLICT ("
+                    + uniqueColumns
+                    + ")"
+                    + " DO UPDATE SET "
+                    + updateClause;
+        }
+        return Optional.of(upsertCause);
     }
 
     @Override
