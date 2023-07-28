@@ -95,6 +95,10 @@
                             </filters>
                             <relocations>
                                 <relocation>
+                                    <pattern>org.apache.inlong.sort.base</pattern>
+                                    <shadedPattern>org.apache.inlong.sort.cdc.sqlserver.shaded.org.apache.inlong.sort.base</shadedPattern>
+                                </relocation>
+                                <relocation>
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>com.ververica.cdc.connectors.shaded.org.apache.kafka</shadedPattern>
                                 </relocation>
