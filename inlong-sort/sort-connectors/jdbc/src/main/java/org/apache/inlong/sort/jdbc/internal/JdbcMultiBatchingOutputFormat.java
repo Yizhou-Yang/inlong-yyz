@@ -578,8 +578,8 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                             record.setField(i, StringData.fromString(fieldValue));
                     }
                 } catch (Exception e) {
-                    throw new IllegalArgumentException(String.format("Parse field failed for value: %s", fieldValue),
-                            e);
+                    throw new IllegalArgumentException(String.format("Parse field failed for field:%s, the value: %s",
+                            fieldName, fieldValue), e);
                 }
             }
         }
