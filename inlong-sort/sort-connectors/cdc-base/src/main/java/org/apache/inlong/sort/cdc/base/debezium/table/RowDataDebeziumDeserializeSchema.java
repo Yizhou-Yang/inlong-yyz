@@ -708,6 +708,7 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
     public void deserialize(SourceRecord record, Collector<RowData> out,
             TableChange tableSchema)
             throws Exception {
+        LOG.warn("====rawdata: {}", record.toString());
         Envelope.Operation op = Envelope.operationFor(record);
         Struct value = (Struct) record.value();
         Schema valueSchema = record.valueSchema();
