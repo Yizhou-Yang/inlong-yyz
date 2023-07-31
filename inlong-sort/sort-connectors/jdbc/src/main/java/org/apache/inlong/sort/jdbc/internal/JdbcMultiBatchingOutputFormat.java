@@ -143,6 +143,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     private transient ListState<MetricState> metricStateListState;
     private transient MetricState metricState;
     private SinkTableMetricData sinkMetricData;
+    private static final String ZERO_SECOND_FORMAT = ":00";
 
     static {
         SQL_TIME_FORMAT = (new DateTimeFormatterBuilder()).appendPattern("HH:mm:ss")
@@ -573,19 +574,22 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                             break;
                         case TIMESTAMP_WITHOUT_TIME_ZONE:
                             fieldValue = fieldValue.replace("T", " ");
-                            TimestampData timestamp = TimestampData.fromTimestamp(Timestamp.valueOf(fieldValue));
+                            TimestampData timestamp;
+                            try {
+                                timestamp = TimestampData.fromTimestamp(Timestamp.valueOf(fieldValue));
+                            } catch (Exception ex) {
+                                fieldValue += ZERO_SECOND_FORMAT;
+                                timestamp = TimestampData.fromTimestamp(Timestamp.valueOf(fieldValue));
+                            }
                             record.setField(i, timestamp);
                             break;
                         default:
                             record.setField(i, StringData.fromString(fieldValue));
                     }
                 } catch (Exception e) {
-                    // throw new IllegalArgumentException(
-                    // String.format("Parse field failed for field:%s with value: %s of table:%s",
-                    // fieldName, fieldValue, tableIdentifier), e);
                     throw new IllegalArgumentException(
-                            String.format("Parse field failed for field:%s with value: %s of table:%s, rawdata:%s",
-                                    fieldName, fieldValue, tableIdentifier, new String(rawData)),
+                            String.format("Parse field failed for field:%s with value: %s of table:%s",
+                                    fieldName, fieldValue, tableIdentifier),
                             e);
                 }
             }
