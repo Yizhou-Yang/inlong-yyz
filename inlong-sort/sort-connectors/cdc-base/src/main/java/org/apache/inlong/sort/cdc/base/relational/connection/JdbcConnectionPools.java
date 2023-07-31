@@ -40,7 +40,7 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
 
     public static synchronized JdbcConnectionPools getInstance(JdbcConnectionPoolFactory jdbcConnectionPoolFactory) {
         if (instance == null) {
-            jdbcConnectionPoolFactory = jdbcConnectionPoolFactory;
+            JdbcConnectionPools.jdbcConnectionPoolFactory = jdbcConnectionPoolFactory;
             instance = new JdbcConnectionPools();
         }
         return instance;
