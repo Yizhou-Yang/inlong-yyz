@@ -392,6 +392,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         jsonDynamicSchemaFormat = (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(sinkMultipleFormat);
         if (row instanceof RowData) {
             RowData rowData = (RowData) row;
+            LOG.warn("rawdata: {}", new String(rowData.getBinary(0)));
             JsonNode rootNode = jsonDynamicSchemaFormat.deserialize(rowData.getBinary(0));
             String tableIdentifier;
             String database;
@@ -431,7 +432,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 }
                 JsonNode physicalData = jsonDynamicSchemaFormat.getPhysicalData(rootNode);
                 List<Map<String, String>> physicalDataList = jsonDynamicSchemaFormat.jsonNode2Map(physicalData);
-                record = generateRecord(tableIdentifier, rowType, physicalDataList.get(0));
+                record = generateRecord(tableIdentifier, rowType, physicalDataList.get(0), rowData.getBinary(0));
                 List<RowKind> rowKinds = jsonDynamicSchemaFormat
                         .opType2RowKind(jsonDynamicSchemaFormat.getOpType(rootNode));
                 record.setRowKind(rowKinds.get(rowKinds.size() - 1));
@@ -507,7 +508,8 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     /**
      * Convert fieldMap(data) to GenericRowData with rowType(schema)
      */
-    protected GenericRowData generateRecord(String tableIdentifier, RowType rowType, Map<String, String> fieldMap) {
+    protected GenericRowData generateRecord(String tableIdentifier, RowType rowType, Map<String, String> fieldMap,
+            byte[] rawData) {
         String[] fieldNames = rowType.getFieldNames().toArray(new String[0]);
         int arity = fieldNames.length;
         GenericRowData record = new GenericRowData(arity);
@@ -578,9 +580,13 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                             record.setField(i, StringData.fromString(fieldValue));
                     }
                 } catch (Exception e) {
+                    // throw new IllegalArgumentException(
+                    // String.format("Parse field failed for field:%s with value: %s of table:%s",
+                    // fieldName, fieldValue, tableIdentifier), e);
                     throw new IllegalArgumentException(
-                            String.format("Parse field failed for field:%s with value: %s of table:%s",
-                                    fieldName, fieldValue, tableIdentifier), e);
+                            String.format("Parse field failed for field:%s with value: %s of table:%s, rawdata:%s",
+                                    fieldName, fieldValue, tableIdentifier, new String(rawData)),
+                            e);
                 }
             }
         }
