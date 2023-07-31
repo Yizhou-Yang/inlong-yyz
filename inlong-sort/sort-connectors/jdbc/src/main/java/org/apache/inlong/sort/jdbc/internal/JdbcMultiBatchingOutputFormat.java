@@ -393,7 +393,6 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         jsonDynamicSchemaFormat = (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(sinkMultipleFormat);
         if (row instanceof RowData) {
             RowData rowData = (RowData) row;
-            LOG.warn("rawdata: {}", new String(rowData.getBinary(0)));
             JsonNode rootNode = jsonDynamicSchemaFormat.deserialize(rowData.getBinary(0));
             String tableIdentifier;
             String database;
