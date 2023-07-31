@@ -431,7 +431,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 }
                 JsonNode physicalData = jsonDynamicSchemaFormat.getPhysicalData(rootNode);
                 List<Map<String, String>> physicalDataList = jsonDynamicSchemaFormat.jsonNode2Map(physicalData);
-                record = generateRecord(rowType, physicalDataList.get(0));
+                record = generateRecord(tableIdentifier, rowType, physicalDataList.get(0));
                 List<RowKind> rowKinds = jsonDynamicSchemaFormat
                         .opType2RowKind(jsonDynamicSchemaFormat.getOpType(rootNode));
                 record.setRowKind(rowKinds.get(rowKinds.size() - 1));
@@ -507,7 +507,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     /**
      * Convert fieldMap(data) to GenericRowData with rowType(schema)
      */
-    protected GenericRowData generateRecord(RowType rowType, Map<String, String> fieldMap) {
+    protected GenericRowData generateRecord(String tableIdentifier, RowType rowType, Map<String, String> fieldMap) {
         String[] fieldNames = rowType.getFieldNames().toArray(new String[0]);
         int arity = fieldNames.length;
         GenericRowData record = new GenericRowData(arity);
@@ -578,8 +578,9 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                             record.setField(i, StringData.fromString(fieldValue));
                     }
                 } catch (Exception e) {
-                    throw new IllegalArgumentException(String.format("Parse field failed for field:%s, the value: %s",
-                            fieldName, fieldValue), e);
+                    throw new IllegalArgumentException(
+                            String.format("Parse field failed for field:%s with value: %s of table:%s",
+                                    fieldName, fieldValue, tableIdentifier), e);
                 }
             }
         }
