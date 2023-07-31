@@ -517,64 +517,69 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             if (StringUtils.isBlank(fieldValue)) {
                 record.setField(i, null);
             } else {
-                switch (rowType.getFields().get(i).getType().getTypeRoot()) {
-                    case BIGINT:
-                        record.setField(i, Long.valueOf(fieldValue));
-                        break;
-                    case BOOLEAN:
-                        record.setField(i, Boolean.valueOf(fieldValue));
-                        break;
-                    case DOUBLE:
-                        record.setField(i, Double.valueOf(fieldValue));
-                        break;
-                    case DECIMAL:
-                        DecimalType decimalType = (DecimalType) rowType.getFields().get(i).getType();
-                        record.setField(i, DecimalData.fromBigDecimal(new BigDecimal(fieldValue),
-                                decimalType.getPrecision(), decimalType.getScale()));
-                        break;
-                    case TIME_WITHOUT_TIME_ZONE:
-                    case INTERVAL_DAY_TIME:
-                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
-                        LocalTime time = LocalTime.parse(fieldValue, formatter);
-                        LocalDateTime dateTime = LocalDateTime.of(LocalDate.now(), time);
-                        TimestampData timestampData = TimestampData.fromInstant(dateTime.toInstant(ZoneOffset.UTC));
-                        record.setField(i, timestampData);
-                        break;
-                    case VARBINARY:
-                    case BINARY:
-                        record.setField(i, fieldValue.getBytes(StandardCharsets.UTF_8));
-                        break;
-                    // support mysql
-                    case INTEGER:
-                        record.setField(i, Integer.valueOf(fieldValue));
-                        break;
-                    case SMALLINT:
-                        record.setField(i, Short.valueOf(fieldValue));
-                        break;
-                    case TINYINT:
-                        record.setField(i, Byte.valueOf(fieldValue));
-                        break;
-                    case FLOAT:
-                        record.setField(i, Float.valueOf(fieldValue));
-                        break;
-                    case DATE:
-                        record.setField(i, (int) LocalDate.parse(fieldValue).toEpochDay());
-                        break;
-                    case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                        TemporalAccessor parsedTimestampWithLocalZone =
-                                SQL_TIMESTAMP_WITH_LOCAL_TIMEZONE_FORMAT.parse(fieldValue);
-                        LocalTime localTime = parsedTimestampWithLocalZone.query(TemporalQueries.localTime());
-                        LocalDate localDate = parsedTimestampWithLocalZone.query(TemporalQueries.localDate());
-                        record.setField(i, TimestampData.fromInstant(LocalDateTime.of(localDate, localTime)
-                                .toInstant(ZoneOffset.UTC)));
-                        break;
-                    case TIMESTAMP_WITHOUT_TIME_ZONE:
-                        fieldValue = fieldValue.replace("T", " ");
-                        TimestampData timestamp = TimestampData.fromTimestamp(Timestamp.valueOf(fieldValue));
-                        record.setField(i, timestamp);
-                        break;
-                    default:
-                        record.setField(i, StringData.fromString(fieldValue));
+                try {
+                    switch (rowType.getFields().get(i).getType().getTypeRoot()) {
+                        case BIGINT:
+                            record.setField(i, Long.valueOf(fieldValue));
+                            break;
+                        case BOOLEAN:
+                            record.setField(i, Boolean.valueOf(fieldValue));
+                            break;
+                        case DOUBLE:
+                            record.setField(i, Double.valueOf(fieldValue));
+                            break;
+                        case DECIMAL:
+                            DecimalType decimalType = (DecimalType) rowType.getFields().get(i).getType();
+                            record.setField(i, DecimalData.fromBigDecimal(new BigDecimal(fieldValue),
+                                    decimalType.getPrecision(), decimalType.getScale()));
+                            break;
+                        case TIME_WITHOUT_TIME_ZONE:
+                        case INTERVAL_DAY_TIME:
+                            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+                            LocalTime time = LocalTime.parse(fieldValue, formatter);
+                            LocalDateTime dateTime = LocalDateTime.of(LocalDate.now(), time);
+                            TimestampData timestampData = TimestampData.fromInstant(dateTime.toInstant(ZoneOffset.UTC));
+                            record.setField(i, timestampData);
+                            break;
+                        case VARBINARY:
+                        case BINARY:
+                            record.setField(i, fieldValue.getBytes(StandardCharsets.UTF_8));
+                            break;
+                        // support mysql
+                        case INTEGER:
+                            record.setField(i, Integer.valueOf(fieldValue));
+                            break;
+                        case SMALLINT:
+                            record.setField(i, Short.valueOf(fieldValue));
+                            break;
+                        case TINYINT:
+                            record.setField(i, Byte.valueOf(fieldValue));
+                            break;
+                        case FLOAT:
+                            record.setField(i, Float.valueOf(fieldValue));
+                            break;
+                        case DATE:
+                            record.setField(i, (int) LocalDate.parse(fieldValue).toEpochDay());
+                            break;
+                        case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                            TemporalAccessor parsedTimestampWithLocalZone =
+                                    SQL_TIMESTAMP_WITH_LOCAL_TIMEZONE_FORMAT.parse(fieldValue);
+                            LocalTime localTime = parsedTimestampWithLocalZone.query(TemporalQueries.localTime());
+                            LocalDate localDate = parsedTimestampWithLocalZone.query(TemporalQueries.localDate());
+                            record.setField(i, TimestampData.fromInstant(LocalDateTime.of(localDate, localTime)
+                                    .toInstant(ZoneOffset.UTC)));
+                            break;
+                        case TIMESTAMP_WITHOUT_TIME_ZONE:
+                            fieldValue = fieldValue.replace("T", " ");
+                            TimestampData timestamp = TimestampData.fromTimestamp(Timestamp.valueOf(fieldValue));
+                            record.setField(i, timestamp);
+                            break;
+                        default:
+                            record.setField(i, StringData.fromString(fieldValue));
+                    }
+                } catch (Exception e) {
+                    throw new IllegalArgumentException(String.format("Parse field failed for value: %s", fieldValue),
+                            e);
                 }
             }
         }
