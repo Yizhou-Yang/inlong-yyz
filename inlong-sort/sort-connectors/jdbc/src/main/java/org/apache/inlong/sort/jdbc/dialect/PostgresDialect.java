@@ -19,9 +19,9 @@ package org.apache.inlong.sort.jdbc.dialect;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.connector.jdbc.internal.converter.JdbcRowConverter;
-import org.apache.flink.connector.jdbc.internal.converter.PostgresRowConverter;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.inlong.sort.jdbc.converter.postgres.PostgresRowConverter;
 import org.apache.inlong.sort.jdbc.internal.JdbcMultiBatchingComm;
 import org.apache.inlong.sort.jdbc.table.AbstractJdbcDialect;
 

@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import javax.annotation.Nullable;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.table.api.DataTypes;
@@ -38,6 +39,7 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
+import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
 import org.apache.inlong.sort.cdc.base.debezium.table.MetadataConverter;
 import org.apache.inlong.sort.formats.json.canal.CanalJson;
 import org.apache.inlong.sort.formats.json.debezium.DebeziumJson;
@@ -394,25 +396,32 @@ public enum PostgreSQLReadableMetaData {
         long ts = (Long) messageStruct.get(FieldName.TIMESTAMP);
         // actual data
         GenericRowData data = rowData;
-        Map<String, Object> field = (Map<String, Object>) data.getField(0);
-        List<Map<String, Object>> dataList = new ArrayList<>();
-        dataList.add(field);
-
-        CanalJson canalJson = CanalJson.builder()
-                .data(dataList)
-                .database(databaseName)
-                .schema(schemaName)
-                .sql("")
-                .es(opTs).isDdl(false)
-                .pkNames(getPkNames(tableSchema))
-                .table(tableName)
-                .ts(ts)
-                .type(getCanalOpType(rowData))
-                .sqlType(getSqlType(tableSchema))
-                .build();
         try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            return StringData.fromString(objectMapper.writeValueAsString(canalJson));
+            Map<String, Object> field = (Map<String, Object>) data.getField(0);
+            for (Entry<String, Object> kv : field.entrySet()) {
+                if (kv.getValue() != null && kv.getValue() instanceof Struct) {
+                    Struct maybePoint = (Struct) kv.getValue();
+                    if ("io.debezium.data.geometry.Point".equals(maybePoint.schema().name())) {
+                        field.put(kv.getKey(), String.format("(%s,%s)", maybePoint.getFloat64("x"),
+                                maybePoint.getFloat64("y")));
+                    }
+                }
+            }
+            List<Map<String, Object>> dataList = new ArrayList<>();
+            dataList.add(field);
+            CanalJson canalJson = CanalJson.builder()
+                    .data(dataList)
+                    .database(databaseName)
+                    .schema(schemaName)
+                    .sql("")
+                    .es(opTs).isDdl(false)
+                    .pkNames(getPkNames(tableSchema))
+                    .table(tableName)
+                    .ts(ts)
+                    .type(getCanalOpType(rowData))
+                    .sqlType(getSqlType(tableSchema))
+                    .build();
+            return StringData.fromString(JsonDynamicSchemaFormat.objectMapper.writeValueAsString(canalJson));
         } catch (Exception e) {
             throw new IllegalStateException("exception occurs when get meta data", e);
         }

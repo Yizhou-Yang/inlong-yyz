@@ -29,6 +29,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
+import org.apache.flink.table.types.logical.TimeType;
 import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.utils.TypeConversions;
@@ -44,7 +45,6 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -228,10 +228,10 @@ public abstract class AbstractJdbcRowConverter implements JdbcRowConverter {
                 return (val, index, statement) -> statement.setDate(
                         index, Date.valueOf(LocalDate.ofEpochDay(val.getInt(index))));
             case TIME_WITHOUT_TIME_ZONE:
+                final int precision = ((TimeType) type).getPrecision();
                 return (val, index, statement) -> statement.setTime(
                         index,
-                        Time.valueOf(
-                                LocalTime.ofNanoOfDay(val.getInt(index) * 1_000_000L)));
+                        Time.valueOf(val.getTimestamp(index, precision).toLocalDateTime().toLocalTime()));
             case TIMESTAMP_WITH_TIME_ZONE:
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 final int timestampPrecision = ((TimestampType) type).getPrecision();

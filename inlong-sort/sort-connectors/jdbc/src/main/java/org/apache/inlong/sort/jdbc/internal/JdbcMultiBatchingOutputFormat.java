@@ -40,11 +40,13 @@ import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.runtime.util.ExecutorThreadFactory;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
+import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
+import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
@@ -66,6 +68,7 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -79,7 +82,6 @@ import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalQueries;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -388,7 +390,6 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     public final synchronized void writeRecord(In row) throws IOException {
         checkFlushException();
         jsonDynamicSchemaFormat = (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(sinkMultipleFormat);
-
         if (row instanceof RowData) {
             RowData rowData = (RowData) row;
             JsonNode rootNode = jsonDynamicSchemaFormat.deserialize(rowData.getBinary(0));
@@ -414,7 +415,6 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 LOG.info("Cal tableIdentifier get Exception:", e);
                 return;
             }
-
             GenericRowData record;
             try {
                 RowType rowType = jsonDynamicSchemaFormat.extractSchema(rootNode);
@@ -436,10 +436,8 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                         .opType2RowKind(jsonDynamicSchemaFormat.getOpType(rootNode));
                 record.setRowKind(rowKinds.get(rowKinds.size() - 1));
             } catch (Exception e) {
-                LOG.warn("Extract schema failed", e);
-                return;
+                throw new RuntimeException("Generate record failed", e);
             }
-
             try {
                 recordsMap.computeIfAbsent(tableIdentifier, k -> new ArrayList<>())
                         .add(record);
@@ -527,18 +525,25 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                         record.setField(i, Boolean.valueOf(fieldValue));
                         break;
                     case DOUBLE:
-                    case DECIMAL:
                         record.setField(i, Double.valueOf(fieldValue));
+                        break;
+                    case DECIMAL:
+                        DecimalType decimalType = (DecimalType) rowType.getFields().get(i).getType();
+                        record.setField(i, DecimalData.fromBigDecimal(new BigDecimal(fieldValue),
+                                decimalType.getPrecision(), decimalType.getScale()));
                         break;
                     case TIME_WITHOUT_TIME_ZONE:
                     case INTERVAL_DAY_TIME:
-                        TimestampData timestampData = TimestampData.fromEpochMillis(Long.valueOf(fieldValue));
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+                        LocalTime time = LocalTime.parse(fieldValue, formatter);
+                        LocalDateTime dateTime = LocalDateTime.of(LocalDate.now(), time);
+                        TimestampData timestampData = TimestampData.fromInstant(dateTime.toInstant(ZoneOffset.UTC));
                         record.setField(i, timestampData);
                         break;
+                    case VARBINARY:
                     case BINARY:
-                        record.setField(i, Arrays.toString(fieldValue.getBytes(StandardCharsets.UTF_8)));
+                        record.setField(i, fieldValue.getBytes(StandardCharsets.UTF_8));
                         break;
-
                     // support mysql
                     case INTEGER:
                         record.setField(i, Integer.valueOf(fieldValue));

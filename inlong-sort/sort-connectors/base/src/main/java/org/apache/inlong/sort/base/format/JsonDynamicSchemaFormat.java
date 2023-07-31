@@ -153,7 +153,7 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
                     .put(java.sql.Types.OTHER, new VarCharType())
                     .build();
 
-    public final ObjectMapper objectMapper = new ObjectMapper();
+    public static final ObjectMapper objectMapper = new ObjectMapper();
     protected final JsonToRowDataConverters rowDataConverters;
     protected final boolean adaptSparkEngine;
 
