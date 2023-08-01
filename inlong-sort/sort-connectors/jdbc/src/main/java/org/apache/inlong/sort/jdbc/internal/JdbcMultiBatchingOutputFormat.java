@@ -71,7 +71,7 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -143,7 +143,6 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     private transient ListState<MetricState> metricStateListState;
     private transient MetricState metricState;
     private SinkTableMetricData sinkMetricData;
-    private static final String ZERO_SECOND_FORMAT = ":00";
 
     static {
         SQL_TIME_FORMAT = (new DateTimeFormatterBuilder()).appendPattern("HH:mm:ss")
@@ -571,13 +570,15 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                                     .toInstant(ZoneOffset.UTC)));
                             break;
                         case TIMESTAMP_WITHOUT_TIME_ZONE:
-                            fieldValue = fieldValue.replace("T", " ");
                             TimestampData timestamp;
                             try {
-                                timestamp = TimestampData.fromTimestamp(Timestamp.valueOf(fieldValue));
+                                timestamp = TimestampData.fromLocalDateTime(
+                                        LocalDateTime.parse(fieldValue, DateTimeFormatter.ISO_LOCAL_DATE_TIME));
                             } catch (Exception ex) {
-                                fieldValue += ZERO_SECOND_FORMAT;
-                                timestamp = TimestampData.fromTimestamp(Timestamp.valueOf(fieldValue));
+                                LOG.warn(
+                                        "Parse value: {} by timestamp without time zone failed for field:{} of table:{}",
+                                        fieldValue, fieldName, tableIdentifier, ex);
+                                timestamp = TimestampData.fromInstant(Instant.parse(fieldValue));
                             }
                             record.setField(i, timestamp);
                             break;
@@ -586,7 +587,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                     }
                 } catch (Exception e) {
                     throw new IllegalArgumentException(
-                            String.format("Parse field failed for field:%s with value: %s of table:%s",
+                            String.format("Parse value: %s failed for field:%s of table:%s",
                                     fieldName, fieldValue, tableIdentifier),
                             e);
                 }
