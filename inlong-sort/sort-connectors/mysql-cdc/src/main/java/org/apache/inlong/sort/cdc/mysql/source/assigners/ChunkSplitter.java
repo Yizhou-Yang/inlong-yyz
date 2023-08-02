@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -50,6 +51,7 @@ import static org.apache.inlong.sort.cdc.mysql.debezium.DebeziumUtils.openJdbcCo
 import static org.apache.inlong.sort.cdc.mysql.source.utils.ChunkUtils.splitId;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.ObjectUtils.doubleCompare;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.StatementUtils.queryApproximateRowCnt;
+import static org.apache.inlong.sort.cdc.mysql.source.utils.StatementUtils.queryCollationType;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.StatementUtils.queryMin;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.StatementUtils.queryMinMax;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.StatementUtils.queryNextChunkMax;
@@ -58,12 +60,18 @@ import static org.apache.inlong.sort.cdc.mysql.source.utils.StatementUtils.query
  * The {@code ChunkSplitter}'s task is to split table into a set of chunks or called splits (i.e.
  * {@link MySqlSnapshotSplit}).
  */
-class ChunkSplitter {
+public class ChunkSplitter {
 
     private static final Logger LOG = LoggerFactory.getLogger(ChunkSplitter.class);
 
     private final MySqlSourceConfig sourceConfig;
     private final MySqlSchema mySqlSchema;
+
+    public enum CollationType {
+        CASE_SENSITIVE,
+        CASE_INSENSITIVE,
+        UNDEFINED
+    }
 
     public ChunkSplitter(MySqlSchema mySqlSchema, MySqlSourceConfig sourceConfig) {
         this.mySqlSchema = mySqlSchema;
@@ -170,8 +178,12 @@ class ChunkSplitter {
             return Collections.singletonList(ChunkRange.all());
         } else {
             Column splitColumn = ChunkUtils.getSplitColumn(table);
+            CollationType collationType =
+                    splitColumn.jdbcType() == Types.VARCHAR
+                            ? queryCollationType(jdbc, table.id(), splitColumn.name(), LOG)
+                            : CollationType.UNDEFINED;
             try {
-                return splitTableIntoChunks(jdbc, tableId, splitColumn);
+                return splitTableIntoChunks(jdbc, tableId, splitColumn, collationType);
             } catch (SQLException e) {
                 throw new FlinkRuntimeException("Failed to split chunks for table " + tableId, e);
             }
@@ -184,7 +196,7 @@ class ChunkSplitter {
      * many queries and is not efficient.
      */
     private List<ChunkRange> splitTableIntoChunks(
-            JdbcConnection jdbc, TableId tableId, Column splitColumn) throws SQLException {
+            JdbcConnection jdbc, TableId tableId, Column splitColumn, CollationType collationType) throws SQLException {
         final String splitColumnName = splitColumn.name();
         final Object[] minMaxOfSplitColumn = queryMinMax(jdbc, tableId, splitColumnName);
         final Object min = minMaxOfSplitColumn[0];
@@ -211,13 +223,13 @@ class ChunkSplitter {
                 // the minimum dynamic chunk size is at least 1
                 final int dynamicChunkSize = Math.max((int) (distributionFactor * chunkSize), 1);
                 return splitEvenlySizedChunks(
-                        tableId, min, max, approximateRowCnt, dynamicChunkSize);
+                        tableId, min, max, approximateRowCnt, dynamicChunkSize, collationType);
             } else {
                 return splitUnevenlySizedChunks(
-                        jdbc, tableId, splitColumnName, min, max, chunkSize);
+                        jdbc, tableId, splitColumnName, min, max, chunkSize, collationType);
             }
         } else {
-            return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize);
+            return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize, collationType);
         }
     }
 
@@ -226,7 +238,8 @@ class ChunkSplitter {
      * and tumble chunks in step size.
      */
     private List<ChunkRange> splitEvenlySizedChunks(
-            TableId tableId, Object min, Object max, long approximateRowCnt, int chunkSize) {
+            TableId tableId, Object min, Object max, long approximateRowCnt, int chunkSize,
+            CollationType collationType) {
         LOG.info(
                 "Use evenly-sized chunk optimization for table {}, "
                         + "the approximate row count is {}, the chunk size is {}",
@@ -241,7 +254,7 @@ class ChunkSplitter {
         final List<ChunkRange> splits = new ArrayList<>();
         Object chunkStart = null;
         Object chunkEnd = ObjectUtils.plus(min, chunkSize);
-        while (ObjectUtils.compare(chunkEnd, max) <= 0) {
+        while (ObjectUtils.compare(chunkEnd, max, collationType) <= 0) {
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
             chunkStart = chunkEnd;
             chunkEnd = ObjectUtils.plus(chunkEnd, chunkSize);
@@ -262,21 +275,22 @@ class ChunkSplitter {
             String splitColumnName,
             Object min,
             Object max,
-            int chunkSize)
+            int chunkSize,
+            CollationType collationType)
             throws SQLException {
         LOG.info(
                 "Use unevenly-sized chunks for table {}, the chunk size is {}", tableId, chunkSize);
         final List<ChunkRange> splits = new ArrayList<>();
         Object chunkStart = null;
-        Object chunkEnd = nextChunkEnd(jdbc, min, tableId, splitColumnName, max, chunkSize);
+        Object chunkEnd = nextChunkEnd(jdbc, min, tableId, splitColumnName, max, chunkSize, collationType);
         int count = 0;
-        while (chunkEnd != null && ObjectUtils.compare(chunkEnd, max) <= 0) {
+        while (chunkEnd != null && ObjectUtils.compare(chunkEnd, max, collationType) <= 0) {
             // we start from [null, min + chunk_size) and avoid [null, min)
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
             // may sleep a while to avoid DDOS on MySQL server
             maySleep(count++, tableId);
             chunkStart = chunkEnd;
-            chunkEnd = nextChunkEnd(jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize);
+            chunkEnd = nextChunkEnd(jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize, collationType);
         }
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));
@@ -289,7 +303,7 @@ class ChunkSplitter {
             TableId tableId,
             String splitColumnName,
             Object max,
-            int chunkSize)
+            int chunkSize, CollationType collationType)
             throws SQLException {
         // chunk end might be null when max values are removed
         Object chunkEnd =
@@ -299,7 +313,7 @@ class ChunkSplitter {
             // should query the next one larger than chunkEnd
             chunkEnd = queryMin(jdbc, tableId, splitColumnName, chunkEnd);
         }
-        if (ObjectUtils.compare(chunkEnd, max) >= 0) {
+        if (ObjectUtils.compare(chunkEnd, max, collationType) >= 0) {
             return null;
         } else {
             return chunkEnd;

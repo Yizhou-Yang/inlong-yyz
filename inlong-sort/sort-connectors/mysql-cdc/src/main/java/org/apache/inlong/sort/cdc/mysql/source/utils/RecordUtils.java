@@ -19,6 +19,7 @@ package org.apache.inlong.sort.cdc.mysql.source.utils;
 
 import org.apache.inlong.sort.cdc.mysql.debezium.dispatcher.SignalEventDispatcher;
 import org.apache.inlong.sort.cdc.mysql.debezium.reader.DebeziumReader;
+import org.apache.inlong.sort.cdc.mysql.source.assigners.ChunkSplitter;
 import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffset;
 import org.apache.inlong.sort.cdc.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.inlong.sort.cdc.mysql.source.split.MySqlSnapshotSplit;
@@ -56,6 +57,7 @@ import static org.apache.inlong.sort.cdc.mysql.debezium.dispatcher.SignalEventDi
 import static org.apache.inlong.sort.cdc.mysql.debezium.dispatcher.SignalEventDispatcher.SPLIT_ID_KEY;
 import static org.apache.inlong.sort.cdc.mysql.debezium.dispatcher.SignalEventDispatcher.TABLE_NAME;
 import static org.apache.inlong.sort.cdc.mysql.debezium.dispatcher.SignalEventDispatcher.WATERMARK_KIND;
+import static org.apache.inlong.sort.cdc.mysql.source.assigners.ChunkSplitter.CollationType.CASE_INSENSITIVE;
 
 /**
  * Utility class to deal record.
@@ -92,7 +94,8 @@ public class RecordUtils {
     public static List<SourceRecord> normalizedSplitRecords(
             MySqlSnapshotSplit snapshotSplit,
             List<SourceRecord> sourceRecords,
-            SchemaNameAdjuster nameAdjuster) {
+            SchemaNameAdjuster nameAdjuster,
+            Map<TableId, ChunkSplitter.CollationType> collationTypeMap) {
         List<SourceRecord> normalizedRecords = new ArrayList<>();
         Map<Struct, SourceRecord> snapshotRecordsWithKey = new HashMap<>();
         List<SourceRecord> snapshotRecordsWithoutKey = new ArrayList<>();
@@ -130,7 +133,8 @@ public class RecordUtils {
                         Object[] key =
                                 getSplitKey(snapshotSplit.getSplitKeyType(), binlog, nameAdjuster);
                         if (splitKeyRangeContains(
-                                key, snapshotSplit.getSplitStart(), snapshotSplit.getSplitEnd())) {
+                                key, snapshotSplit.getSplitStart(), snapshotSplit.getSplitEnd(),
+                                collationTypeMap.get(getTableId(binlog)))) {
                             binlogRecords.add(binlog);
                         }
                     }
@@ -417,7 +421,8 @@ public class RecordUtils {
      * Returns the specific key contains in the split key range or not.
      */
     public static boolean splitKeyRangeContains(
-            Object[] key, Object[] splitKeyStart, Object[] splitKeyEnd) {
+            Object[] key, Object[] splitKeyStart, Object[] splitKeyEnd,
+            ChunkSplitter.CollationType collationType) {
         // for all range
         if (splitKeyStart == null && splitKeyEnd == null) {
             return true;
@@ -426,22 +431,22 @@ public class RecordUtils {
         if (splitKeyStart == null) {
             int[] upperBoundRes = new int[key.length];
             for (int i = 0; i < key.length; i++) {
-                upperBoundRes[i] = compareObjects(key[i], splitKeyEnd[i]);
+                upperBoundRes[i] = compareObjects(key[i], splitKeyEnd[i], collationType);
             }
             return Arrays.stream(upperBoundRes).anyMatch(value -> value < 0)
                     && Arrays.stream(upperBoundRes).allMatch(value -> value <= 0);
         } else if (splitKeyEnd == null) {
             int[] lowerBoundRes = new int[key.length];
             for (int i = 0; i < key.length; i++) {
-                lowerBoundRes[i] = compareObjects(key[i], splitKeyStart[i]);
+                lowerBoundRes[i] = compareObjects(key[i], splitKeyStart[i], collationType);
             }
             return Arrays.stream(lowerBoundRes).allMatch(value -> value >= 0);
         } else {
             int[] lowerBoundRes = new int[key.length];
             int[] upperBoundRes = new int[key.length];
             for (int i = 0; i < key.length; i++) {
-                lowerBoundRes[i] = compareObjects(key[i], splitKeyStart[i]);
-                upperBoundRes[i] = compareObjects(key[i], splitKeyEnd[i]);
+                lowerBoundRes[i] = compareObjects(key[i], splitKeyStart[i], collationType);
+                upperBoundRes[i] = compareObjects(key[i], splitKeyEnd[i], collationType);
             }
             return Arrays.stream(lowerBoundRes).anyMatch(value -> value >= 0)
                     && (Arrays.stream(upperBoundRes).anyMatch(value -> value < 0)
@@ -457,7 +462,8 @@ public class RecordUtils {
      * @return A split which contain the specific key.
      */
     public static FinishedSnapshotSplitInfo getSplitInfoByBinarySearch(
-            List<FinishedSnapshotSplitInfo> splitInfos, Object[] target) {
+            List<FinishedSnapshotSplitInfo> splitInfos, Object[] target,
+            ChunkSplitter.CollationType collationType) {
         int left = 0;
         int right = splitInfos.size() - 1;
 
@@ -468,9 +474,9 @@ public class RecordUtils {
             Object[] splitStart = splitInfo.getSplitStart();
             Object[] splitEnd = splitInfo.getSplitEnd();
 
-            if (splitKeyRangeContains(target, splitStart, splitEnd)) {
+            if (splitKeyRangeContains(target, splitStart, splitEnd, collationType)) {
                 return splitInfo;
-            } else if (splitStart != null && isLessThanUpperBoundary(target, splitStart)) {
+            } else if (splitStart != null && isLessThanUpperBoundary(target, splitStart, collationType)) {
                 right = mid - 1;
             } else {
                 left = mid + 1;
@@ -480,16 +486,24 @@ public class RecordUtils {
         return null;
     }
 
-    public static boolean isLessThanUpperBoundary(Object[] key, Object[] upperBoundary) {
+    public static boolean isLessThanUpperBoundary(Object[] key, Object[] upperBoundary,
+            ChunkSplitter.CollationType collationType) {
         int[] upperBoundRes = new int[key.length];
         for (int i = 0; i < key.length; i++) {
-            upperBoundRes[i] = compareObjects(key[i], upperBoundary[i]);
+            upperBoundRes[i] = compareObjects(key[i], upperBoundary[i], collationType);
         }
         return Arrays.stream(upperBoundRes).allMatch(value -> value < 0);
     }
 
-    private static int compareObjects(Object o1, Object o2) {
+    private static int compareObjects(Object o1, Object o2, ChunkSplitter.CollationType collationType) {
+        assert collationType != null;
         if (o1 instanceof Comparable && o1.getClass().equals(o2.getClass())) {
+            if (collationType == CASE_INSENSITIVE // Fix potential imbalanced chunks for VARCHAR
+                    && o1 instanceof String
+                    && o2 instanceof String) {
+                o1 = ((String) o1).toUpperCase();
+                o2 = ((String) o2).toUpperCase();
+            }
             return ((Comparable) o1).compareTo(o2);
         } else {
             return o1.toString().compareTo(o2.toString());
@@ -525,5 +539,44 @@ public class RecordUtils {
 
     public static TableId getTableId(String dbName, String tableName) {
         return new TableId(dbName, null, tableName);
+    }
+
+    public static TableId retrieveTableId(SourceRecord sourceRecord) {
+        if (sourceRecord.topic().contains(".")) {
+            return retrieveTableIdFromTopic(sourceRecord);
+        } else {
+            return retrieveTableIdFromKey(sourceRecord);
+        }
+    }
+
+    // Retrieve TableId from topic string like `mysql_binlog_source.Database.Table`
+    private static TableId retrieveTableIdFromTopic(SourceRecord sourceRecord) {
+        String[] topicParts = sourceRecord.topic().split("\\.");
+        if (topicParts.length != 3) {
+            throw new IllegalArgumentException("Illegal topic for sourceRecord " + sourceRecord);
+        }
+        return new TableId(topicParts[1], null, topicParts[2]);
+    }
+
+    // Retrieve TableId from key string like `CaseInsensitive.Partition_Sample:0`
+    private static TableId retrieveTableIdFromKey(SourceRecord sourceRecord) {
+        Object key = sourceRecord.key();
+        if (!(key instanceof Struct)) {
+            throw new IllegalArgumentException(
+                    "Unsupported sourceRecord key type " + key.getClass().getName());
+        }
+
+        String splitId = ((Struct) key).get("split_id").toString();
+        String[] splitIdParts = splitId.split("\\.");
+        if (splitIdParts.length != 2) {
+            throw new IllegalArgumentException("Illegal split_id for sourceRecord " + sourceRecord);
+        }
+        String database = splitIdParts[0];
+        splitIdParts = splitIdParts[1].split(":");
+        if (splitIdParts.length != 2) {
+            throw new IllegalArgumentException("Illegal split_id for sourceRecord " + sourceRecord);
+        }
+
+        return new TableId(database, null, splitIdParts[0]);
     }
 }

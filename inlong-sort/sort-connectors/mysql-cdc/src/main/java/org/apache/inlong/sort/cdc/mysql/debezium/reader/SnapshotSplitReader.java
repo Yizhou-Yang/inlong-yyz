@@ -27,17 +27,21 @@ import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.spi.SnapshotResult;
 import io.debezium.pipeline.spi.SnapshotResult.SnapshotResultStatus;
+import io.debezium.relational.TableId;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.inlong.sort.cdc.mysql.debezium.dispatcher.SignalEventDispatcher;
 import org.apache.inlong.sort.cdc.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import org.apache.inlong.sort.cdc.mysql.debezium.task.MySqlSnapshotSplitReadTask;
 import org.apache.inlong.sort.cdc.mysql.debezium.task.context.StatefulTaskContext;
+import org.apache.inlong.sort.cdc.mysql.source.assigners.ChunkSplitter;
 import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffset;
 import org.apache.inlong.sort.cdc.mysql.source.split.MySqlBinlogSplit;
 import org.apache.inlong.sort.cdc.mysql.source.split.MySqlSnapshotSplit;
 import org.apache.inlong.sort.cdc.mysql.source.split.MySqlSplit;
+import org.apache.inlong.sort.cdc.mysql.source.utils.ChunkUtils;
 import org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -45,14 +49,17 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.normalizedSplitRecords;
+import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.retrieveTableId;
 
 /**
  * A snapshot reader that reads data from Table in split level, the split is assigned by primary key
@@ -72,6 +79,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
     private MySqlSnapshotSplitReadTask splitSnapshotReadTask;
     private MySqlSnapshotSplit currentSnapshotSplit;
     private SchemaNameAdjuster nameAdjuster;
+    private final Map<TableId, ChunkSplitter.CollationType> collationTypeMap;
 
     public SnapshotSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
         this.statefulTaskContext = statefulTaskContext;
@@ -81,6 +89,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         this.currentTaskRunning = false;
         this.hasNextElement = new AtomicBoolean(false);
         this.reachEnd = new AtomicBoolean(false);
+        this.collationTypeMap = new HashMap<>();
     }
 
     @Override
@@ -237,7 +246,27 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                 checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
                 for (DataChangeEvent event : batch) {
-                    sourceRecords.add(event.getRecord());
+                    SourceRecord sourceRecord = event.getRecord();
+                    sourceRecords.add(sourceRecord);
+
+                    try {
+                        TableId tableId = retrieveTableId(sourceRecord);
+                        RowType splitKeyType =
+                                ChunkUtils.getSplitType(
+                                        statefulTaskContext.getDatabaseSchema().tableFor(tableId));
+                        if (!collationTypeMap.containsKey(tableId)) {
+                            collationTypeMap.put(
+                                    tableId,
+                                    BinlogSplitReader.getCollationType(
+                                            statefulTaskContext.getSourceConfig(),
+                                            tableId,
+                                            splitKeyType));
+                        }
+                    } catch (Exception e) {
+                        // Ignore invalid topic data like ' __debezium-heartbeat.mysql_binlog_source'
+                        LOG.debug("Cannot retrieve table id from source record {}, skip.", sourceRecord, e);
+                    }
+
                     if (RecordUtils.isEndWatermarkEvent(event.getRecord())) {
                         reachBinlogEnd = true;
                         break;
@@ -246,7 +275,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
             }
             // snapshot split return its data once
             hasNextElement.set(false);
-            return normalizedSplitRecords(currentSnapshotSplit, sourceRecords, nameAdjuster)
+            return normalizedSplitRecords(currentSnapshotSplit, sourceRecords, nameAdjuster, collationTypeMap)
                     .iterator();
         }
         // the data has been polled, no more data

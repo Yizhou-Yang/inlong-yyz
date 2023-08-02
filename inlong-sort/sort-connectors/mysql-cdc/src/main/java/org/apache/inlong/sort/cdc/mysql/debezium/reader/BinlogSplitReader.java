@@ -19,9 +19,17 @@ package org.apache.inlong.sort.cdc.mysql.debezium.reader;
 
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventType;
+
+import java.sql.SQLException;
 import java.util.function.Predicate;
+
+import io.debezium.jdbc.JdbcConnection;
+import org.apache.flink.table.types.logical.VarCharType;
+import org.apache.inlong.sort.cdc.mysql.debezium.DebeziumUtils;
 import org.apache.inlong.sort.cdc.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import org.apache.inlong.sort.cdc.mysql.debezium.task.context.StatefulTaskContext;
+import org.apache.inlong.sort.cdc.mysql.source.assigners.ChunkSplitter;
+import org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceConfig;
 import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffset;
 import org.apache.inlong.sort.cdc.mysql.source.offset.BinlogOffsetKind;
 import org.apache.inlong.sort.cdc.mysql.source.split.FinishedSnapshotSplitInfo;
@@ -30,8 +38,6 @@ import org.apache.inlong.sort.cdc.mysql.source.split.MySqlSplit;
 import org.apache.inlong.sort.cdc.mysql.source.utils.ChunkUtils;
 import org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils;
 
-import com.github.shyiko.mysql.binlog.event.Event;
-import com.github.shyiko.mysql.binlog.event.EventType;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
@@ -56,13 +62,13 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
-import java.util.function.Predicate;
 
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getSplitInfoByBinarySearch;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getSplitKey;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.getTableId;
 import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.isDataChangeRecord;
+import static org.apache.inlong.sort.cdc.mysql.source.utils.StatementUtils.queryCollationType;
 
 /**
  * A Debezium binlog reader implementation that also support reads binlog and filter overlapping
@@ -84,6 +90,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     // tableId -> the max splitHighWatermark
     private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
     private Tables.TableFilter capturedTableFilter;
+    private final Map<TableId, ChunkSplitter.CollationType> collationTypeMap;
 
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
         this.statefulTaskContext = statefulTaskContext;
@@ -91,6 +98,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
         this.executor = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
+        this.collationTypeMap = new HashMap<>();
     }
 
     @Override
@@ -213,15 +221,23 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                                 splitKeyType,
                                 sourceRecord,
                                 statefulTaskContext.getSchemaNameAdjuster());
+                if (!collationTypeMap.containsKey(tableId)) {
+                    collationTypeMap.put(
+                            tableId,
+                            getCollationType(
+                                    statefulTaskContext.getSourceConfig(), tableId, splitKeyType));
+                }
+
                 // currently, we only support using binary search algorithm for a single split key.
                 if (key.length == 1) {
                     FinishedSnapshotSplitInfo splitInfo = getSplitInfoByBinarySearch(
-                            finishedSplitsInfo.get(tableId), key);
+                            finishedSplitsInfo.get(tableId), key, collationTypeMap.get(tableId));
                     return splitInfo != null && position.isAfter(splitInfo.getHighWatermark());
                 }
                 for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
                     if (RecordUtils.splitKeyRangeContains(
-                            key, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
+                            key, splitInfo.getSplitStart(), splitInfo.getSplitEnd(),
+                            collationTypeMap.get(splitInfo.getTableId()))
                             && position.isAfter(splitInfo.getHighWatermark())) {
                         return true;
                     }
@@ -233,6 +249,23 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         // always send the schema change event and signal event
         // we need record them to state of Flink
         return true;
+    }
+
+    public static ChunkSplitter.CollationType getCollationType(
+            MySqlSourceConfig sourceConfig, TableId tableId, RowType splitKeyType) {
+        try (JdbcConnection connection = DebeziumUtils.openJdbcConnection(sourceConfig)) {
+            if (splitKeyType.getFieldCount() != 1) {
+                LOG.warn("Unsupported split key type count {}", splitKeyType.getFieldCount());
+                return ChunkSplitter.CollationType.UNDEFINED;
+            } else if (!(splitKeyType.getTypeAt(0) instanceof VarCharType)) {
+                return ChunkSplitter.CollationType.UNDEFINED;
+            }
+            return queryCollationType(
+                    connection, tableId, splitKeyType.getFields().get(0).getName(), LOG);
+        } catch (SQLException ex) {
+            LOG.warn("Unexpected error while connecting to MySQL", ex);
+            return ChunkSplitter.CollationType.UNDEFINED;
+        }
     }
 
     private boolean hasEnterPureBinlogPhase(TableId tableId, BinlogOffset position) {

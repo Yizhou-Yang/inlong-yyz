@@ -19,7 +19,10 @@ package org.apache.inlong.sort.cdc.mysql.source.utils;
 
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.inlong.sort.cdc.mysql.source.assigners.ChunkSplitter;
+import org.slf4j.Logger;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -345,5 +348,60 @@ public class StatementUtils {
 
     private static String quotedTableIdString(TableId tableId) {
         return tableId.toQuotedString('`');
+    }
+
+    public static ChunkSplitter.CollationType queryCollationType(
+            JdbcConnection connection, TableId tableId, String splitColumn, Logger log) {
+        // SHOW FULL COLUMNS FROM CaseInsensitive.Partition_Sample WHERE `Field` = 'k';
+        String query =
+                String.format(
+                        "SHOW FULL COLUMNS FROM %s WHERE `Field` = '%s'",
+                        tableId.toQuotedString('`'), splitColumn);
+        try {
+            String collation =
+                    connection.queryAndMap(
+                            query,
+                            rs -> {
+                                if (rs.next()) {
+                                    return rs.getString(3);
+                                } else {
+                                    return "";
+                                }
+                            });
+
+            if (StringUtils.isEmpty(collation)) {
+                return ChunkSplitter.CollationType.UNDEFINED;
+            }
+
+            collation = collation.toLowerCase(); // preventive measure
+
+            if (collation.endsWith("_cs") || collation.endsWith("_bin")) {
+                log.info(
+                        "Chunk splitting key `{}` of table `{}` is case-sensitive.",
+                        splitColumn,
+                        tableId.table());
+                return ChunkSplitter.CollationType.CASE_SENSITIVE;
+            } else if (collation.endsWith("_ci")) {
+                log.info(
+                        "Chunk splitting key `{}` of table `{}` is case-insensitive.",
+                        splitColumn,
+                        tableId.table());
+                return ChunkSplitter.CollationType.CASE_INSENSITIVE;
+            } else {
+                log.warn(
+                        "Unknown collation '{}' for chunk splitting key `{}` of table `{}`.",
+                        collation,
+                        splitColumn,
+                        tableId.table());
+                return ChunkSplitter.CollationType.UNDEFINED;
+            }
+        } catch (SQLException e) {
+            log.warn(
+                    "Unable to get collation for column `{}` in table `{}`.",
+                    splitColumn,
+                    tableId.table(),
+                    e);
+            return ChunkSplitter.CollationType.UNDEFINED;
+        }
     }
 }

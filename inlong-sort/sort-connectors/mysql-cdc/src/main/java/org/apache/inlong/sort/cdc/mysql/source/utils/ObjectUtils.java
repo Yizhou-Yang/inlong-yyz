@@ -17,8 +17,12 @@
 
 package org.apache.inlong.sort.cdc.mysql.source.utils;
 
+import org.apache.inlong.sort.cdc.mysql.source.assigners.ChunkSplitter;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
+
+import static org.apache.inlong.sort.cdc.mysql.source.assigners.ChunkSplitter.CollationType.CASE_INSENSITIVE;
 
 /** Utilities for operation on {@link Object}. */
 public class ObjectUtils {
@@ -81,8 +85,14 @@ public class ObjectUtils {
      *     not <i>mutually comparable</i> (for example, strings and integers).
      */
     @SuppressWarnings("unchecked")
-    public static int compare(Object obj1, Object obj2) {
+    public static int compare(Object obj1, Object obj2, ChunkSplitter.CollationType collationType) {
         if (obj1 instanceof Comparable && obj1.getClass().equals(obj2.getClass())) {
+            if (collationType == CASE_INSENSITIVE // Fix potential imbalanced chunks for VARCHAR
+                    && obj1 instanceof String
+                    && obj2 instanceof String) {
+                obj1 = ((String) obj1).toUpperCase();
+                obj2 = ((String) obj2).toUpperCase();
+            }
             return ((Comparable) obj1).compareTo(obj2);
         } else {
             return obj1.toString().compareTo(obj2.toString());
