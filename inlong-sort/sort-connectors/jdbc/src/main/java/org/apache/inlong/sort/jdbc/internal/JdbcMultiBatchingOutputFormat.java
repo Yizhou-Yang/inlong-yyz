@@ -40,11 +40,13 @@ import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.runtime.util.ExecutorThreadFactory;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
+import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
+import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
@@ -66,9 +68,10 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -79,7 +82,6 @@ import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalQueries;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -388,7 +390,6 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     public final synchronized void writeRecord(In row) throws IOException {
         checkFlushException();
         jsonDynamicSchemaFormat = (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(sinkMultipleFormat);
-
         if (row instanceof RowData) {
             RowData rowData = (RowData) row;
             JsonNode rootNode = jsonDynamicSchemaFormat.deserialize(rowData.getBinary(0));
@@ -414,7 +415,6 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 LOG.info("Cal tableIdentifier get Exception:", e);
                 return;
             }
-
             GenericRowData record;
             try {
                 RowType rowType = jsonDynamicSchemaFormat.extractSchema(rootNode);
@@ -431,15 +431,13 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 }
                 JsonNode physicalData = jsonDynamicSchemaFormat.getPhysicalData(rootNode);
                 List<Map<String, String>> physicalDataList = jsonDynamicSchemaFormat.jsonNode2Map(physicalData);
-                record = generateRecord(rowType, physicalDataList.get(0));
+                record = generateRecord(tableIdentifier, rowType, physicalDataList.get(0));
                 List<RowKind> rowKinds = jsonDynamicSchemaFormat
                         .opType2RowKind(jsonDynamicSchemaFormat.getOpType(rootNode));
                 record.setRowKind(rowKinds.get(rowKinds.size() - 1));
             } catch (Exception e) {
-                LOG.warn("Extract schema failed", e);
-                return;
+                throw new RuntimeException("Generate record failed", e);
             }
-
             try {
                 recordsMap.computeIfAbsent(tableIdentifier, k -> new ArrayList<>())
                         .add(record);
@@ -509,7 +507,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     /**
      * Convert fieldMap(data) to GenericRowData with rowType(schema)
      */
-    protected GenericRowData generateRecord(RowType rowType, Map<String, String> fieldMap) {
+    protected GenericRowData generateRecord(String tableIdentifier, RowType rowType, Map<String, String> fieldMap) {
         String[] fieldNames = rowType.getFieldNames().toArray(new String[0]);
         int arity = fieldNames.length;
         GenericRowData record = new GenericRowData(arity);
@@ -519,57 +517,79 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             if (StringUtils.isBlank(fieldValue)) {
                 record.setField(i, null);
             } else {
-                switch (rowType.getFields().get(i).getType().getTypeRoot()) {
-                    case BIGINT:
-                        record.setField(i, Long.valueOf(fieldValue));
-                        break;
-                    case BOOLEAN:
-                        record.setField(i, Boolean.valueOf(fieldValue));
-                        break;
-                    case DOUBLE:
-                    case DECIMAL:
-                        record.setField(i, Double.valueOf(fieldValue));
-                        break;
-                    case TIME_WITHOUT_TIME_ZONE:
-                    case INTERVAL_DAY_TIME:
-                        TimestampData timestampData = TimestampData.fromEpochMillis(Long.valueOf(fieldValue));
-                        record.setField(i, timestampData);
-                        break;
-                    case BINARY:
-                        record.setField(i, Arrays.toString(fieldValue.getBytes(StandardCharsets.UTF_8)));
-                        break;
-
-                    // support mysql
-                    case INTEGER:
-                        record.setField(i, Integer.valueOf(fieldValue));
-                        break;
-                    case SMALLINT:
-                        record.setField(i, Short.valueOf(fieldValue));
-                        break;
-                    case TINYINT:
-                        record.setField(i, Byte.valueOf(fieldValue));
-                        break;
-                    case FLOAT:
-                        record.setField(i, Float.valueOf(fieldValue));
-                        break;
-                    case DATE:
-                        record.setField(i, (int) LocalDate.parse(fieldValue).toEpochDay());
-                        break;
-                    case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                        TemporalAccessor parsedTimestampWithLocalZone =
-                                SQL_TIMESTAMP_WITH_LOCAL_TIMEZONE_FORMAT.parse(fieldValue);
-                        LocalTime localTime = parsedTimestampWithLocalZone.query(TemporalQueries.localTime());
-                        LocalDate localDate = parsedTimestampWithLocalZone.query(TemporalQueries.localDate());
-                        record.setField(i, TimestampData.fromInstant(LocalDateTime.of(localDate, localTime)
-                                .toInstant(ZoneOffset.UTC)));
-                        break;
-                    case TIMESTAMP_WITHOUT_TIME_ZONE:
-                        fieldValue = fieldValue.replace("T", " ");
-                        TimestampData timestamp = TimestampData.fromTimestamp(Timestamp.valueOf(fieldValue));
-                        record.setField(i, timestamp);
-                        break;
-                    default:
-                        record.setField(i, StringData.fromString(fieldValue));
+                try {
+                    switch (rowType.getFields().get(i).getType().getTypeRoot()) {
+                        case BIGINT:
+                            record.setField(i, Long.valueOf(fieldValue));
+                            break;
+                        case BOOLEAN:
+                            record.setField(i, Boolean.valueOf(fieldValue));
+                            break;
+                        case DOUBLE:
+                            record.setField(i, Double.valueOf(fieldValue));
+                            break;
+                        case DECIMAL:
+                            DecimalType decimalType = (DecimalType) rowType.getFields().get(i).getType();
+                            record.setField(i, DecimalData.fromBigDecimal(new BigDecimal(fieldValue),
+                                    decimalType.getPrecision(), decimalType.getScale()));
+                            break;
+                        case TIME_WITHOUT_TIME_ZONE:
+                        case INTERVAL_DAY_TIME:
+                            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+                            LocalTime time = LocalTime.parse(fieldValue, formatter);
+                            LocalDateTime dateTime = LocalDateTime.of(LocalDate.now(), time);
+                            TimestampData timestampData = TimestampData.fromInstant(dateTime.toInstant(ZoneOffset.UTC));
+                            record.setField(i, timestampData);
+                            break;
+                        case VARBINARY:
+                        case BINARY:
+                            record.setField(i, fieldValue.getBytes(StandardCharsets.UTF_8));
+                            break;
+                        // support mysql
+                        case INTEGER:
+                            record.setField(i, Integer.valueOf(fieldValue));
+                            break;
+                        case SMALLINT:
+                            record.setField(i, Short.valueOf(fieldValue));
+                            break;
+                        case TINYINT:
+                            record.setField(i, Byte.valueOf(fieldValue));
+                            break;
+                        case FLOAT:
+                            record.setField(i, Float.valueOf(fieldValue));
+                            break;
+                        case DATE:
+                            record.setField(i, (int) LocalDate.parse(fieldValue).toEpochDay());
+                            break;
+                        case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                            TemporalAccessor parsedTimestampWithLocalZone =
+                                    SQL_TIMESTAMP_WITH_LOCAL_TIMEZONE_FORMAT.parse(fieldValue);
+                            LocalTime localTime = parsedTimestampWithLocalZone.query(TemporalQueries.localTime());
+                            LocalDate localDate = parsedTimestampWithLocalZone.query(TemporalQueries.localDate());
+                            record.setField(i, TimestampData.fromInstant(LocalDateTime.of(localDate, localTime)
+                                    .toInstant(ZoneOffset.UTC)));
+                            break;
+                        case TIMESTAMP_WITHOUT_TIME_ZONE:
+                            TimestampData timestamp;
+                            try {
+                                timestamp = TimestampData.fromLocalDateTime(
+                                        LocalDateTime.parse(fieldValue, DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                            } catch (Exception ex) {
+                                LOG.warn(
+                                        "Parse value: {} by timestamp without time zone failed for field:{} of table:{}",
+                                        fieldValue, fieldName, tableIdentifier, ex);
+                                timestamp = TimestampData.fromInstant(Instant.parse(fieldValue));
+                            }
+                            record.setField(i, timestamp);
+                            break;
+                        default:
+                            record.setField(i, StringData.fromString(fieldValue));
+                    }
+                } catch (Exception e) {
+                    throw new IllegalArgumentException(
+                            String.format("Parse value: %s failed for field:%s of table:%s",
+                                    fieldName, fieldValue, tableIdentifier),
+                            e);
                 }
             }
         }

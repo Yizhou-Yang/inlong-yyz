@@ -122,6 +122,14 @@ public class PostgresDialect implements JdbcDataSourceDialect {
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
             return TableDiscoveryUtils.listTables(
                     // there is always a single database provided
+                    // A database is the highest level of organizational structure in the PostgreSQL database management
+                    // system.
+                    // A database contains one or more schemas.
+                    // Data within a database is isolated, and tables, views, and other objects from different databases
+                    // cannot directly access each other.
+                    // When you connect to PostgreSQL, you need to specify the database you want to connect to. Queries
+                    // running in one database cannot directly access data in another database.
+                    // Databases are created and dropped using the CREATE DATABASE and DROP DATABASE commands.
                     sourceConfig.getDatabaseList().get(0),
                     jdbc,
                     ((PostgresSourceConfig) sourceConfig).getTableFilters());

@@ -153,7 +153,7 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
                     .put(java.sql.Types.OTHER, new VarCharType())
                     .build();
 
-    public final ObjectMapper objectMapper = new ObjectMapper();
+    public static final ObjectMapper objectMapper = new ObjectMapper();
     protected final JsonToRowDataConverters rowDataConverters;
     protected final boolean adaptSparkEngine;
 
@@ -345,7 +345,10 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
             Entry<String, JsonNode> entry = schemaFields.next();
             String name = entry.getKey();
             LogicalType type = sqlType2FlinkType(entry.getValue().asInt());
-            String dialectType = dialectSchema.get(name) != null ? dialectSchema.get(name).asText() : null;
+            String dialectType = null;
+            if (dialectSchema != null && dialectSchema.get(name) != null) {
+                dialectType = dialectSchema.get(name).asText();
+            }
             type = handleDialectSqlType(type, dialectType);
             if (pkNames.contains(name)) {
                 type = type.copy(false);
