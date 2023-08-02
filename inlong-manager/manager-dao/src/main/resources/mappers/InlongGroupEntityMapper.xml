@@ -228,13 +228,22 @@
         from inlong_group
         where is_deleted = 0
     </select>
-    <select id="selectDeletedGroupIds" resultType="java.lang.String">
+    <select id="selectDeletedGroupIdsWithTimeBefore" resultType="java.lang.String">
         select inlong_group_id
         from inlong_group
         where modify_time &lt;= #{timeBefore, jdbcType=TIMESTAMP}
         group by inlong_group_id
         having min(is_deleted) > 0
         limit #{limit, jdbcType=INTEGER}
+    </select>
+
+    <select id="selectDeletedGroupIdsWithTimeAfter" resultType="java.lang.String">
+        select inlong_group_id
+        from inlong_group
+        where modify_time >= #{timeAfter, jdbcType=TIMESTAMP}
+        group by inlong_group_id
+        having min(is_deleted) > 0
+            limit #{limit, jdbcType=INTEGER}
     </select>
 
     <update id="updateByPrimaryKey" parameterType="org.apache.inlong.manager.dao.entity.InlongGroupEntity">

@@ -183,6 +183,15 @@ public interface StreamSourceEntityMapper {
             @Param("operator") String operator);
 
     /**
+     * Logical delete stream source by agentIp, change status at same time.
+     *
+     * @param agentIp
+     * @param status
+     */
+    void logicalDeleteByAgentIp(@Param("agentIp") String agentIp, @Param("status") Integer status,
+            @Param("targetStatus") Integer targetStatus);
+
+    /**
      * Physical delete stream sources by group id and stream id
      */
     int deleteByRelatedId(@Param("groupId") String groupId, @Param("streamId") String streamId);

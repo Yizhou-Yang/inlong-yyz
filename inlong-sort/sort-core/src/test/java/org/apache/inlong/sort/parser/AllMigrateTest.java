@@ -22,6 +22,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.inlong.common.enums.MetaField;
+import org.apache.inlong.sort.formats.common.BooleanFormatInfo;
 import org.apache.inlong.sort.formats.common.StringFormatInfo;
 import org.apache.inlong.sort.formats.common.VarBinaryFormatInfo;
 import org.apache.inlong.sort.parser.impl.FlinkSqlParser;
@@ -58,13 +59,33 @@ public class AllMigrateTest {
         option.put("include-schema-change", "true");
         option.put("gh-ost.ddl.change", "true");
         List<String> tables = new ArrayList(10);
-        tables.add("test.*");
+        tables.add("test.fff");
         List<FieldInfo> fields = Collections.singletonList(
                 new MetaFieldInfo("data", MetaField.DATA));
 
         return new MySqlExtractNode("1", "mysql_input", fields,
                 null, option, null,
                 tables, "localhost", "root", "inlong",
+                "test", null, null, true, null,
+                ExtractMode.CDC, null, null);
+    }
+
+    private MySqlExtractNode buildSingleNodeExtractNode() {
+
+        Map<String, String> option = new HashMap<>();
+        option.put("append-mode", "false");
+        option.put("debezium.max.queue.size", "2222");
+        option.put("scan.incremental.snapshot.chunk.size", "3");
+        option.put("include-incremental", "true");
+        List<String> tables = new ArrayList(10);
+        tables.add("test.fff");
+        List<FieldInfo> fields = Arrays.asList(
+                new FieldInfo("id", new StringFormatInfo()),
+                new MetaFieldInfo("metaIncremental", MetaField.INCREMENTAL));
+
+        return new MySqlExtractNode("1", "mysql_input", fields,
+                null, option, null,
+                tables, "localhost", "root", "Eminem@123456",
                 "test", null, null, true, null,
                 ExtractMode.CDC, null, null);
     }
@@ -127,6 +148,22 @@ public class AllMigrateTest {
                 null, null);
     }
 
+    private KafkaLoadNode buildOneNodeKafkaNode() {
+        List<FieldInfo> fields = Arrays.asList(
+                new FieldInfo("id", new StringFormatInfo()),
+                new FieldInfo("metaIncremental", new BooleanFormatInfo()));
+        List<FieldRelation> relations = Arrays.asList(
+                new FieldRelation(new FieldInfo("id", new StringFormatInfo()),
+                        new FieldInfo("id", new StringFormatInfo())),
+                new FieldRelation(new FieldInfo("metaIncremental", new StringFormatInfo()),
+                        new FieldInfo("metaIncremental", new BooleanFormatInfo())));
+        CsvFormat csvFormat = new CsvFormat();
+        csvFormat.setDisableQuoteCharacter(true);
+        return new KafkaLoadNode("2", "kafka_output", fields, relations, null, null,
+                "topic", "localhost:9092",
+                csvFormat, null, null, null);
+    }
+
     private NodeRelation buildNodeRelation(List<Node> inputs, List<Node> outputs) {
         List<String> inputIds = inputs.stream().map(Node::getId).collect(Collectors.toList());
         List<String> outputIds = outputs.stream().map(Node::getId).collect(Collectors.toList());
@@ -151,6 +188,28 @@ public class AllMigrateTest {
         StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env, settings);
         Node inputNode = buildAllMigrateExtractNode();
         Node outputNode = buildAllMigrateKafkaNode();
+        StreamInfo streamInfo = new StreamInfo("1", Arrays.asList(inputNode, outputNode),
+                Collections.singletonList(buildNodeRelation(Collections.singletonList(inputNode),
+                        Collections.singletonList(outputNode))));
+        GroupInfo groupInfo = new GroupInfo("1", Collections.singletonList(streamInfo));
+        FlinkSqlParser parser = FlinkSqlParser.getInstance(tableEnv, groupInfo);
+        ParseResult result = parser.parse();
+        Assert.assertTrue(result.tryExecute());
+    }
+
+    @Test
+    public void testOneNode() throws Exception {
+        EnvironmentSettings settings = EnvironmentSettings
+                .newInstance()
+                .useBlinkPlanner()
+                .inStreamingMode()
+                .build();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        env.enableCheckpointing(10000);
+        StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env, settings);
+        Node inputNode = buildSingleNodeExtractNode();
+        Node outputNode = buildOneNodeKafkaNode();
         StreamInfo streamInfo = new StreamInfo("1", Arrays.asList(inputNode, outputNode),
                 Collections.singletonList(buildNodeRelation(Collections.singletonList(inputNode),
                         Collections.singletonList(outputNode))));

@@ -187,11 +187,11 @@ public class IcebergSingleFileCommiter extends IcebergProcessFunction<WriteResul
                     "Flink job id parsed from checkpoint snapshot shouldn't be null or empty");
 
             // ------------------------------
-            // ↓                             ↑
+            // ↓ ↑
             // a --> a+1 --> a+2 --> ... --> a+n
             // max checkpoint id = m
             // a >= m: supplementary commit snapshot between checkpoint (`m`, `a`]
-            // a <  m: rollback to snapshot associated with checkpoint `a`
+            // a < m: rollback to snapshot associated with checkpoint `a`
             rollbackAndRecover(restoredFlinkJobId, restoredCheckpointId);
         }
     }
@@ -209,10 +209,10 @@ public class IcebergSingleFileCommiter extends IcebergProcessFunction<WriteResul
     }
 
     private void rollbackAndRecover(String restoredFlinkJobId, Long restoredCheckpointId) throws Exception {
-            // Since flink's checkpoint id will start from the max-committed-checkpoint-id + 1 in the new flink job even
-            // if it's restored from a snapshot created by another different flink job, so it's safe to assign the max
-            // committed checkpoint id from restored flink job to the current flink job.
-            this.maxCommittedCheckpointId = getMaxCommittedCheckpointId(table, restoredFlinkJobId);
+        // Since flink's checkpoint id will start from the max-committed-checkpoint-id + 1 in the new flink job even
+        // if it's restored from a snapshot created by another different flink job, so it's safe to assign the max
+        // committed checkpoint id from restored flink job to the current flink job.
+        this.maxCommittedCheckpointId = getMaxCommittedCheckpointId(table, restoredFlinkJobId);
         // Find snapshot associated with restoredCheckpointId
         long snapshotId = getSnapshotIdAssociatedWithChkId(table, restoredFlinkJobId, restoredCheckpointId);
 
@@ -221,27 +221,30 @@ public class IcebergSingleFileCommiter extends IcebergProcessFunction<WriteResul
         if (restoredCheckpointId < maxCommittedCheckpointId) {
             if (snapshotId != -1) {
                 LOG.info("Rollback committed snapshot to {}", snapshotId);
-                rollback(snapshotId);  // TODO:what if rollback throw Exception
+                rollback(snapshotId); // TODO:what if rollback throw Exception
             } else {
                 long minUncommittedCheckpointId = dataFilesPerCheckpoint.keySet().stream().min(Long::compareTo).get();
                 if (maxCommittedCheckpointId >= minUncommittedCheckpointId) {
-                    LOG.warn("It maybe has some repeat data between chk[{}, {}]", minUncommittedCheckpointId, maxCommittedCheckpointId);
-            }
-                
+                    LOG.warn("It maybe has some repeat data between chk[{}, {}]", minUncommittedCheckpointId,
+                            maxCommittedCheckpointId);
+                }
+
                 // should recover all manifest that has not been deleted. Not deleted mean it may not be committed.
-                long uncommittedChkId = findLastCommittedManifest(dataFilesPerCheckpoint.headMap(maxCommittedCheckpointId, true), table.io());
+                long uncommittedChkId = findLastCommittedManifest(
+                        dataFilesPerCheckpoint.headMap(maxCommittedCheckpointId, true), table.io());
                 LOG.info("Snapshot has been expired. Recover all uncommitted snapshot between chk[{}, {}]. "
-                            + "maxCommittedCheckpointId is {}, minUncommittedCheckpointId is {}.",
-                            uncommittedChkId, restoredCheckpointId,
-                            maxCommittedCheckpointId, minUncommittedCheckpointId);
+                        + "maxCommittedCheckpointId is {}, minUncommittedCheckpointId is {}.",
+                        uncommittedChkId, restoredCheckpointId,
+                        maxCommittedCheckpointId, minUncommittedCheckpointId);
                 if (uncommittedChkId != -1) {
                     recover(restoredFlinkJobId, dataFilesPerCheckpoint.tailMap(uncommittedChkId, false));
                 } else {
                     recover(restoredFlinkJobId, dataFilesPerCheckpoint);
-        }
-    }
+                }
+            }
         } else {
-            LOG.info("Recover uncommitted snapshot between chk({}, {}]. ", maxCommittedCheckpointId, restoredCheckpointId);
+            LOG.info("Recover uncommitted snapshot between chk({}, {}]. ", maxCommittedCheckpointId,
+                    restoredCheckpointId);
             recover(restoredFlinkJobId, dataFilesPerCheckpoint.tailMap(maxCommittedCheckpointId, false));
         }
         dataFilesPerCheckpoint.clear();
@@ -314,6 +317,7 @@ public class IcebergSingleFileCommiter extends IcebergProcessFunction<WriteResul
             continuousEmptyCheckpoints = 0;
         }
         // remove already committed snapshot manifest info
+
         pendingMap.keySet().forEach(deltaManifestsMap::remove);
         pendingMap.clear();
 
@@ -402,7 +406,8 @@ public class IcebergSingleFileCommiter extends IcebergProcessFunction<WriteResul
 
     private void commitOperation(SnapshotUpdate<?> operation, int numDataFiles, int numDeleteFiles, String description,
             String newFlinkJobId, long checkpointId) {
-        LOG.info("Committing {} with {} data files and {} delete files to table {} with max committed checkpoint id {}.",
+        LOG.info(
+                "Committing {} with {} data files and {} delete files to table {} with max committed checkpoint id {}.",
                 description, numDataFiles, numDeleteFiles, table, checkpointId);
         operation.set(MAX_COMMITTED_CHECKPOINT_ID, Long.toString(checkpointId));
         operation.set(FLINK_JOB_ID, newFlinkJobId);
@@ -504,9 +509,9 @@ public class IcebergSingleFileCommiter extends IcebergProcessFunction<WriteResul
 
     static long findLastCommittedManifest(NavigableMap<Long, byte[]> deltaManifestsMap, FileIO io) throws IOException {
         List<Long> uncommittedChkList = deltaManifestsMap.keySet()
-            .stream()
-            .sorted((a, b) -> a < b ? 1 : ((a == b) ? 0 : -1))
-            .collect(Collectors.toList());
+                .stream()
+                .sorted((a, b) -> a < b ? 1 : ((a == b) ? 0 : -1))
+                .collect(Collectors.toList());
         long uncommittedChkId = -1;
         for (long chkId : uncommittedChkList) {
             byte[] e = deltaManifestsMap.get(chkId);

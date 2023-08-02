@@ -57,6 +57,7 @@ public class DorisDynamicTableSink implements DynamicTableSink {
     private final boolean enableSchemaChange;
     @Nullable
     private final String schemaChangePolicies;
+    private final boolean autoCreateTableWhenSnapshot;
 
     public DorisDynamicTableSink(DorisOptions options,
             DorisReadOptions readOptions,
@@ -74,7 +75,8 @@ public class DorisDynamicTableSink implements DynamicTableSink {
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
             boolean enableSchemaChange,
-            @Nullable String schemaChangePolicies) {
+            @Nullable String schemaChangePolicies,
+            boolean autoCreateTableWhenSnapshot) {
         this.options = options;
         this.readOptions = readOptions;
         this.executionOptions = executionOptions;
@@ -92,6 +94,7 @@ public class DorisDynamicTableSink implements DynamicTableSink {
         this.dirtySink = dirtySink;
         this.enableSchemaChange = enableSchemaChange;
         this.schemaChangePolicies = schemaChangePolicies;
+        this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
     }
 
     @Override
@@ -132,7 +135,8 @@ public class DorisDynamicTableSink implements DynamicTableSink {
                 .setDirtyOptions(dirtyOptions)
                 .setDirtySink(dirtySink)
                 .setEnableSchemaChange(enableSchemaChange)
-                .setSchemaChangePolicies(schemaChangePolicies);
+                .setSchemaChangePolicies(schemaChangePolicies)
+                .setAutoCreateTableWhenSnapshot(autoCreateTableWhenSnapshot);
         return SinkFunctionProvider.of(
                 new GenericDorisSinkFunction<>(builder.build()), parallelism);
     }
@@ -155,7 +159,8 @@ public class DorisDynamicTableSink implements DynamicTableSink {
                 dirtyOptions,
                 dirtySink,
                 enableSchemaChange,
-                schemaChangePolicies);
+                schemaChangePolicies,
+                autoCreateTableWhenSnapshot);
     }
 
     @Override

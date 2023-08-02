@@ -563,10 +563,10 @@ public class StreamSourceServiceImpl implements StreamSourceService {
     }
 
     @Override
-    public Boolean updateStatusWhenTimeout(Integer id, Integer targetStatus, String operator) {
-        sourceMapper.updatePreviousStatusByRelatedId(id, targetStatus);
-        LOGGER.info("success to update source previousStatus={} for id={} by {}",
-                targetStatus, id, operator);
+    public Boolean logicalDeleteByAgentIp(String agentIp, String operator) {
+        sourceMapper.logicalDeleteByAgentIp(agentIp, SourceStatus.SOURCE_DISABLE.getCode(), null);
+        LOGGER.info("success to logical delete source by agentIp={} and operator={}",
+                agentIp, operator);
         return true;
     }
 

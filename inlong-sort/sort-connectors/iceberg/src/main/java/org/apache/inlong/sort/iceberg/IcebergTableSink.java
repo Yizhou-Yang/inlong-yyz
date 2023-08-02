@@ -48,6 +48,7 @@ import java.util.Map;
 import static org.apache.inlong.sort.base.Constants.IGNORE_ALL_CHANGELOG;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_DATABASE_PATTERN;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
@@ -55,6 +56,9 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_PK_AUTO_GENERA
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_SCHEMA_UPDATE_POLICY;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TYPE_MAP_COMPATIBLE_WITH_SPARK;
+import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_ENABLE;
+import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_POLICIES;
+import static org.apache.inlong.sort.base.Constants.SWITCH_APPEND_UPSERT_ENABLE;
 import static org.apache.inlong.sort.iceberg.FlinkDynamicTableFactory.WRITE_DISTRIBUTION_MODE;
 
 /**
@@ -115,16 +119,22 @@ public class IcebergTableSink implements DynamicTableSink, SupportsPartitioning,
         List<String> equalityColumns = tableSchema.getPrimaryKey()
                 .map(UniqueConstraint::getColumns)
                 .orElseGet(ImmutableList::of);
-
+        LOG.info("equality columns {}", equalityColumns);
         final ReadableConfig tableOptions = Configuration.fromMap(catalogTable.getOptions());
         boolean multipleSink = tableOptions.get(SINK_MULTIPLE_ENABLE);
+        boolean schemaChange = tableOptions.get(SINK_SCHEMA_CHANGE_ENABLE);
+        boolean autoCreateTableWhenSnapshot = tableOptions.get(SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT);
+        String schemaChangePolicies = tableOptions.getOptional(SINK_SCHEMA_CHANGE_POLICIES).orElse(null);
+        LOG.info("policy {}", tableOptions.get(SINK_MULTIPLE_SCHEMA_UPDATE_POLICY));
         if (multipleSink) {
             return (DataStreamSinkProvider) dataStream -> FlinkSink.forRowData(dataStream)
                     .overwrite(overwrite)
                     .appendMode(tableOptions.get(IGNORE_ALL_CHANGELOG))
                     .metric(tableOptions.get(INLONG_METRIC), tableOptions.get(INLONG_AUDIT))
                     .catalogLoader(catalogLoader)
+                    .tableSchema(tableSchema)
                     .multipleSink(tableOptions.get(SINK_MULTIPLE_ENABLE))
+                    .switchAppendUpsertEnable(tableOptions.get(SWITCH_APPEND_UPSERT_ENABLE))
                     .multipleSinkOption(MultipleSinkOption.builder()
                             .withFormat(tableOptions.get(SINK_MULTIPLE_FORMAT))
                             .withSparkEngineEnable(tableOptions.get(SINK_MULTIPLE_TYPE_MAP_COMPATIBLE_WITH_SPARK))
@@ -138,6 +148,9 @@ public class IcebergTableSink implements DynamicTableSink, SupportsPartitioning,
                     .action(actionsProvider)
                     .tableOptions(tableOptions)
                     .distributionMode(DistributionMode.fromName(tableOptions.get(WRITE_DISTRIBUTION_MODE)))
+                    .enableSchemaChange(schemaChange)
+                    .schemaChangePolicies(schemaChangePolicies)
+                    .autoCreateTableWhenSnapshot(autoCreateTableWhenSnapshot)
                     .append();
         } else {
             return (DataStreamSinkProvider) dataStream -> FlinkSink.forRowData(dataStream)
@@ -152,6 +165,7 @@ public class IcebergTableSink implements DynamicTableSink, SupportsPartitioning,
                     .action(actionsProvider)
                     .tableOptions(tableOptions)
                     .distributionMode(DistributionMode.fromName(tableOptions.get(WRITE_DISTRIBUTION_MODE)))
+                    .switchAppendUpsertEnable(tableOptions.get(SWITCH_APPEND_UPSERT_ENABLE))
                     .append();
         }
     }

@@ -163,7 +163,13 @@ public enum MetaField {
     /**
      * Timestamp of the Kafka record, it is only used for Kafka.
      */
-    TIMESTAMP;
+    TIMESTAMP,
+
+    /**
+     * Determine if a data is from cdc snapshot phase or not
+     * true for increment phase, false for snapshot phase
+     */
+    INCREMENTAL;
 
     public static MetaField forName(String name) {
         for (MetaField metaField : values()) {

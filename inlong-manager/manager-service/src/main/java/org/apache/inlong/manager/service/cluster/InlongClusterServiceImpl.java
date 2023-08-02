@@ -39,6 +39,7 @@ import org.apache.inlong.manager.common.consts.InlongConstants;
 import org.apache.inlong.manager.common.enums.ClusterType;
 import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
 import org.apache.inlong.manager.common.enums.GroupStatus;
+import org.apache.inlong.manager.common.enums.SourceStatus;
 import org.apache.inlong.manager.common.enums.UserTypeEnum;
 import org.apache.inlong.manager.common.exceptions.BusinessException;
 import org.apache.inlong.manager.common.util.CommonBeanUtils;
@@ -52,6 +53,7 @@ import org.apache.inlong.manager.dao.mapper.InlongClusterNodeEntityMapper;
 import org.apache.inlong.manager.dao.mapper.InlongClusterTagEntityMapper;
 import org.apache.inlong.manager.dao.mapper.InlongGroupEntityMapper;
 import org.apache.inlong.manager.dao.mapper.InlongStreamEntityMapper;
+import org.apache.inlong.manager.dao.mapper.StreamSourceEntityMapper;
 import org.apache.inlong.manager.pojo.cluster.BindTagRequest;
 import org.apache.inlong.manager.pojo.cluster.ClusterInfo;
 import org.apache.inlong.manager.pojo.cluster.ClusterNodeRequest;
@@ -109,6 +111,8 @@ public class InlongClusterServiceImpl implements InlongClusterService {
     private InlongGroupEntityMapper groupMapper;
     @Autowired
     private InlongStreamEntityMapper streamMapper;
+    @Autowired
+    private StreamSourceEntityMapper streamSourceEntityMapper;
     @Autowired
     private InlongClusterOperatorFactory clusterOperatorFactory;
     @Autowired
@@ -1427,16 +1431,20 @@ public class InlongClusterServiceImpl implements InlongClusterService {
         clusterPageRequest.setClusterTag(agentClusterNodeRequest.getClusterTags());
         try {
             List<InlongClusterEntity> inlongClusterEntities = clusterMapper.selectByCondition(clusterPageRequest);
-            LOGGER.info("inlongClusterEntities: {}", GSON.toJson(inlongClusterEntities));
+            LOGGER.debug("inlongClusterEntities: {}", GSON.toJson(inlongClusterEntities));
             if (CollectionUtils.isNotEmpty(inlongClusterEntities)) {
                 Integer clusterId = inlongClusterEntities.get(0).getId();
                 List<DeleteAgentClusterNodeRequest> deleteAgentClusterNodeRequests =
                         agentClusterNodeRequest.getDeleteAgentClusterNodeRequests();
                 for (DeleteAgentClusterNodeRequest clusterNodeRequest : deleteAgentClusterNodeRequests) {
                     clusterNodeRequest.setParentId(clusterId);
-                    LOGGER.info("clusterNodeRequest: {}", GSON.toJson(clusterNodeRequest));
-                    clusterNodeMapper
+                    LOGGER.debug("clusterNodeRequest: {}", GSON.toJson(clusterNodeRequest));
+                    int deleteNum = clusterNodeMapper
                             .logicDeleteNodeByAgentGroup(clusterNodeRequest);
+                    if (deleteNum > 0) {
+                        streamSourceEntityMapper.logicalDeleteByAgentIp(clusterNodeRequest.getIp(),
+                                SourceStatus.SOURCE_DISABLE.getCode(), null);
+                    }
                 }
             }
         } catch (Exception e) {

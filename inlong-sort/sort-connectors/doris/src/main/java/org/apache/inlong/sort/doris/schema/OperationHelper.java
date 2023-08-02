@@ -18,12 +18,21 @@
 package org.apache.inlong.sort.doris.schema;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DecimalType;
+import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.logical.RowType.RowField;
+import org.apache.flink.table.types.logical.TimeType;
+import org.apache.flink.table.types.logical.TimestampType;
+import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
+import org.apache.flink.table.types.logical.ZonedTimestampType;
 import org.apache.flink.util.Preconditions;
 import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
+import org.apache.inlong.sort.doris.model.TableSchema;
 import org.apache.inlong.sort.protocol.ddl.Column;
 import org.apache.inlong.sort.protocol.ddl.enums.PositionType;
 import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
@@ -32,7 +41,9 @@ import org.apache.inlong.sort.protocol.ddl.operations.CreateTableOperation;
 import java.sql.Types;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.StringJoiner;
+import java.util.stream.Collectors;
 
 public class OperationHelper {
 
@@ -40,6 +51,7 @@ public class OperationHelper {
     private static final String DOUBLE_QUOTES = "\"";
     private final JsonDynamicSchemaFormat dynamicSchemaFormat;
     private final int VARCHAR_MAX_LENGTH = 65533;
+    private final int CHAR_MAX_LENGTH = 255;
 
     private OperationHelper(JsonDynamicSchemaFormat dynamicSchemaFormat) {
         this.dynamicSchemaFormat = dynamicSchemaFormat;
@@ -143,7 +155,6 @@ public class OperationHelper {
                     if (precisions.size() == 2) {
                         scale = Integer.parseInt(precisions.get(1));
                     }
-
                 }
                 decimalType = new DecimalType(isNullable, precision, scale);
                 type = decimalType.asSerializableString();
@@ -303,5 +314,100 @@ public class OperationHelper {
         // Add light schema change support for it if the version of doris is greater than 1.2.0 or equals 1.2.0
         sb.append("\nPROPERTIES (\n\t\"light_schema_change\" = \"true\"\n)");
         return sb.toString();
+    }
+
+    public String buildCreateTableStatement(String database, String table, List<String> primaryKeys,
+            RowType rowType) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("CREATE TABLE IF NOT EXISTS `").append(database).append("`.`").append(table).append("`(\n");
+        Iterator<RowField> iterator = rowType.getFields().iterator();
+        StringJoiner joiner = new StringJoiner(",");
+        while (iterator.hasNext()) {
+            RowField column = iterator.next();
+            sb.append("\t`").append(column.getName()).append("` ").append(convert2DorisType(column.getType()));
+            sb.append(" COMMENT ").append(quote("Add Column Auto"));
+            joiner.add(String.format("`%s`", column.getName()));
+            if (iterator.hasNext()) {
+                sb.append(",\n");
+            }
+        }
+        sb.append("\n)\n");
+        String model = "DUPLICATE";
+        if (primaryKeys != null && !primaryKeys.isEmpty()) {
+            model = "UNIQUE";
+            joiner = new StringJoiner(",");
+            for (String primaryKey : primaryKeys) {
+                joiner.add(String.format("`%s`", primaryKey));
+            }
+        }
+        String keys = joiner.toString();
+        sb.append(model).append(" KEY(").append(keys).append(")");
+        sb.append("\nCOMMENT ").append(quote("Create Table Auto"));
+        sb.append("\nDISTRIBUTED BY HASH(").append(keys).append(")");
+        // Add light schema change support for it if the version of doris is greater than 1.2.0 or equals 1.2.0
+        sb.append("\nPROPERTIES (\n\t\"light_schema_change\" = \"true\"\n)");
+        // sb.append("\nPROPERTIES (\n\t\"replication_num\" = \"1\"\n)");
+        return sb.toString();
+    }
+
+    private String convert2DorisType(LogicalType type) {
+        String dorisType;
+        if (type instanceof VarCharType) {
+            VarCharType varcharType = (VarCharType) type;
+            // Because the precision definition of varchar by Doris is different from that of MySQL.
+            // The precision in MySQL is the number of characters, while Doris is the number of bytes,
+            // and Chinese characters occupy 3 bytes, so the precision multiplys by 3 here.
+            int length = Math.min(varcharType.getLength() * 3, VARCHAR_MAX_LENGTH);
+            varcharType = new VarCharType(type.isNullable(), length);
+            dorisType = varcharType.asSummaryString();
+        } else if (type instanceof CharType) {
+            CharType charType = (CharType) type;
+            int length = Math.min(charType.getLength(), CHAR_MAX_LENGTH);
+            if (length != charType.getLength()) {
+                charType = new CharType(length);
+            }
+            dorisType = charType.asSummaryString();
+        } else if (type instanceof TimestampType || type instanceof LocalZonedTimestampType
+                || type instanceof ZonedTimestampType) {
+            dorisType = "DATETIME";
+        } else if (type instanceof TimeType || type instanceof BinaryType || type instanceof VarBinaryType) {
+            dorisType = String.format("STRING%s", type.isNullable() ? "" : " NOT NULL");
+        } else {
+            dorisType = type.asSummaryString();
+        }
+        return dorisType;
+    }
+
+    public String buildAddColumnStatement(TableSchema tableSchema, RowType rowType) {
+        if (tableSchema.getProperties() != null && tableSchema.getProperties().size() < rowType.getFieldCount()) {
+            // Only support add column auto
+            Set<String> columnsOfSchema = tableSchema.getProperties().stream().map(TableSchema.Column::getName)
+                    .collect(Collectors.toSet());
+            RowField preField = null;
+            StringBuilder sb = new StringBuilder();
+            for (RowField field : rowType.getFields()) {
+                if (!columnsOfSchema.contains(field.getName())) {
+                    sb.append("ADD COLUMN `").append(field.getName()).append("` ")
+                            .append(convert2DorisType(field.getType()));
+                    sb.append(" COMMENT ").append(quote("Add Column Auto"));
+                    if (preField != null && columnsOfSchema.contains(preField.getName())) {
+                        sb.append(" AFTER `").append(preField.getName()).append("`");
+                    }
+                    sb.append(",");
+                }
+                preField = field;
+            }
+            if (sb.length() > 0) {
+                sb.deleteCharAt(sb.lastIndexOf(","));
+                return sb.toString();
+            } else {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    public String buildCreateDatabaseStatement(String database) {
+        return String.format("CREATE DATABASE `%s`", database);
     }
 }

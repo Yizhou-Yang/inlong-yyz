@@ -18,6 +18,7 @@
 package org.apache.inlong.sort.iceberg.sink;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
@@ -27,6 +28,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.util.DataFormatConverters;
@@ -47,7 +49,6 @@ import org.apache.iceberg.flink.FlinkSchemaUtil;
 import org.apache.iceberg.flink.FlinkWriteConf;
 import org.apache.iceberg.flink.FlinkWriteOptions;
 import org.apache.iceberg.flink.TableLoader;
-import org.apache.iceberg.flink.sink.TaskWriterFactory;
 import org.apache.iceberg.flink.util.FlinkCompatibilityUtil;
 import org.apache.iceberg.io.WriteResult;
 import org.apache.iceberg.relocated.com.google.common.annotations.VisibleForTesting;
@@ -56,6 +57,7 @@ import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
 import org.apache.iceberg.relocated.com.google.common.collect.Sets;
 import org.apache.iceberg.types.TypeUtil;
+import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.util.PropertyUtil;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
 import org.apache.inlong.sort.base.dirty.sink.DirtySink;
@@ -78,9 +80,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import static org.apache.flink.table.api.DataTypes.FIELD;
+import static org.apache.flink.table.api.DataTypes.ROW;
 import static org.apache.iceberg.TableProperties.UPSERT_ENABLED;
 import static org.apache.iceberg.TableProperties.UPSERT_ENABLED_DEFAULT;
 import static org.apache.iceberg.TableProperties.WRITE_DISTRIBUTION_MODE;
+import static org.apache.inlong.sort.base.Constants.META_INCREMENTAL;
 
 /**
  * Copy from iceberg-flink:iceberg-flink-1.13:0.13.2
@@ -100,6 +105,7 @@ public class FlinkSink {
             IcebergMultipleFilesCommiter.class.getSimpleName();
     private static final String ICEBERG_WHOLE_DATABASE_MIGRATION_NAME =
             DynamicSchemaHandleOperator.class.getSimpleName();
+    public static final int BLANK_FIELD_INDEX = -1;
 
     private FlinkSink() {
     }
@@ -174,6 +180,11 @@ public class FlinkSink {
         private DirtyOptions dirtyOptions;
         private @Nullable DirtySink<Object> dirtySink;
         private ReadableConfig tableOptions;
+
+        private boolean enableSchemaChange;
+        private String schemaChangePolicies;
+        private boolean switchAppendUpsertEnable = false;
+        private boolean autoCreateTableWhenSnapshot;
 
         private Builder() {
         }
@@ -265,6 +276,11 @@ public class FlinkSink {
             return this;
         }
 
+        public Builder switchAppendUpsertEnable(boolean switchAppendUpsertEnable) {
+            this.switchAppendUpsertEnable = switchAppendUpsertEnable;
+            return this;
+        }
+
         public Builder multipleSinkOption(MultipleSinkOption multipleSinkOption) {
             this.multipleSinkOption = multipleSinkOption;
             return this;
@@ -273,6 +289,21 @@ public class FlinkSink {
         public Builder overwrite(boolean newOverwrite) {
             this.overwrite = newOverwrite;
             writeOptions.put(FlinkWriteOptions.OVERWRITE_MODE.key(), Boolean.toString(newOverwrite));
+            return this;
+        }
+
+        public Builder enableSchemaChange(boolean schemaChange) {
+            this.enableSchemaChange = schemaChange;
+            return this;
+        }
+
+        public Builder autoCreateTableWhenSnapshot(boolean autoCreateTableWhenSnapshot) {
+            this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
+            return this;
+        }
+
+        public Builder schemaChangePolicies(String schemaChangePolicies) {
+            this.schemaChangePolicies = schemaChangePolicies;
             return this;
         }
 
@@ -526,6 +557,7 @@ public class FlinkSink {
                 }
                 equalityFieldIds = Lists.newArrayList(equalityFieldSet);
             }
+            LOG.info("equalityFieldIds in iceberg: {}", equalityFieldIds);
             return equalityFieldIds;
         }
 
@@ -579,7 +611,9 @@ public class FlinkSink {
             boolean upsertMode = (flinkWriteConf.upsertMode() || PropertyUtil.propertyAsBoolean(table.properties(),
                     UPSERT_ENABLED, UPSERT_ENABLED_DEFAULT)) && !appendMode;
 
+            LOG.info("The iceberg sink is using {} mode.", upsertMode ? "upsert" : "append");
             // Validate the equality fields and partition fields if we enable the upsert mode.
+
             if (upsertMode) {
                 Preconditions.checkState(!flinkWriteConf.overwriteMode(),
                         "OVERWRITE mode shouldn't be enable when configuring to use UPSERT data stream.");
@@ -596,7 +630,8 @@ public class FlinkSink {
 
             IcebergProcessOperator<RowData, WriteResult> streamWriter = createStreamWriter(
                     table, flinkRowType, equalityFieldIds, flinkWriteConf, appendMode, inlongMetric,
-                    auditHostAndPorts, dirtyOptions, dirtySink);
+                    auditHostAndPorts, dirtyOptions, dirtySink, tableSchema,
+                    switchAppendUpsertEnable);
 
             int parallelism = writeParallelism == null ? input.getParallelism() : writeParallelism;
             SingleOutputStreamOperator<WriteResult> writerStream = input
@@ -616,17 +651,20 @@ public class FlinkSink {
 
             int parallelism = writeParallelism == null ? input.getParallelism() : writeParallelism;
             DynamicSchemaHandleOperator routeOperator = new DynamicSchemaHandleOperator(
-                    catalogLoader, multipleSinkOption, dirtyOptions, dirtySink, inlongMetric, auditHostAndPorts);
+                    catalogLoader, multipleSinkOption, dirtyOptions, dirtySink, inlongMetric, auditHostAndPorts,
+                    enableSchemaChange, schemaChangePolicies, autoCreateTableWhenSnapshot);
             SingleOutputStreamOperator<RecordWithSchema> routeStream = input
                     .transform(operatorName(ICEBERG_WHOLE_DATABASE_MIGRATION_NAME),
                             TypeInformation.of(RecordWithSchema.class),
                             routeOperator)
                     .setParallelism(parallelism);
-
+            RowType tableSchemaRowType = (RowType) tableSchema.toRowDataType().getLogicalType();
+            int metaFieldIndex = getMetaFieldIndex(tableSchema);
             IcebergProcessOperator streamWriter =
                     new IcebergProcessOperator(new IcebergMultipleStreamWriter(
                             appendMode, catalogLoader, inlongMetric, auditHostAndPorts,
-                            multipleSinkOption, dirtyOptions, dirtySink));
+                            multipleSinkOption, dirtyOptions, dirtySink, tableSchemaRowType, metaFieldIndex,
+                            switchAppendUpsertEnable));
             SingleOutputStreamOperator<MultipleWriteResult> writerStream = routeStream
                     .transform(operatorName(ICEBERG_MULTIPLE_STREAM_WRITER_NAME),
                             TypeInformation.of(IcebergProcessOperator.class),
@@ -709,21 +747,48 @@ public class FlinkSink {
 
     }
 
+    static DataType filterOutMetaField(TableSchema requestedSchema) {
+        DataTypes.Field[] fields = requestedSchema.getTableColumns().stream()
+                .filter(column -> !META_INCREMENTAL.equals(column.getName()))
+                .map(column -> FIELD(column.getName(), column.getType()))
+                .toArray(DataTypes.Field[]::new);
+        return ROW(fields).notNull();
+    }
+
     static RowType toFlinkRowType(Schema schema, TableSchema requestedSchema) {
         if (requestedSchema != null) {
             // Convert the flink schema to iceberg schema firstly, then reassign ids to match the existing iceberg
             // schema.
-            Schema writeSchema = TypeUtil.reassignIds(FlinkSchemaUtil.convert(requestedSchema), schema);
+            List<NestedField> filteredFields = FlinkSchemaUtil.convert(requestedSchema)
+                    .columns()
+                    .stream()
+                    .filter(nestedField -> !META_INCREMENTAL.equals(nestedField.name()))
+                    .collect(Collectors.toList());
+            Schema writeSchema = TypeUtil.reassignIds(new Schema(filteredFields), schema);
             TypeUtil.validateWriteSchema(schema, writeSchema, true, true);
 
             // We use this flink schema to read values from RowData. The flink's TINYINT and SMALLINT will be promoted
             // to iceberg INTEGER, that means if we use iceberg's table schema to read TINYINT (backend by 1 'byte'),
             // we will read 4 bytes rather than 1 byte, it will mess up the byte array in BinaryRowData. So here we must
             // use flink schema.
-            return (RowType) requestedSchema.toRowDataType().getLogicalType();
+            return (RowType) filterOutMetaField(requestedSchema).getLogicalType();
         } else {
             return FlinkSchemaUtil.convert(schema);
         }
+    }
+
+    static int getMetaFieldIndex(TableSchema tableSchema) {
+        RowType rowType = (RowType) tableSchema.toRowDataType().getLogicalType();
+        List<RowType.RowField> fields = rowType.getFields();
+        int metaFieldIndex = BLANK_FIELD_INDEX;
+        for (int i = 0; i < fields.size(); i++) {
+            RowType.RowField rowField = fields.get(i);
+            if (META_INCREMENTAL.equals(rowField.getName())) {
+                metaFieldIndex = i;
+                break;
+            }
+        }
+        return metaFieldIndex;
     }
 
     static IcebergProcessOperator<RowData, WriteResult> createStreamWriter(Table table,
@@ -734,11 +799,13 @@ public class FlinkSink {
             String inlongMetric,
             String auditHostAndPorts,
             DirtyOptions dirtyOptions,
-            @Nullable DirtySink<Object> dirtySink) {
+            @Nullable DirtySink<Object> dirtySink,
+            TableSchema tableSchema,
+            boolean switchAppendUpsertEnable) {
         Preconditions.checkArgument(table != null, "Iceberg table should't be null");
 
         Table serializableTable = SerializableTable.copyOf(table);
-        TaskWriterFactory<RowData> taskWriterFactory =
+        RowDataTaskWriterFactory taskWriterFactory =
                 new RowDataTaskWriterFactory(
                         serializableTable,
                         serializableTable.schema(),
@@ -749,9 +816,12 @@ public class FlinkSink {
                         flinkWriteConf.upsertMode(),
                         appendMode);
 
+        RowType tableSchemaRowType = (RowType) tableSchema.toRowDataType().getLogicalType();
+        int metaFieldIndex = getMetaFieldIndex(tableSchema);
         return new IcebergProcessOperator<>(new IcebergSingleStreamWriter<>(
                 table.name(), taskWriterFactory, inlongMetric, auditHostAndPorts,
-                null, dirtyOptions, dirtySink, false));
+                flinkRowType, dirtyOptions, dirtySink, false,
+                tableSchemaRowType, metaFieldIndex, switchAppendUpsertEnable));
     }
 
 }

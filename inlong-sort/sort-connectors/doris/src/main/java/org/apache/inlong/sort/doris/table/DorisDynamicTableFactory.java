@@ -66,6 +66,7 @@ import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.DIRTY_PREFIX;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_DATABASE_PATTERN;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
@@ -260,6 +261,7 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
         options.add(AUDIT_KEYS);
         options.add(SINK_SCHEMA_CHANGE_ENABLE);
         options.add(SINK_SCHEMA_CHANGE_POLICIES);
+        options.add(SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT);
         return options;
     }
 
@@ -345,6 +347,7 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
         boolean ignoreSingleTableErrors = helper.getOptions().get(SINK_MULTIPLE_IGNORE_SINGLE_TABLE_ERRORS);
         SchemaUpdateExceptionPolicy schemaUpdatePolicy = helper.getOptions()
                 .get(SINK_MULTIPLE_SCHEMA_UPDATE_POLICY);
+        boolean autoCreateTableWhenSnapshot = helper.getOptions().get(SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT);
         String sinkMultipleFormat = helper.getOptions().getOptional(SINK_MULTIPLE_FORMAT).orElse(null);
         boolean enableSchemaChange = helper.getOptions().get(SINK_SCHEMA_CHANGE_ENABLE);
         String schemaChangePolicies = helper.getOptions().getOptional(SINK_SCHEMA_CHANGE_POLICIES).orElse(null);
@@ -374,7 +377,8 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
                 dirtyOptions,
                 dirtySink,
                 enableSchemaChange,
-                schemaChangePolicies);
+                schemaChangePolicies,
+                autoCreateTableWhenSnapshot);
     }
 
     private void validateSinkMultiple(DataType physicalDataType, boolean multipleSink, String sinkMultipleFormat,

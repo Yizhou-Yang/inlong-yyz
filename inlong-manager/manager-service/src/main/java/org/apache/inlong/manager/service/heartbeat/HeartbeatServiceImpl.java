@@ -19,23 +19,30 @@ package org.apache.inlong.manager.service.heartbeat;
 
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.common.enums.ComponentTypeEnum;
 import org.apache.inlong.common.heartbeat.GroupHeartbeat;
 import org.apache.inlong.common.heartbeat.StreamHeartbeat;
+import org.apache.inlong.manager.common.consts.SourceType;
 import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
+import org.apache.inlong.manager.common.enums.SourceStatus;
 import org.apache.inlong.manager.common.exceptions.BusinessException;
 import org.apache.inlong.manager.common.util.CommonBeanUtils;
 import org.apache.inlong.manager.common.util.Preconditions;
 import org.apache.inlong.manager.dao.entity.ComponentHeartbeatEntity;
 import org.apache.inlong.manager.dao.entity.GroupHeartbeatEntity;
 import org.apache.inlong.manager.dao.entity.StreamHeartbeatEntity;
+import org.apache.inlong.manager.dao.entity.StreamSourceEntity;
 import org.apache.inlong.manager.dao.mapper.ComponentHeartbeatEntityMapper;
 import org.apache.inlong.manager.dao.mapper.GroupHeartbeatEntityMapper;
 import org.apache.inlong.manager.dao.mapper.StreamHeartbeatEntityMapper;
+import org.apache.inlong.manager.dao.mapper.StreamSourceEntityMapper;
 import org.apache.inlong.manager.pojo.common.PageResult;
 import org.apache.inlong.manager.pojo.heartbeat.ComponentHeartbeatResponse;
 import org.apache.inlong.manager.pojo.heartbeat.GroupHeartbeatResponse;
@@ -47,7 +54,10 @@ import org.apache.inlong.manager.service.core.HeartbeatService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * Heartbeat service layer implementation
@@ -60,6 +70,8 @@ public class HeartbeatServiceImpl implements HeartbeatService {
 
     @Autowired
     private HeartbeatManager heartbeatManager;
+    @Autowired
+    private StreamSourceEntityMapper sourceMapper;
     @Autowired
     private ComponentHeartbeatEntityMapper componentHeartbeatMapper;
     @Autowired
@@ -79,9 +91,10 @@ public class HeartbeatServiceImpl implements HeartbeatService {
         heartbeatManager.reportHeartbeat(request);
         ComponentTypeEnum componentType = ComponentTypeEnum.forType(request.getComponentType());
         switch (componentType) {
+            case Agent:
+                return updateAgentHeartbeatOpt(request);
             case Sort:
             case DataProxy:
-            case Agent:
             case Cache:
             case SDK:
                 return updateHeartbeatOpt(request);
@@ -215,6 +228,60 @@ public class HeartbeatServiceImpl implements HeartbeatService {
             default:
                 throw new BusinessException("Unsupported component type for " + component);
         }
+    }
+
+    /**
+     * Update heartbeatMsg for agent , if groupMsg is empty, then logically remove all stream source related.
+     * If type of stream_source is file, change status from heartbeat_timeout
+     *
+     * @param request
+     * @return
+     */
+    private Boolean updateAgentHeartbeatOpt(HeartbeatReportRequest request) {
+        // If heartbeatMsg not contain any group ,just delete
+        if (CollectionUtils.isEmpty(request.getGroupHeartbeats()) && StringUtils.isNotBlank(request.getIp())) {
+            String agentIp = request.getIp();
+            sourceMapper.logicalDeleteByAgentIp(agentIp, SourceStatus.SOURCE_DISABLE.getCode(),
+                    SourceStatus.SOURCE_NORMAL.getCode());
+        }
+        List<StreamHeartbeat> streamHeartbeats = request.getStreamHeartbeats();
+        Map<String, Integer> heartbeatDuplicateMap = Maps.newHashMap();
+        for (StreamHeartbeat streamHeartbeat : streamHeartbeats) {
+            String streamId = streamHeartbeat.getInlongStreamId();
+            String groupId = streamHeartbeat.getInlongGroupId();
+            String key = groupId + ":" + streamId;
+            if (heartbeatDuplicateMap.containsKey(key)) {
+                heartbeatDuplicateMap.put(key, heartbeatDuplicateMap.get(key) + 1);
+            } else {
+                heartbeatDuplicateMap.put(key, 1);
+            }
+        }
+        for (Map.Entry<String, Integer> entry : heartbeatDuplicateMap.entrySet()) {
+            if (entry.getValue() > 1) {
+                String groupId = entry.getKey().split(":")[0];
+                String streamId = entry.getKey().split(":")[1];
+                String agentIp = request.getIp();
+                log.info("duplicate agent collect task, agentIp:{}, groupId:{}, streamId:{}, count:{}", agentIp,
+                        groupId, streamId, entry.getValue());
+            }
+        }
+
+        List<StreamSourceEntity> sourceEntities = sourceMapper.selectAllByAgentIpAndCluster(
+                Collections.singletonList(SourceStatus.HEARTBEAT_TIMEOUT.getCode()),
+                Lists.newArrayList(SourceType.FILE), request.getIp(), request.getClusterName());
+        for (StreamSourceEntity sourceEntity : sourceEntities) {
+            // restore state for all source by ip and type
+            if (sourceEntity.getIsDeleted() != 0) {
+                sourceEntity.setPreviousStatus(sourceEntity.getStatus());
+                sourceEntity.setStatus(SourceStatus.TO_BE_ISSUED_DELETE.getCode());
+            } else {
+                sourceEntity.setStatus(sourceEntity.getPreviousStatus());
+                sourceEntity.setPreviousStatus(SourceStatus.HEARTBEAT_TIMEOUT.getCode());
+            }
+            sourceMapper.updateByPrimaryKeySelective(sourceEntity);
+        }
+
+        return updateHeartbeatOpt(request);
     }
 
     /**

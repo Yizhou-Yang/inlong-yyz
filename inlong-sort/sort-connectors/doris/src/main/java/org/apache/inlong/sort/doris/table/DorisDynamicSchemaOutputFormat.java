@@ -127,6 +127,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
     @SuppressWarnings({"rawtypes"})
     private final Map<String, List> batchMap = new HashMap<>();
     private final Map<String, String> columnsMap = new HashMap<>();
+    private final Map<String, JsonNode> latestData = new HashMap<>();
     /**
      * data will not be submitted when table is in errorTables list
      */
@@ -154,6 +155,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
     @Nullable
     private final String schemaChangePolicies;
     private final DirtySinkHelper<Object> dirtySinkHelper;
+    private final boolean autoCreateTableWhenSnapshot;
     private SchemaChangeHelper helper;
     private long batchBytes = 0L;
     private int size;
@@ -190,7 +192,8 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
             boolean enableSchemaChange,
-            @Nullable String schemaChangePolicies) {
+            @Nullable String schemaChangePolicies,
+            boolean autoCreateTableWhenSnapshot) {
         this.options = option;
         this.readOptions = readOptions;
         this.executionOptions = executionOptions;
@@ -208,6 +211,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         this.dirtySinkHelper = new DirtySinkHelper<>(dirtyOptions, dirtySink);
         this.enableSchemaChange = enableSchemaChange;
         this.schemaChangePolicies = schemaChangePolicies;
+        this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
         handleStreamLoadProp();
     }
 
@@ -597,17 +601,22 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
     }
 
     private void handleColumnsChange(String tableIdentifier, JsonNode rootNode, JsonNode physicalData) {
-        String columns = parseColumns(rootNode, physicalData);
         String oldColumns = columnsMap.get(tableIdentifier);
-        if (columns == null && oldColumns != null || (columns != null && !columns.equals(oldColumns))) {
+        String columns = parseColumns(rootNode, physicalData);
+        if (oldColumns == null) {
+            columnsMap.put(tableIdentifier, columns);
+            latestData.put(tableIdentifier, rootNode);
+            return;
+        }
+        if (!columns.equals(oldColumns)) {
             flushSingleTable(tableIdentifier, batchMap.get(tableIdentifier));
-            if (!errorTables.contains(tableIdentifier)) {
-                columnsMap.put(tableIdentifier, columns);
-            } else {
-                batchMap.remove(tableIdentifier);
-                columnsMap.remove(tableIdentifier);
-                errorTables.remove(tableIdentifier);
-            }
+            helper.applySchemaChange(tableIdentifier, rootNode, autoCreateTableWhenSnapshot);
+            latestData.put(tableIdentifier, rootNode);
+            columnsMap.put(tableIdentifier, columns);
+            batchMap.remove(tableIdentifier);
+            errorTables.remove(tableIdentifier);
+        } else {
+            latestData.put(tableIdentifier, rootNode);
         }
     }
 
@@ -722,7 +731,6 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             flushExceptionMap.put(tableIdentifier, e);
             // may count repeatedly
             errorNum.getAndAdd(values.size());
-
             if (!multipleSink) {
                 try {
                     handleSingleTable(e, values, loadValue);
@@ -731,7 +739,6 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                     throw new RuntimeException(e);
                 }
             }
-
             if (SchemaUpdateExceptionPolicy.THROW_WITH_STOP == schemaUpdatePolicy) {
                 throw new RuntimeException(
                         String.format("Writing records to streamload of tableIdentifier:%s failed, the value: %s.",
@@ -760,7 +767,6 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                     }
                 }
             }
-
             values.clear();
         }
     }
@@ -859,20 +865,35 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
     private RespContent load(String tableIdentifier, String result) throws IOException {
         String[] tableWithDb = tableIdentifier.split("\\.");
         RespContent respContent = null;
-        for (int i = 0; i <= executionOptions.getMaxRetries(); i++) {
+        int tryTimes = 0;
+        while (tryTimes < executionOptions.getMaxRetries()) {
             try {
                 respContent = dorisStreamLoad.load(tableWithDb[0], tableWithDb[1], result);
                 break;
             } catch (StreamLoadException e) {
-                LOG.error("doris sink error, retry times = {}", i, e);
-                if (i >= executionOptions.getMaxRetries()) {
+                if (multipleSink && autoCreateTableWhenSnapshot && DorisParseUtils
+                        .parseUnkownDatabaseError(e.getMessage())) {
+                    if (helper.createDatabaseAuto(tableIdentifier, latestData.get(tableIdentifier))) {
+                        continue;
+                    }
+                }
+                if (multipleSink && autoCreateTableWhenSnapshot && DorisParseUtils
+                        .parseUnkownTableError(e.getMessage())) {
+                    if (helper.applySchemaChange(tableIdentifier, latestData.get(tableIdentifier),
+                            autoCreateTableWhenSnapshot)) {
+                        continue;
+                    }
+                }
+                tryTimes++;
+                LOG.warn("doris sink error, retry times = {}", tryTimes, e);
+                if (tryTimes >= executionOptions.getMaxRetries()) {
                     throw new IOException(e);
                 }
                 try {
                     dorisStreamLoad.setHostPort(getBackend());
                     LOG.warn("streamload error,switch be: {}",
                             dorisStreamLoad.getLoadUrlStr(tableWithDb[0], tableWithDb[1]), e);
-                    Thread.sleep(1000L * i);
+                    Thread.sleep(1000L * tryTimes);
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();
                     throw new IOException("unable to flush; interrupted while doing another attempt", e);
@@ -935,6 +956,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         private DirtySink<Object> dirtySink;
         private boolean enableSchemaChange;
         private String schemaChangePolicies;
+        private boolean autoCreateTableWhenSnapshot;
 
         public Builder() {
             this.optionsBuilder = DorisOptions.builder().setTableIdentifier("");
@@ -1036,6 +1058,11 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             return this;
         }
 
+        public Builder setAutoCreateTableWhenSnapshot(boolean autoCreateTableWhenSnapshot) {
+            this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
+            return this;
+        }
+
         public Builder setSchemaChangePolicies(String schemaChangePolicies) {
             this.schemaChangePolicies = schemaChangePolicies;
             return this;
@@ -1066,7 +1093,8 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                     dirtyOptions,
                     dirtySink,
                     enableSchemaChange,
-                    schemaChangePolicies);
+                    schemaChangePolicies,
+                    autoCreateTableWhenSnapshot);
         }
     }
 }

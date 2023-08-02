@@ -17,6 +17,7 @@
 
 package org.apache.inlong.sort.cdc.mysql.table;
 
+import static org.apache.inlong.sort.cdc.mysql.source.utils.RecordUtils.isSnapshotRecord;
 import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getCanalData;
 import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getDebeziumData;
 import static org.apache.inlong.sort.cdc.mysql.utils.MetaDataUtils.getMetaData;
@@ -138,6 +139,28 @@ public enum MySqlReadableMetadata {
                         @Nullable TableChanges.TableChange tableSchema, RowData rowData) {
                     // construct canal json
                     return getCanalData(record, (GenericRowData) rowData, tableSchema);
+                }
+            }),
+
+    INCREMENTAL(
+            "meta.incremental",
+            DataTypes.BOOLEAN(),
+            new MetadataConverter() {
+
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record) {
+                    return null;
+                }
+
+                @Override
+                public Object read(SourceRecord record,
+                        @Nullable TableChanges.TableChange tableSchema, RowData rowData) {
+                    // construct canal json
+                    Struct messageStruct = (Struct) record.value();
+                    Struct sourceStruct = messageStruct.getStruct(FieldName.SOURCE);
+                    return !isSnapshotRecord(sourceStruct);
                 }
             }),
 

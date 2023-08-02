@@ -124,6 +124,9 @@ public interface Metadata {
             case DATA_BYTES_CANAL:
                 metadataType = "BYTES";
                 break;
+            case INCREMENTAL:
+                metadataType = "BOOLEAN";
+                break;
             default:
                 throw new UnsupportedOperationException(String.format("Unsupport meta field for %s: %s",
                         this.getClass().getSimpleName(), metaField));

@@ -161,6 +161,8 @@ public final class Constants {
 
     public static final String GHOST_TAG = "/* gh-ost */";
 
+    public static final String META_INCREMENTAL = "incremental_inlong";
+
     public static final ConfigOption<String> INLONG_METRIC =
             ConfigOptions.key("inlong.metric.labels")
                     .stringType()
@@ -236,6 +238,13 @@ public final class Constants {
                     .defaultValue(false)
                     .withDescription("The option 'sink.multiple.enable' "
                             + "is used to determine whether to support multiple sink writing, default is 'false'.");
+
+    public static final ConfigOption<Boolean> SWITCH_APPEND_UPSERT_ENABLE =
+            ConfigOptions.key("switch.append.upsert.enable")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("The option 'switch.append.upsert.enable' "
+                            + "is used to switch between append and upsert, default is 'false'.");
 
     public static final ConfigOption<SchemaUpdateExceptionPolicy> SINK_MULTIPLE_SCHEMA_UPDATE_POLICY =
             ConfigOptions.key("sink.multiple.schema-update.policy")
@@ -387,6 +396,12 @@ public final class Constants {
                     .booleanType()
                     .defaultValue(false)
                     .withDescription("Whether supports schema-change, default value is 'false'");
+
+    public static final ConfigOption<Boolean> SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT =
+            ConfigOptions.key("sink.multiple.auto-create-table-when-snapshot")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Whether supporting auto create table when snapshot, default value is 'false'");
 
     public static final ConfigOption<String> SINK_SCHEMA_CHANGE_POLICIES =
             ConfigOptions.key("sink.schema-change.policies")

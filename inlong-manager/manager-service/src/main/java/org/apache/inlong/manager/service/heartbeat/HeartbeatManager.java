@@ -58,7 +58,6 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -174,22 +173,6 @@ public class HeartbeatManager implements AbstractHeartbeatManager {
                     handlerNum += insertClusterNode(clusterInfo, heartbeatMsg, clusterInfo.getCreator());
                 } else {
                     handlerNum += updateClusterNode(clusterNode, heartbeatMsg);
-                    if (Objects.equals(clusterNode.getType(), ClusterType.AGENT)) {
-                        List<StreamSourceEntity> sourceEntities = sourceMapper.selectAllByAgentIpAndCluster(
-                                Collections.singletonList(SourceStatus.HEARTBEAT_TIMEOUT.getCode()),
-                                Lists.newArrayList(SourceType.FILE), heartbeat.getIp(), heartbeatMsg.getClusterName());
-                        for (StreamSourceEntity sourceEntity : sourceEntities) {
-                            // restore state for all source by ip and type
-                            if (sourceEntity.getIsDeleted() != 0) {
-                                sourceEntity.setPreviousStatus(sourceEntity.getStatus());
-                                sourceEntity.setStatus(SourceStatus.TO_BE_ISSUED_DELETE.getCode());
-                            } else {
-                                sourceEntity.setStatus(sourceEntity.getPreviousStatus());
-                                sourceEntity.setPreviousStatus(SourceStatus.HEARTBEAT_TIMEOUT.getCode());
-                            }
-                            sourceMapper.updateByPrimaryKeySelective(sourceEntity);
-                        }
-                    }
                 }
             }
         }
@@ -243,7 +226,12 @@ public class HeartbeatManager implements AbstractHeartbeatManager {
             clusterNode.setStatus(NodeStatus.HEARTBEAT_TIMEOUT.getStatus());
             clusterNodeMapper.updateById(clusterNode);
             if (Objects.equals(clusterNode.getType(), ClusterType.AGENT)) {
-                List<StreamSourceEntity> sourceEntities = sourceMapper.selectAllByAgentIpAndCluster(null,
+                List<Integer> statusList =
+                        Arrays.asList(SourceStatus.values()).stream()
+                                .filter(sourceStatus -> sourceStatus != SourceStatus.HEARTBEAT_TIMEOUT)
+                                .map(sourceStatus -> sourceStatus.getCode()).collect(
+                                        Collectors.toList());
+                List<StreamSourceEntity> sourceEntities = sourceMapper.selectAllByAgentIpAndCluster(statusList,
                         Lists.newArrayList(SourceType.FILE), clusterNode.getIp(), heartbeatMsg.getClusterName());
                 for (StreamSourceEntity sourceEntity : sourceEntities) {
                     // set source status to heartbeat timeout for all source by ip and type

@@ -19,6 +19,7 @@ package org.apache.inlong.sort.iceberg.catalog.hybris;
 
 import com.qcloud.dlc.common.Constants;
 import com.qcloud.dlc.metastore.DLCDataCatalogMetastoreClient;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CosNConfigKeys;
@@ -146,8 +147,6 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
                         "Illegal warehouse location, supportted location:" + SUPPORTED_WAREHOUSE);
             }
             this.conf.set(HiveConf.ConfVars.METASTOREWAREHOUSE.varname, warehouse);
-        } else {
-            this.conf.set(HiveConf.ConfVars.METASTOREWAREHOUSE.varname, ConfVars.METASTOREWAREHOUSE.defaultStrVal);
         }
 
         this.listAllTables = Boolean.parseBoolean(properties.getOrDefault(LIST_ALL_TABLES, LIST_ALL_TABLES_DEFAULT));
@@ -532,7 +531,8 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
         // Not managed table:
         // - stick to the {WAREHOUSE_DIR}/{DB_NAME}.db/{TABLE_NAME} path
         String warehouseLocation = getWarehouseLocation();
-        if (!ConfVars.METASTOREWAREHOUSE.defaultStrVal.equals(warehouseLocation)) {
+        if (StringUtils.isNotEmpty(warehouseLocation)
+                && !ConfVars.METASTOREWAREHOUSE.defaultStrVal.equals(warehouseLocation)) {
             return String.format(
                     "%s/%s.db/%s",
                     warehouseLocation,
@@ -556,10 +556,7 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
     }
 
     private String getWarehouseLocation() {
-        String warehouseLocation = conf.get(HiveConf.ConfVars.METASTOREWAREHOUSE.varname);
-        Preconditions.checkNotNull(warehouseLocation,
-                "Warehouse location is not set: hive.metastore.warehouse.dir=null");
-        return warehouseLocation;
+        return conf.get(HiveConf.ConfVars.METASTOREWAREHOUSE.varname);
     }
 
     private Map<String, String> convertToMetadata(Database database) {
@@ -567,7 +564,9 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
         Map<String, String> meta = Maps.newHashMap();
 
         meta.putAll(database.getParameters());
-        meta.put("location", database.getLocationUri());
+        if (StringUtils.isNotEmpty(database.getLocationUri())) {
+            meta.put("location", database.getLocationUri());
+        }
         if (database.getDescription() != null) {
             meta.put("comment", database.getDescription());
         }
@@ -584,8 +583,10 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
         Map<String, String> parameter = Maps.newHashMap();
 
         database.setName(namespace.level(0));
-        database.setLocationUri(new Path(getWarehouseLocation(), namespace.level(0)).toString() + ".db");
-
+        String location = getWarehouseLocation();
+        if (StringUtils.isNotEmpty(location)) {
+            database.setLocationUri(new Path(getWarehouseLocation(), namespace.level(0)).toString() + ".db");
+        }
         meta.forEach((key, value) -> {
             if (key.equals("comment")) {
                 database.setDescription(value);
@@ -606,7 +607,7 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
     public String toString() {
         return MoreObjects.toStringHelper(this)
                 .add("name", name)
-                .add("uri", this.conf == null ? "" : this.conf.get(HiveConf.ConfVars.METASTOREURIS.varname))
+                .add("uri", this.conf == null ? "" : this.conf.get(HiveConf.ConfVars.METASTOREURIS.varname, ""))
                 .toString();
     }
 

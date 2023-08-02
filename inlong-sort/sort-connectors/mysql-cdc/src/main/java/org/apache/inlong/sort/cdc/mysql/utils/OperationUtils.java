@@ -142,6 +142,7 @@ public class OperationUtils {
                 default:
                     LOG.warn("doesn't support alter operation {}, statement {}",
                             alterExpression.getOperation(), statement);
+                    throw new IllegalStateException("statement not supported now");
             }
 
         });

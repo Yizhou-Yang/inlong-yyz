@@ -23,6 +23,9 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.types.RowKind;
 
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,6 +38,15 @@ public class DorisParseUtils {
      * Pattern of escape mode for hexadecimal characters, such as "hi\\x33hi\\x44hello".
      */
     private static final Pattern HEX_PATTERN = Pattern.compile("\\\\x(\\d{2})");
+
+    private static final Pattern UNKOWN_TABLE_PATTERN = Pattern
+            .compile(".*errcode = 7, detailmessage = unknown table.*");
+    private static final Pattern UNKOWN_DATABASE_PATTERN = Pattern
+            .compile(".*errcode = 2, detailmessage = unknown database.*");
+    private static final List<Pattern> EXISTS_PATTERNS = Arrays.asList(
+            Pattern.compile(".*errcode = 2, detailmessage = table .* already exists.*"),
+            Pattern.compile(".*errcode = 2, detailmessage = can not add column which already exists in base table:.*"),
+            Pattern.compile(".*errcode = 2, detailmessage = can't create database .*; database exists.*"));
 
     /**
      * A utility function used to determine the DORIS_DELETE_SIGN for a row change.
@@ -112,6 +124,29 @@ public class DorisParseUtils {
         }
         throw new IllegalArgumentException(
                 "Convert to LocalDate failed from unexpected value '" + obj + "' of type " + obj.getClass().getName());
+    }
+
+    public static boolean parseUnkownDatabaseError(String message) {
+        if (message == null) {
+            return false;
+        }
+        return UNKOWN_DATABASE_PATTERN.matcher(message.toLowerCase(Locale.ROOT)).matches();
+    }
+
+    public static boolean parseUnkownTableError(String message) {
+        if (message == null) {
+            return false;
+        }
+        return UNKOWN_TABLE_PATTERN.matcher(message.toLowerCase(Locale.ROOT)).matches();
+    }
+
+    public static boolean parseAlreadyExistsError(String message) {
+        for (Pattern p : EXISTS_PATTERNS) {
+            if (p.matcher(message.toLowerCase(Locale.ROOT)).matches()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private enum LogicalTypeEnum {

@@ -108,9 +108,8 @@ public class HiveTableOperations extends BaseMetastoreTableOperations {
             .build();
     private static final BiMap<String, String> ICEBERG_TO_HMS_TRANSLATION = ImmutableBiMap.of(
             // gc.enabled in Iceberg and external.table.purge in Hive
-            //      are meant to do the same things but with different names
-            GC_ENABLED, "external.table.purge"
-    );
+            // are meant to do the same things but with different names
+            GC_ENABLED, "external.table.purge");
     // the max size is based on HMS backend database. For Hive versions below 2.3, the max table
     // parameter size is 4000
     // characters, see https://issues.apache.org/jira/browse/HIVE-12274

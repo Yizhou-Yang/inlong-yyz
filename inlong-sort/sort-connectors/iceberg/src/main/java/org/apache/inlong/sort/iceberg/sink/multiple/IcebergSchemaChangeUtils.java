@@ -18,84 +18,81 @@
 package org.apache.inlong.sort.iceberg.sink.multiple;
 
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.UpdateSchema;
-import org.apache.iceberg.flink.FlinkSchemaUtil;
+import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.SupportsNamespaces;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.relocated.com.google.common.base.Joiner;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
+import org.apache.iceberg.relocated.com.google.common.collect.ImmutableMap;
 import org.apache.iceberg.types.Type;
-import org.apache.iceberg.types.Types.NestedField;
-import org.apache.inlong.sort.base.sink.TableChange;
+import org.apache.inlong.sort.schema.TableChange;
 import org.apache.inlong.sort.iceberg.FlinkTypeToType;
-import org.apache.inlong.sort.base.sink.TableChange.AddColumn;
-import org.apache.inlong.sort.base.sink.TableChange.ColumnPosition;
-import org.apache.inlong.sort.base.sink.TableChange.UnknownColumnChange;
+import org.apache.inlong.sort.util.SchemaChangeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
-public class SchemaChangeUtils {
+public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(IcebergSchemaChangeUtils.class);
 
     private static final Joiner DOT = Joiner.on(".");
 
-    /**
-     * Compare two schemas and get the schema changes that happened in them.
-     * TODO: currently only support add column
-     *
-     * @param oldSchema
-     * @param newSchema
-     * @return
-     */
-    static List<TableChange> diffSchema(Schema oldSchema, Schema newSchema) {
-        List<String> oldFields = oldSchema.columns().stream().map(NestedField::name).collect(Collectors.toList());
-        List<String> newFields = newSchema.columns().stream().map(NestedField::name).collect(Collectors.toList());
-        int oi = 0;
-        int ni = 0;
-        List<TableChange> tableChanges = new ArrayList<>();
-        while (ni < newFields.size()) {
-            if (oi < oldFields.size() && oldFields.get(oi).equals(newFields.get(ni))) {
-                oi++;
-                ni++;
-            } else {
-                NestedField newField = newSchema.findField(newFields.get(ni));
-                tableChanges.add(
-                        new AddColumn(
-                                new String[]{newField.name()},
-                                FlinkSchemaUtil.convert(newField.type()),
-                                !newField.isRequired(),
-                                newField.doc(),
-                                ni == 0 ? ColumnPosition.first() : ColumnPosition.after(newFields.get(ni - 1))));
-                ni++;
+    public static void createTable(Catalog catalog, TableIdentifier tableId, SupportsNamespaces asNamespaceCatalog,
+            Schema schema) {
+        if (!catalog.tableExists(tableId)) {
+            if (asNamespaceCatalog != null && !asNamespaceCatalog.namespaceExists(tableId.namespace())) {
+                try {
+                    asNamespaceCatalog.createNamespace(tableId.namespace());
+                    LOGGER.info("Auto create Database({}) in Catalog({}).", tableId.namespace(), catalog.name());
+                } catch (AlreadyExistsException e) {
+                    LOGGER.warn("Database({}) already exist in Catalog({})!", tableId.namespace(), catalog.name());
+                }
+            }
+            ImmutableMap.Builder<String, String> properties = ImmutableMap.builder();
+            properties.put("format-version", "2");
+            properties.put("write.upsert.enabled", "true");
+            properties.put("write.metadata.metrics.default", "full");
+            // for hive visible
+            properties.put("engine.hive.enabled", "true");
+            try {
+                catalog.createTable(tableId, schema, PartitionSpec.unpartitioned(), properties.build());
+                LOGGER.info("Auto create Table({}) in Database({}) in Catalog({})!",
+                        tableId.name(), tableId.namespace(), catalog.name());
+            } catch (AlreadyExistsException e) {
+                LOGGER.warn("Table({}) already exist in Database({}) in Catalog({})!",
+                        tableId.name(), tableId.namespace(), catalog.name());
             }
         }
-
-        if (oi != oldFields.size()) {
-            tableChanges.clear();
-            tableChanges.add(
-                    new UnknownColumnChange(
-                            String.format("Unsupported schema update.\n"
-                                    + "oldSchema:\n%s\n, newSchema:\n %s", oldSchema, newSchema)));
-        }
-
-        return tableChanges;
     }
 
     public static void applySchemaChanges(UpdateSchema pendingUpdate, List<TableChange> tableChanges) {
-        for (TableChange change : tableChanges) {
-            if (change instanceof TableChange.AddColumn) {
-                apply(pendingUpdate, (TableChange.AddColumn) change);
+        try {
+            for (TableChange change : tableChanges) {
+                if (change instanceof TableChange.AddColumn) {
+                    apply(pendingUpdate, (TableChange.AddColumn) change);
+                } else {
+                    throw new UnsupportedOperationException("Cannot apply unknown table change: " + change);
+                }
+            }
+            pendingUpdate.commit();
+        } catch (Exception e) {
+            if (e.getMessage().contains("Cannot add column, name already exists")) {
+                // try catch exception for replay ddl binlog
+                LOGGER.warn("ddl exec exception", e);
             } else {
-                throw new UnsupportedOperationException("Cannot apply unknown table change: " + change);
+                throw e;
             }
         }
-        pendingUpdate.commit();
     }
 
     public static void apply(UpdateSchema pendingUpdate, TableChange.AddColumn add) {
-        Preconditions.checkArgument(add.isNullable(),
-                "Incompatible change: cannot add required column: %s", leafName(add.fieldNames()));
         Type type = add.dataType().accept(new FlinkTypeToType(RowType.of(add.dataType())));
         pendingUpdate.addColumn(parentName(add.fieldNames()), leafName(add.fieldNames()), type, add.comment());
 

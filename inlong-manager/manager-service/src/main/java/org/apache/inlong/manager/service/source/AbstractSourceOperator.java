@@ -166,7 +166,6 @@ public abstract class AbstractSourceOperator implements StreamSourceOperator {
         // setting updated parameters of stream source entity.
         setTargetEntity(request, entity);
         entity.setModifier(operator);
-
         entity.setPreviousStatus(entity.getStatus());
 
         // re-issue task if necessary
@@ -175,21 +174,20 @@ public abstract class AbstractSourceOperator implements StreamSourceOperator {
             if (GroupStatus.forCode(groupStatus).equals(GroupStatus.CONFIG_SUCCESSFUL)) {
                 entity.setStatus(SourceStatus.TO_BE_ISSUED_RETRY.getCode());
             } else {
-                switch (SourceStatus.forCode(entity.getStatus())) {
+                switch (sourceStatus) {
                     case SOURCE_NORMAL:
                         entity.setStatus(SourceStatus.TO_BE_ISSUED_RETRY.getCode());
                         break;
                     case SOURCE_FAILED:
                         entity.setStatus(SourceStatus.SOURCE_NEW.getCode());
                         break;
+                    case HEARTBEAT_TIMEOUT:
+                        entity.setPreviousStatus(SourceStatus.TO_BE_ISSUED_RETRY.getCode());
+                        break;
                     default:
                         // others leave it be
                         break;
                 }
-            }
-            if (Objects.equals(SourceStatus.HEARTBEAT_TIMEOUT.getCode(), sourceStatus.getCode())) {
-                entity.setPreviousStatus(sourceStatus.getCode());
-                entity.setStatus(SourceStatus.HEARTBEAT_TIMEOUT.getCode());
             }
         }
 
@@ -221,8 +219,8 @@ public abstract class AbstractSourceOperator implements StreamSourceOperator {
             curEntity.setStatus(curState.getCode());
             curEntity.setPreviousStatus(nextState.getCode());
         } else {
-            curEntity.setPreviousStatus(curState.getCode());
             curEntity.setStatus(nextState.getCode());
+            curEntity.setPreviousStatus(curState.getCode());
         }
         LOGGER.info("sueccess test stop source ={}, status={}, prestatus={} ", curEntity, curEntity.getStatus(),
                 curEntity.getPreviousStatus());
