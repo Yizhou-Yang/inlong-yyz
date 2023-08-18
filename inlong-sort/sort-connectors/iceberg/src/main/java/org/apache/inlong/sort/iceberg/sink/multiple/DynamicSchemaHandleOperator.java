@@ -227,6 +227,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE == multipleSinkOption.getSchemaUpdatePolicy()) {
                 handleDirtyData(jsonNode, jsonNode, DirtyType.TABLE_IDENTIFIER_PARSE_ERROR, e,
                         TableIdentifier.of("unknown", "unknown"));
+                return;
             }
         }
         if (blacklist.contains(tableId)) {
@@ -279,7 +280,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             TableIdentifier tableId,
             boolean needDirtyMetric) {
         DirtyOptions dirtyOptions = dirtySinkHelper.getDirtyOptions();
-        if (rootNode != null) {
+        if (rootNode != null && dirtySinkHelper.getDirtySink() != null) {
             try {
                 String dirtyLabel = dynamicSchemaFormat.parse(rootNode,
                         DirtySinkHelper.regexReplace(dirtyOptions.getLabels(), DirtyType.BATCH_LOAD_ERROR, null));
@@ -291,7 +292,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
             }
-        } else {
+        } else if (dirtySinkHelper.getDirtySink() != null) {
             dirtySinkHelper.invoke(dirtyData, dirtyType, dirtyOptions.getLabels(), dirtyOptions.getLogTag(),
                     dirtyOptions.getIdentifier(), e);
         }
@@ -452,7 +453,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
                     RecordWithSchema recordWithSchema = queue.poll();
                     handleDirtyDataOfLogWithIgnore(recordWithSchema.getOriginalData(), dataSchema, tableId,
                             new RuntimeException(
-                                    String.format("SchemaUpdatePolicy %s does not support schema dynamic update!",
+                                    String.format("SchemaUpdatePolicy %s schema is exception!",
                                             multipleSinkOption.getSchemaUpdatePolicy())));
                 } else if (SchemaUpdateExceptionPolicy.STOP_PARTIAL == multipleSinkOption
                         .getSchemaUpdatePolicy()) {
