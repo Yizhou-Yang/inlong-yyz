@@ -110,40 +110,40 @@ public class JobManager extends AbstractDaemon {
     }
 
     /**
-     * submit job to work thread.
-     *
-     * @param job job
-     */
-    private void addJob(Job job) {
-        if (pendingJobs.containsKey(job.getJobInstanceId())) {
-            return;
-        }
-        try {
-            JobWrapper jobWrapper = new JobWrapper(agentManager, job);
-            JobWrapper jobWrapperRet = jobs.putIfAbsent(jobWrapper.getJob().getJobInstanceId(), jobWrapper);
-            if (jobWrapperRet != null) {
-                LOGGER.warn("{} has been added to running pool, "
-                        + "cannot be added repeatedly", job.getJobInstanceId());
-                return;
-            } else {
-                getJobMetric().jobRunningCount.incrementAndGet();
-            }
-            this.runningPool.execute(jobWrapper);
-        } catch (Exception rje) {
-            LOGGER.debug("reject job {}", job.getJobInstanceId(), rje);
-            pendingJobs.putIfAbsent(job.getJobInstanceId(), job);
-        } catch (Throwable t) {
-            ThreadUtils.threadThrowableHandler(Thread.currentThread(), t);
-        }
-    }
-
-    /**
      * add file job profile
      *
      * @param profile job profile.
      */
     public boolean submitFileJobProfile(JobProfile profile) {
         return submitJobProfile(profile, false, true);
+    }
+
+    /**
+     * make up file job
+     *
+     * @param profile job profile.
+     */
+    public void makeUpJob(JobProfile profile, boolean singleJob) {
+        LOGGER.error("need to make up job {}", profile);
+        if (!isJobValid(profile)) {
+            LOGGER.error("make up job failed, invalid profile {}", profile);
+            return;
+        }
+        String jobId = profile.get(JOB_ID);
+        if (singleJob) {
+            profile.set(JOB_INSTANCE_ID, AgentUtils.getSingleJobId(JOB_ID_PREFIX, jobId));
+        } else {
+            profile.set(JOB_INSTANCE_ID, AgentUtils.getUniqId(JOB_ID_PREFIX, jobId, index.incrementAndGet()));
+        }
+        JobProfile jobFromDb = jobProfileDb.getJobById(profile.getInstanceId());
+        if (jobFromDb == null) {
+            jobProfileDb.storeJobFirstTime(profile);
+        } else {
+            jobFromDb.set(JOB_VERSION, profile.get(JOB_VERSION));
+            profile = jobFromDb;
+        }
+        LOGGER.info("submit job final profile {}", profile.toJsonStr());
+        addJobToMemory(new Job(profile));
     }
 
     /**
@@ -174,8 +174,36 @@ public class JobManager extends AbstractDaemon {
             }
         }
         LOGGER.info("submit job final profile {}", profile.toJsonStr());
-        addJob(new Job(profile));
+        addJobToMemory(new Job(profile));
         return true;
+    }
+
+    /**
+     * submit job to work thread.
+     *
+     * @param job job
+     */
+    private void addJobToMemory(Job job) {
+        if (pendingJobs.containsKey(job.getJobInstanceId())) {
+            return;
+        }
+        try {
+            JobWrapper jobWrapper = new JobWrapper(agentManager, job);
+            JobWrapper jobWrapperRet = jobs.putIfAbsent(jobWrapper.getJob().getJobInstanceId(), jobWrapper);
+            if (jobWrapperRet != null) {
+                LOGGER.warn("{} has been added to running pool, "
+                        + "cannot be added repeatedly", job.getJobInstanceId());
+                return;
+            } else {
+                getJobMetric().jobRunningCount.incrementAndGet();
+            }
+            this.runningPool.execute(jobWrapper);
+        } catch (Exception rje) {
+            LOGGER.debug("reject job {}", job.getJobInstanceId(), rje);
+            pendingJobs.putIfAbsent(job.getJobInstanceId(), job);
+        } catch (Throwable t) {
+            ThreadUtils.threadThrowableHandler(Thread.currentThread(), t);
+        }
     }
 
     private boolean isJobValid(JobProfile profile) {
@@ -224,7 +252,7 @@ public class JobManager extends AbstractDaemon {
         List<JobProfile> profileList = jobProfileDb.getRestartJobs();
         for (JobProfile profile : profileList) {
             LOGGER.info("init starting job from db {}", profile.toJsonStr());
-            addJob(new Job(profile));
+            addJobToMemory(new Job(profile));
         }
     }
 
@@ -239,7 +267,7 @@ public class JobManager extends AbstractDaemon {
                     for (String jobId : pendingJobs.keySet()) {
                         Job job = pendingJobs.remove(jobId);
                         if (job != null) {
-                            addJob(job);
+                            addJobToMemory(job);
                         }
                     }
                     TimeUnit.SECONDS.sleep(monitorInterval);

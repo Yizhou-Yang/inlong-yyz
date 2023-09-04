@@ -38,9 +38,9 @@ import static org.apache.inlong.agent.constant.FetcherConstants.DEFAULT_AGENT_MA
 import static org.apache.inlong.agent.constant.FetcherConstants.DEFAULT_AGENT_TDM_IP_CHECK_HTTP_PATH;
 import static org.apache.inlong.agent.constant.FetcherConstants.DEFAULT_AGENT_TDM_VIP_HTTP_PATH;
 import static org.apache.inlong.agent.constant.FetcherConstants.VERSION;
+import static org.apache.inlong.agent.constant.JobConstants.JOB_FILE_TRIGGER;
 import static org.apache.inlong.agent.constant.JobConstants.JOB_OP;
 import static org.apache.inlong.agent.constant.JobConstants.JOB_RETRY_TIME;
-import static org.apache.inlong.agent.constant.JobConstants.JOB_TRIGGER;
 import static org.apache.inlong.agent.plugin.fetcher.ManagerResultFormatter.getResultData;
 import static org.apache.inlong.agent.plugin.utils.PluginUtils.copyJobProfile;
 import static org.apache.inlong.agent.utils.AgentUtils.fetchLocalIp;
@@ -93,7 +93,7 @@ public class ManagerFetcher extends AbstractDaemon implements ProfileFetcher {
     private static final int MAX_RETRY = 2;
     private final String managerVipUrl;
     private final String baseManagerUrl;
-    private final String managerTaskUrl;
+    private final String fetchAndReportFileTaskUrl;
     private final String managerIpsCheckUrl;
     private final String managerDbCollectorTaskUrl;
     private final AgentConfiguration conf;
@@ -113,7 +113,7 @@ public class ManagerFetcher extends AbstractDaemon implements ProfileFetcher {
             httpManager = new HttpManager(conf);
             baseManagerUrl = buildBaseUrl();
             managerVipUrl = buildVipUrl(baseManagerUrl);
-            managerTaskUrl = buildFileCollectTaskUrl(baseManagerUrl);
+            fetchAndReportFileTaskUrl = buildFileCollectTaskUrl(baseManagerUrl);
             managerIpsCheckUrl = buildIpCheckUrl(baseManagerUrl);
             managerDbCollectorTaskUrl = buildDbCollectorGetTaskUrl(baseManagerUrl);
             uniqId = conf.get(AGENT_UNIQ_ID, DEFAULT_AGENT_UNIQ_ID);
@@ -207,7 +207,8 @@ public class ManagerFetcher extends AbstractDaemon implements ProfileFetcher {
     public void fetchCommand() {
         LOGGER.info("fetchCommand start");
         List<CommandEntity> unackedCommands = commandDb.getUnackedCommands();
-        String resultStr = httpManager.doSentPost(managerTaskUrl, getFetchRequest(unackedCommands));
+        String resultStr = httpManager.doSentPost(fetchAndReportFileTaskUrl,
+                getFetchRequest(unackedCommands));
         JsonObject resultData = getResultData(resultStr);
         JsonElement element = resultData.get(AGENT_MANAGER_RETURN_PARAM_DATA);
         if (element != null) {
@@ -265,8 +266,8 @@ public class ManagerFetcher extends AbstractDaemon implements ProfileFetcher {
                 .map(TriggerProfile::getTriggerProfiles)
                 .forEach(profile -> {
                     LOGGER.info("the triggerProfile: {}", profile.toJsonStr());
-                    if (profile.hasKey(JOB_TRIGGER)) {
-                        dealWithTdmTriggerProfile(profile);
+                    if (profile.hasKey(JOB_FILE_TRIGGER)) {
+                        dealWithFileTriggerProfile(profile);
                     } else {
                         dealWithJobProfile(profile);
                     }
@@ -375,7 +376,7 @@ public class ManagerFetcher extends AbstractDaemon implements ProfileFetcher {
     /**
      * the trigger profile returned from manager should be parsed
      */
-    public void dealWithTdmTriggerProfile(TriggerProfile triggerProfile) {
+    public void dealWithFileTriggerProfile(TriggerProfile triggerProfile) {
         ManagerOpEnum opType = ManagerOpEnum.getOpType(triggerProfile.getInt(JOB_OP));
         boolean success = true;
         try {

@@ -167,6 +167,21 @@ public class SenderManager {
         shutdown = true;
         resendExecutorService.shutdown();
         sender.close();
+        cleanResendQueue();
+    }
+
+    private void cleanResendQueue() {
+        while (!resendQueue.isEmpty()) {
+            try {
+                AgentSenderCallback callback = resendQueue.poll(1, TimeUnit.SECONDS);
+                if (callback != null) {
+                    MemoryManager.getInstance()
+                            .release(AGENT_GLOBAL_WRITER_PERMIT, (int) callback.batchMessage.getTotalSize());
+                }
+            } catch (InterruptedException e) {
+                LOGGER.error("clean resend queue error{}", e.getMessage());
+            }
+        }
     }
 
     private AgentMetricItem getMetricItem(Map<String, String> otherDimensions) {
@@ -211,6 +226,9 @@ public class SenderManager {
     }
 
     public void sendBatch(BatchProxyMessage batchMessage) {
+        while (!resendQueue.isEmpty()) {
+            AgentUtils.silenceSleepInMs(retrySleepTime);
+        }
         sendBatchWithRetryCount(batchMessage, 0);
     }
 

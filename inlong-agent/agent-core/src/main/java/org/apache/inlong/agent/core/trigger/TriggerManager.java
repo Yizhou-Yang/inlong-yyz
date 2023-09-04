@@ -65,13 +65,13 @@ public class TriggerManager extends AbstractDaemon {
     }
 
     /**
-     * Restore trigger task.
+     * add trigger task to memory.
      *
      * @param triggerProfile trigger profile
      */
-    public boolean restoreTrigger(TriggerProfile triggerProfile) {
+    public boolean addTriggerToMemory(TriggerProfile triggerProfile) {
         try {
-            Class<?> triggerClass = Class.forName(triggerProfile.get(JobConstants.JOB_TRIGGER));
+            Class<?> triggerClass = Class.forName(triggerProfile.get(JobConstants.JOB_FILE_TRIGGER));
             Trigger trigger = (Trigger) triggerClass.newInstance();
             String triggerId = triggerProfile.get(JOB_ID);
             if (triggerMap.containsKey(triggerId)) {
@@ -118,7 +118,7 @@ public class TriggerManager extends AbstractDaemon {
         // This action must be done before saving in db, because the job.instance.id is needed for the next recovery
         manager.getJobManager().submitJobProfile(triggerProfile, true, isNewJob);
         triggerProfileDB.storeTrigger(triggerProfile);
-        restoreTrigger(triggerProfile);
+        addTriggerToMemory(triggerProfile);
     }
 
     /**
@@ -158,6 +158,7 @@ public class TriggerManager extends AbstractDaemon {
                             JobWrapper job = jobWrapperMap.get(trigger.getTriggerProfile().getInstanceId());
                             if (job == null) {
                                 LOGGER.error("job {} should not be null", trigger.getTriggerProfile().getInstanceId());
+                                manager.getJobManager().makeUpJob(trigger.getTriggerProfile(), true);
                                 return;
                             }
                             String subTaskFile = profile.getOrDefault(JobConstants.JOB_DIR_FILTER_PATTERNS, "");
@@ -169,7 +170,7 @@ public class TriggerManager extends AbstractDaemon {
                             // necessary to filter the stated monitored file task.
 
                             boolean alreadyExistTask = job.exist(tasks -> tasks.stream()
-                                    .filter(task -> !task.getJobConf().hasKey(JobConstants.JOB_TRIGGER))
+                                    .filter(task -> !task.getJobConf().hasKey(JobConstants.JOB_FILE_TRIGGER))
                                     .filter(task -> subTaskFile.equals(
                                             task.getJobConf().get(JobConstants.JOB_DIR_FILTER_PATTERNS, "")))
                                     .findAny().isPresent());
@@ -200,7 +201,7 @@ public class TriggerManager extends AbstractDaemon {
         // fetch all triggers from db
         List<TriggerProfile> profileList = triggerProfileDB.getTriggers();
         for (TriggerProfile profile : profileList) {
-            restoreTrigger(profile);
+            addTriggerToMemory(profile);
         }
     }
 

@@ -17,7 +17,6 @@
 
 package org.apache.inlong.agent.plugin.filter;
 
-import com.google.common.collect.Sets;
 import org.apache.inlong.agent.conf.JobProfile;
 import org.apache.inlong.agent.plugin.AgentBaseTestsHelper;
 import org.apache.inlong.agent.plugin.Reader;
@@ -79,7 +78,7 @@ public class TestDateFormatRegex {
         File file = Paths.get(helper.getTestRootDir().toString(), pathTime.concat(".log")).toFile();
         file.createNewFile();
         PathPattern entity = new PathPattern(helper.getTestRootDir().toString(),
-                Collections.singleton(helper.getTestRootDir().toString() + "/yyyyMMdd.log"), Sets.newHashSet(), "-1d");
+                Collections.singleton(helper.getTestRootDir().toString() + "/yyyyMMdd.log"), "-1d");
         boolean flag = entity.suitable(file.getPath());
         Assert.assertTrue(flag);
     }

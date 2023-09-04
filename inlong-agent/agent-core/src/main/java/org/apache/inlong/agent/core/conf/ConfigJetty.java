@@ -18,7 +18,7 @@
 package org.apache.inlong.agent.core.conf;
 
 import static org.apache.inlong.agent.constant.JobConstants.JOB_SOURCE_TYPE;
-import static org.apache.inlong.agent.constant.JobConstants.JOB_TRIGGER;
+import static org.apache.inlong.agent.constant.JobConstants.JOB_FILE_TRIGGER;
 
 import java.io.Closeable;
 import org.apache.inlong.agent.conf.AgentConfiguration;
@@ -85,7 +85,7 @@ public class ConfigJetty implements Closeable {
         // store job conf to bdb
         if (jobProfile != null) {
             // trigger job is a special kind of job
-            if (jobProfile.hasKey(JOB_TRIGGER)) {
+            if (jobProfile.hasKey(JOB_FILE_TRIGGER)) {
                 triggerManager.submitTrigger(
                         TriggerProfile.parseJsonStr(jobProfile.toJsonStr()), true);
             } else {
@@ -121,7 +121,7 @@ public class ConfigJetty implements Closeable {
      */
     public void deleteJobConf(JobProfile jobProfile) {
         if (jobProfile != null) {
-            if (jobProfile.hasKey(JOB_TRIGGER)) {
+            if (jobProfile.hasKey(JOB_FILE_TRIGGER)) {
                 triggerManager.deleteTrigger(TriggerProfile.parseJobProfile(jobProfile).getTriggerId(), false);
             } else {
                 jobManager.deleteJob(jobProfile.getInstanceId(), false);

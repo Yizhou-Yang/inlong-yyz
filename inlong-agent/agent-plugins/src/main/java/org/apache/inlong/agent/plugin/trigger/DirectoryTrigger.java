@@ -17,19 +17,10 @@
 
 package org.apache.inlong.agent.plugin.trigger;
 
+import static org.apache.inlong.agent.constant.JobConstants.JOB_DIR_FILTER_PATTERNS;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Sets;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.inlong.agent.conf.TriggerProfile;
-import org.apache.inlong.agent.constant.AgentConstants;
-import org.apache.inlong.agent.constant.FileTriggerType;
-import org.apache.inlong.agent.constant.JobConstants;
-import org.apache.inlong.agent.plugin.Trigger;
-import org.apache.inlong.agent.utils.AgentUtils;
-import org.apache.inlong.agent.utils.ThreadUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -50,9 +41,15 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.apache.inlong.agent.constant.JobConstants.JOB_DIR_FILTER_BLACKLIST;
-import static org.apache.inlong.agent.constant.JobConstants.JOB_DIR_FILTER_PATTERNS;
+import org.apache.inlong.agent.conf.TriggerProfile;
+import org.apache.inlong.agent.constant.AgentConstants;
+import org.apache.inlong.agent.constant.FileTriggerType;
+import org.apache.inlong.agent.constant.JobConstants;
+import org.apache.inlong.agent.plugin.Trigger;
+import org.apache.inlong.agent.utils.AgentUtils;
+import org.apache.inlong.agent.utils.ThreadUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Watch directory, if new valid files are created, create jobs correspondingly.
@@ -103,8 +100,8 @@ public class DirectoryTrigger implements Trigger {
     /**
      * register pathPattern into watchers, with offset
      */
-    public Set<String> register(Set<String> whiteList, String offset, Set<String> blackList) throws IOException {
-        this.pathPatterns = PathPattern.buildPathPattern(whiteList, offset, blackList);
+    public Set<String> register(Set<String> whiteList, String offset) throws IOException {
+        this.pathPatterns = PathPattern.buildPathPattern(whiteList, offset);
         LOGGER.info("Watch root path is {}", pathPatterns);
 
         resourceProviderThread.initTrigger(this);
@@ -120,12 +117,8 @@ public class DirectoryTrigger implements Trigger {
         if (this.profile.hasKey(JOB_DIR_FILTER_PATTERNS)) {
             Set<String> pathPatterns = Stream.of(
                     this.profile.get(JOB_DIR_FILTER_PATTERNS).split(",")).collect(Collectors.toSet());
-            Set<String> blackList = Stream.of(
-                    this.profile.get(JOB_DIR_FILTER_BLACKLIST, "").split(","))
-                    .filter(black -> !StringUtils.isBlank(black))
-                    .collect(Collectors.toSet());
             String timeOffset = this.profile.get(JobConstants.JOB_FILE_TIME_OFFSET, "");
-            register(pathPatterns, timeOffset, blackList);
+            register(pathPatterns, timeOffset);
         }
     }
 
@@ -294,7 +287,7 @@ public class DirectoryTrigger implements Trigger {
                         Map<String, String> taskProfile = new HashMap<>();
                         String md5 = AgentUtils.getFileMd5(path.toFile());
                         taskProfile.put(path.toFile().getAbsolutePath() + ".md5", md5);
-                        taskProfile.put(JobConstants.JOB_TRIGGER, null); // del trigger id
+                        taskProfile.put(JobConstants.JOB_FILE_TRIGGER, null); // del trigger id
                         taskProfile.put(JobConstants.JOB_DIR_FILTER_PATTERNS, path.toFile().getAbsolutePath());
                         LOGGER.info("trigger_{} generate job profile to read file {}",
                                 trigger.getTriggerProfile().getTriggerId(), path);

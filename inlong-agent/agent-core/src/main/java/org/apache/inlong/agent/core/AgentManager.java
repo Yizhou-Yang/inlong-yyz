@@ -17,30 +17,22 @@
 
 package org.apache.inlong.agent.core;
 
-import static org.apache.inlong.agent.constant.AgentConstants.AGENT_CONF_PARENT;
-import static org.apache.inlong.agent.constant.AgentConstants.DEFAULT_AGENT_CONF_PARENT;
-import static org.apache.inlong.agent.constant.JobConstants.JOB_TRIGGER;
-
 import java.io.File;
 import java.lang.reflect.Constructor;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.inlong.agent.common.AbstractDaemon;
 import org.apache.inlong.agent.conf.AgentConfiguration;
-import org.apache.inlong.agent.conf.JobProfile;
 import org.apache.inlong.agent.conf.ProfileFetcher;
-import org.apache.inlong.agent.conf.TriggerProfile;
 import org.apache.inlong.agent.constant.AgentConstants;
 import org.apache.inlong.agent.core.conf.ConfigJetty;
 import org.apache.inlong.agent.core.job.JobManager;
-import org.apache.inlong.agent.core.task.TaskManager;
 import org.apache.inlong.agent.core.task.PositionManager;
+import org.apache.inlong.agent.core.task.TaskManager;
 import org.apache.inlong.agent.core.trigger.TriggerManager;
 import org.apache.inlong.agent.db.CommandDb;
 import org.apache.inlong.agent.db.Db;
 import org.apache.inlong.agent.db.JobProfileDb;
-import org.apache.inlong.agent.db.LocalProfile;
 import org.apache.inlong.agent.db.TriggerProfileDb;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +53,6 @@ public class AgentManager extends AbstractDaemon {
     private final AgentConfiguration conf;
     private final ExecutorService agentConfMonitor;
     private final Db db;
-    private final LocalProfile localProfile;
     private final CommandDb commandDb;
     private final JobProfileDb jobProfileDb;
     // jetty for config operations via http.
@@ -73,8 +64,6 @@ public class AgentManager extends AbstractDaemon {
         this.db = initDb();
         commandDb = new CommandDb(db);
         jobProfileDb = new JobProfileDb(db);
-        String parentConfPath = conf.get(AGENT_CONF_PARENT, DEFAULT_AGENT_CONF_PARENT);
-        localProfile = new LocalProfile(parentConfPath);
         triggerManager = new TriggerManager(this, new TriggerProfileDb(db));
         jobManager = new JobManager(this, jobProfileDb);
         taskManager = new TaskManager(this);
@@ -206,20 +195,6 @@ public class AgentManager extends AbstractDaemon {
         LOGGER.info("starting task position manager");
         positionManager.start();
         LOGGER.info("starting read job from local");
-        // read job profiles from local
-        List<JobProfile> profileList = localProfile.readFromLocal();
-        for (JobProfile profile : profileList) {
-            if (profile.hasKey(JOB_TRIGGER)) {
-                TriggerProfile triggerProfile = TriggerProfile.parseJobProfile(profile);
-                // there is no need to store this profile in triggerDB, because
-                // this profile comes from local file.
-                triggerManager.restoreTrigger(triggerProfile);
-            } else {
-                // job db store instance info, so it's suitable to use submitJobProfile
-                // to store instance into job db.
-                jobManager.submitFileJobProfile(profile);
-            }
-        }
         LOGGER.info("starting fetcher");
         if (fetcher != null) {
             fetcher.start();
