@@ -17,10 +17,10 @@
 
 package org.apache.inlong.sort.cdc.sqlserver;
 
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.sqlserver.SqlServerValidator;
-import com.ververica.cdc.connectors.sqlserver.table.StartupOptions;
-import org.apache.inlong.sort.cdc.sqlserver.table.DebeziumSourceFunction;
-import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.sqlserver.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.sqlserver.debezium.DebeziumSourceFunction;
 import io.debezium.connector.sqlserver.SqlServerConnector;
 
 import java.util.Properties;
@@ -53,6 +53,7 @@ public class SqlServerSource {
         private DebeziumDeserializationSchema<T> deserializer;
         private String inlongMetric;
         private String auditHostAndPorts;
+        private boolean sourceMultipleEnable;
 
         public Builder<T> hostname(String hostname) {
             this.hostname = hostname;
@@ -126,6 +127,11 @@ public class SqlServerSource {
             return this;
         }
 
+        public Builder<T> sourceMultipleEnable(boolean sourceMultipleEnable) {
+            this.sourceMultipleEnable = sourceMultipleEnable;
+            return this;
+        }
+
         public DebeziumSourceFunction<T> build() {
             Properties props = new Properties();
             props.setProperty("connector.class", SqlServerConnector.class.getCanonicalName());
@@ -151,9 +157,6 @@ public class SqlServerSource {
                 case INITIAL:
                     props.setProperty("snapshot.mode", "initial");
                     break;
-                case INITIAL_ONLY:
-                    props.setProperty("snapshot.mode", "initial_only");
-                    break;
                 case LATEST_OFFSET:
                     props.setProperty("snapshot.mode", "schema_only");
                     break;
@@ -167,7 +170,7 @@ public class SqlServerSource {
 
             return new DebeziumSourceFunction<>(
                     deserializer, props, null, new SqlServerValidator(props),
-                    inlongMetric, auditHostAndPorts);
+                    inlongMetric, auditHostAndPorts, sourceMultipleEnable);
         }
     }
 }

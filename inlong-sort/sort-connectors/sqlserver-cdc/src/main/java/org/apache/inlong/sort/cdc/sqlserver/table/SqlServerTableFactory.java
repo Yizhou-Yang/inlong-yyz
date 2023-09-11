@@ -17,9 +17,11 @@
 
 package org.apache.inlong.sort.cdc.sqlserver.table;
 
-import com.ververica.cdc.connectors.sqlserver.table.StartupOptions;
+import com.ververica.cdc.connectors.base.options.StartupOptions;
+import com.ververica.cdc.connectors.base.utils.OptionUtils;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -27,16 +29,31 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECTION_POOL_SIZE;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_MAX_RETRIES;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_TIMEOUT;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
+import static com.ververica.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
+import static org.apache.flink.util.Preconditions.checkState;
 import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SOURCE_MULTIPLE_ENABLE;
 
 /** Factory for creating configured instance of {@link SqlServerTableSource}. */
 public class SqlServerTableFactory implements DynamicTableSourceFactory {
@@ -75,12 +92,6 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                     .noDefaultValue()
                     .withDescription("Database name of the SqlServer server to monitor.");
 
-    private static final ConfigOption<String> SCHEMA_NAME =
-            ConfigOptions.key("schema-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Schema name of the SqlServer database to monitor.");
-
     private static final ConfigOption<String> TABLE_NAME =
             ConfigOptions.key("table-name")
                     .stringType()
@@ -99,7 +110,15 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                     .defaultValue("initial")
                     .withDescription(
                             "Optional startup mode for SqlServer CDC consumer, valid enumerations are "
-                                    + "\"initial\", \"initial-only\", \"latest-offset\"");
+                                    + "\"initial\", \"latest-offset\"");
+
+    public static final ConfigOption<Duration> HEARTBEAT_INTERVAL =
+            ConfigOptions.key("heartbeat.interval")
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(30))
+                    .withDescription(
+                            "Optional interval of sending heartbeat event for tracing the "
+                                    + "latest available offsets");
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
@@ -111,7 +130,6 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         String hostname = config.get(HOSTNAME);
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
-        String schemaName = config.get(SCHEMA_NAME);
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
         String inlongMetric = config.getOptional(INLONG_METRIC).orElse(null);
@@ -122,19 +140,59 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
 
+        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
+        int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
+        Duration connectTimeout = config.get(CONNECT_TIMEOUT);
+        int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
+        int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
+        double distributionFactorUpper = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        double distributionFactorLower = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        String chunkKeyColumn =
+                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
+        boolean closeIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        final boolean sourceMultipleEnable = config.get(SOURCE_MULTIPLE_ENABLE);
+        Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
+
+        if (enableParallelRead) {
+            validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
+            validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
+            validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
+            validateIntegerOption(CONNECTION_POOL_SIZE, connectionPoolSize, 1);
+            validateIntegerOption(CONNECT_MAX_RETRIES, connectMaxRetries, 0);
+            validateDistributionFactorUpper(distributionFactorUpper);
+            validateDistributionFactorLower(distributionFactorLower);
+        }
+
+        OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
+
         return new SqlServerTableSource(
                 physicalSchema,
                 port,
                 hostname,
                 databaseName,
-                schemaName,
                 tableName,
                 serverTimeZone,
                 username,
                 password,
                 getDebeziumProperties(context.getCatalogTable().getOptions()),
                 startupOptions,
-                inlongMetric, auditHostAndPorts);
+                enableParallelRead,
+                splitSize,
+                splitMetaGroupSize,
+                fetchSize,
+                connectTimeout,
+                connectionPoolSize,
+                connectMaxRetries,
+                distributionFactorUpper,
+                distributionFactorLower,
+                chunkKeyColumn,
+                closeIdleReaders,
+                inlongMetric,
+                auditHostAndPorts,
+                sourceMultipleEnable,
+                heartbeatInterval);
     }
 
     @Override
@@ -149,7 +207,6 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(DATABASE_NAME);
-        options.add(SCHEMA_NAME);
         options.add(TABLE_NAME);
         return options;
     }
@@ -160,14 +217,25 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         options.add(PORT);
         options.add(SERVER_TIME_ZONE);
         options.add(SCAN_STARTUP_MODE);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        options.add(CHUNK_META_GROUP_SIZE);
+        options.add(SCAN_SNAPSHOT_FETCH_SIZE);
+        options.add(CONNECT_TIMEOUT);
+        options.add(CONNECT_MAX_RETRIES);
+        options.add(CONNECTION_POOL_SIZE);
+        options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
+        options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(INLONG_METRIC);
         options.add(INLONG_AUDIT);
         options.add(AUDIT_KEYS);
+        options.add(SOURCE_MULTIPLE_ENABLE);
         return options;
     }
 
     private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
-    private static final String SCAN_STARTUP_MODE_VALUE_INITIAL_ONLY = "initial-only";
     private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
 
     private static StartupOptions getStartupOptions(ReadableConfig config) {
@@ -177,21 +245,51 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
             case SCAN_STARTUP_MODE_VALUE_INITIAL:
                 return StartupOptions.initial();
 
-            case SCAN_STARTUP_MODE_VALUE_INITIAL_ONLY:
-                return StartupOptions.initialOnly();
-
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
 
             default:
                 throw new ValidationException(
                         String.format(
-                                "Invalid value for option '%s'. Supported values are [%s, %s, %s], but was: %s",
+                                "Invalid value for option '%s'. Supported values are [%s, %s], but was: %s",
                                 SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
-                                SCAN_STARTUP_MODE_VALUE_INITIAL_ONLY,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
                                 modeString));
         }
+    }
+
+    /** Checks the value of given integer option is valid. */
+    private void validateIntegerOption(
+            ConfigOption<Integer> option, int optionValue, int exclusiveMin) {
+        checkState(
+                optionValue > exclusiveMin,
+                String.format(
+                        "The value of option '%s' must larger than %d, but is %d",
+                        option.key(), exclusiveMin, optionValue));
+    }
+
+    /** Checks the value of given evenly distribution factor upper bound is valid. */
+    private void validateDistributionFactorUpper(double distributionFactorUpper) {
+        checkState(
+                doubleCompare(distributionFactorUpper, 1.0d) >= 0,
+                String.format(
+                        "The value of option '%s' must larger than or equals %s, but is %s",
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.key(),
+                        1.0d,
+                        distributionFactorUpper));
+    }
+
+    /** Checks the value of given evenly distribution factor lower bound is valid. */
+    private void validateDistributionFactorLower(double distributionFactorLower) {
+        checkState(
+                doubleCompare(distributionFactorLower, 0.0d) >= 0
+                        && doubleCompare(distributionFactorLower, 1.0d) <= 0,
+                String.format(
+                        "The value of option '%s' must between %s and %s inclusively, but is %s",
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
+                        0.0d,
+                        1.0d,
+                        distributionFactorLower));
     }
 }

@@ -17,26 +17,29 @@
 
 package org.apache.inlong.sort.cdc.sqlserver.table;
 
-import com.ververica.cdc.connectors.sqlserver.table.SqlServerDeserializationConverterFactory;
-import com.ververica.cdc.connectors.sqlserver.table.SqlServerReadableMetadata;
-import com.ververica.cdc.connectors.sqlserver.table.StartupOptions;
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.types.RowKind;
 
 import org.apache.inlong.sort.cdc.sqlserver.SqlServerSource;
-import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import com.ververica.cdc.debezium.table.MetadataConverter;
-import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
+import org.apache.inlong.sort.cdc.sqlserver.base.source.jdbc.JdbcIncrementalSource;
+import org.apache.inlong.sort.cdc.sqlserver.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.sqlserver.debezium.DebeziumSourceFunction;
+import org.apache.inlong.sort.cdc.sqlserver.debezium.table.MetadataConverter;
+import org.apache.inlong.sort.cdc.sqlserver.debezium.table.RowDataDebeziumDeserializeSchema;
+import org.apache.inlong.sort.cdc.sqlserver.source.SqlServerSourceBuilder;
 
+import javax.annotation.Nullable;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
@@ -58,13 +61,23 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
     private final int port;
     private final String hostname;
     private final String database;
-    private final String schemaName;
     private final String tableName;
     private final ZoneId serverTimeZone;
     private final String username;
     private final String password;
     private final Properties dbzProperties;
     private final StartupOptions startupOptions;
+    private final boolean enableParallelRead;
+    private final int splitSize;
+    private final int splitMetaGroupSize;
+    private final int fetchSize;
+    private final Duration connectTimeout;
+    private final int connectionPoolSize;
+    private final int connectMaxRetries;
+    private final double distributionFactorUpper;
+    private final double distributionFactorLower;
+    private final String chunkKeyColumn;
+    private final boolean closeIdleReaders;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -80,45 +93,68 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
 
     private String auditHostAndPorts;
 
+    private final boolean sourceMultipleEnable;
+
+    private Duration heartbeatInterval;
+
     public SqlServerTableSource(
             ResolvedSchema physicalSchema,
             int port,
             String hostname,
             String database,
-            String schemaName,
             String tableName,
             ZoneId serverTimeZone,
             String username,
             String password,
             Properties dbzProperties,
             StartupOptions startupOptions,
+            boolean enableParallelRead,
+            int splitSize,
+            int splitMetaGroupSize,
+            int fetchSize,
+            Duration connectTimeout,
+            int connectMaxRetries,
+            int connectionPoolSize,
+            double distributionFactorUpper,
+            double distributionFactorLower,
+            @Nullable String chunkKeyColumn,
+            boolean closeIdleReaders,
             String inlongMetric,
-            String auditHostAndPorts) {
+            String auditHostAndPorts,
+            boolean sourceMultipleEnable,
+            Duration heartbeatInterval) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
         this.database = checkNotNull(database);
-        this.schemaName = checkNotNull(schemaName);
         this.tableName = checkNotNull(tableName);
         this.serverTimeZone = serverTimeZone;
         this.username = checkNotNull(username);
         this.password = checkNotNull(password);
         this.dbzProperties = dbzProperties;
+        this.startupOptions = startupOptions;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
-        this.startupOptions = startupOptions;
+        this.enableParallelRead = enableParallelRead;
+        this.splitSize = splitSize;
+        this.splitMetaGroupSize = splitMetaGroupSize;
+        this.fetchSize = fetchSize;
+        this.connectTimeout = connectTimeout;
+        this.connectionPoolSize = connectionPoolSize;
+        this.connectMaxRetries = connectMaxRetries;
+        this.distributionFactorUpper = distributionFactorUpper;
+        this.distributionFactorLower = distributionFactorLower;
+        this.chunkKeyColumn = chunkKeyColumn;
+        this.closeIdleReaders = closeIdleReaders;
         this.inlongMetric = inlongMetric;
         this.auditHostAndPorts = auditHostAndPorts;
+        this.sourceMultipleEnable = sourceMultipleEnable;
+        this.heartbeatInterval = heartbeatInterval;
     }
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return ChangelogMode.newBuilder()
-                .addContainedKind(RowKind.INSERT)
-                .addContainedKind(RowKind.UPDATE_BEFORE)
-                .addContainedKind(RowKind.UPDATE_AFTER)
-                .addContainedKind(RowKind.DELETE)
-                .build();
+        return ChangelogMode.all();
     }
 
     @Override
@@ -136,22 +172,54 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         .setServerTimeZone(serverTimeZone)
                         .setUserDefinedConverterFactory(
                                 SqlServerDeserializationConverterFactory.instance())
+                        .setSourceMultipleEnable(sourceMultipleEnable)
                         .build();
-        DebeziumSourceFunction<RowData> sourceFunction =
-                SqlServerSource.<RowData>builder()
-                        .hostname(hostname)
-                        .port(port)
-                        .database(database)
-                        .tableList(schemaName + "." + tableName)
-                        .username(username)
-                        .password(password)
-                        .debeziumProperties(dbzProperties)
-                        .startupOptions(startupOptions)
-                        .deserializer(deserializer)
-                        .inlongMetric(inlongMetric)
-                        .auditHostAndPorts(auditHostAndPorts)
-                        .build();
-        return SourceFunctionProvider.of(sourceFunction, false);
+
+        if (enableParallelRead) {
+            JdbcIncrementalSource<RowData> sqlServerChangeEventSource =
+                    SqlServerSourceBuilder.SqlServerIncrementalSource.<RowData>builder()
+                            .hostname(hostname)
+                            .port(port)
+                            .databaseList(database)
+                            .tableList(tableName)
+                            .serverTimeZone(serverTimeZone.toString())
+                            .username(username)
+                            .password(password)
+                            .startupOptions(startupOptions)
+                            .deserializer(deserializer)
+                            .debeziumProperties(dbzProperties)
+                            .splitSize(splitSize)
+                            .splitMetaGroupSize(splitMetaGroupSize)
+                            .fetchSize(fetchSize)
+                            .connectTimeout(connectTimeout)
+                            .connectionPoolSize(connectionPoolSize)
+                            .connectMaxRetries(connectMaxRetries)
+                            .distributionFactorUpper(distributionFactorUpper)
+                            .distributionFactorLower(distributionFactorLower)
+                            .chunkKeyColumn(chunkKeyColumn)
+                            .closeIdleReaders(closeIdleReaders)
+                            .inlongMetric(inlongMetric)
+                            .heartbeatInterval(heartbeatInterval)
+                            .migrateAll(sourceMultipleEnable)
+                            .build();
+            return SourceProvider.of(sqlServerChangeEventSource);
+        } else {
+            DebeziumSourceFunction<RowData> sourceFunction =
+                    SqlServerSource.<RowData>builder()
+                            .hostname(hostname)
+                            .port(port)
+                            .database(database)
+                            .tableList(tableName)
+                            .username(username)
+                            .password(password)
+                            .debeziumProperties(dbzProperties)
+                            .startupOptions(startupOptions)
+                            .deserializer(deserializer)
+                            .inlongMetric(inlongMetric)
+                            .sourceMultipleEnable(sourceMultipleEnable)
+                            .build();
+            return SourceFunctionProvider.of(sourceFunction, false);
+        }
     }
 
     private MetadataConverter[] getMetadataConverters() {
@@ -177,15 +245,27 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         port,
                         hostname,
                         database,
-                        schemaName,
                         tableName,
                         serverTimeZone,
                         username,
                         password,
                         dbzProperties,
                         startupOptions,
+                        enableParallelRead,
+                        splitSize,
+                        splitMetaGroupSize,
+                        fetchSize,
+                        connectTimeout,
+                        connectionPoolSize,
+                        connectMaxRetries,
+                        distributionFactorUpper,
+                        distributionFactorLower,
+                        chunkKeyColumn,
+                        closeIdleReaders,
                         inlongMetric,
-                        auditHostAndPorts);
+                        auditHostAndPorts,
+                        sourceMultipleEnable,
+                        heartbeatInterval);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -204,7 +284,6 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(physicalSchema, that.physicalSchema)
                 && Objects.equals(hostname, that.hostname)
                 && Objects.equals(database, that.database)
-                && Objects.equals(schemaName, that.schemaName)
                 && Objects.equals(tableName, that.tableName)
                 && Objects.equals(serverTimeZone, that.serverTimeZone)
                 && Objects.equals(username, that.username)
@@ -212,7 +291,18 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(dbzProperties, that.dbzProperties)
                 && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(producedDataType, that.producedDataType)
-                && Objects.equals(metadataKeys, that.metadataKeys);
+                && Objects.equals(metadataKeys, that.metadataKeys)
+                && Objects.equals(enableParallelRead, that.enableParallelRead)
+                && Objects.equals(splitSize, that.splitSize)
+                && Objects.equals(splitMetaGroupSize, that.splitMetaGroupSize)
+                && Objects.equals(fetchSize, that.fetchSize)
+                && Objects.equals(connectTimeout, that.connectTimeout)
+                && Objects.equals(connectMaxRetries, that.connectMaxRetries)
+                && Objects.equals(connectionPoolSize, that.connectionPoolSize)
+                && Objects.equals(distributionFactorUpper, that.distributionFactorUpper)
+                && Objects.equals(distributionFactorLower, that.distributionFactorLower)
+                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
+                && Objects.equals(closeIdleReaders, that.closeIdleReaders);
     }
 
     @Override
@@ -222,7 +312,6 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 port,
                 hostname,
                 database,
-                schemaName,
                 tableName,
                 serverTimeZone,
                 username,
@@ -230,7 +319,18 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 dbzProperties,
                 startupOptions,
                 producedDataType,
-                metadataKeys);
+                metadataKeys,
+                enableParallelRead,
+                splitSize,
+                splitMetaGroupSize,
+                fetchSize,
+                connectTimeout,
+                connectMaxRetries,
+                connectionPoolSize,
+                distributionFactorUpper,
+                distributionFactorLower,
+                chunkKeyColumn,
+                closeIdleReaders);
     }
 
     @Override

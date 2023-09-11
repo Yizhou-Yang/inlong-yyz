@@ -29,6 +29,11 @@
     <packaging>jar</packaging>
     <name>Apache InLong - Sort-connector-sqlserver-cdc</name>
 
+    <properties>
+        <debezium.version>1.9.7.Final</debezium.version>
+        <flink.cdc.base.version>2.4.0</flink.cdc.base.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.ververica</groupId>
@@ -38,6 +43,12 @@
             <groupId>org.apache.inlong</groupId>
             <artifactId>sort-connector-base</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.inlong</groupId>
+            <artifactId>sort-format-json</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
@@ -62,6 +73,7 @@
                                     <include>io.debezium:debezium-core</include>
                                     <include>io.debezium:debezium-connector-sqlserver</include>
                                     <include>com.ververica:flink-connector-debezium</include>
+                                    <include>com.ververica:flink-cdc-base</include>
                                     <include>com.ververica:flink-connector-sqlserver-cdc</include>
                                     <include>com.microsoft.sqlserver:*</include>
                                     <include>org.apache.kafka:*</include>
@@ -90,6 +102,14 @@
                                             dependency graph, nor are any jersey files bundled. -->
                                         <exclude>NOTICE</exclude>
                                         <exclude>common/**</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
                                     </excludes>
                                 </filter>
                             </filters>

@@ -67,6 +67,8 @@ public class CanalJson {
     private Boolean incremental;
     @JsonProperty("dataSourceName")
     private String dataSourceName;
+    @JsonProperty("sqlServerType")
+    private Map<String, String> sqlServerType;
 
     @JsonCreator
     public CanalJson(@Nullable @JsonProperty("data") List<Map<String, Object>> data,
@@ -84,7 +86,8 @@ public class CanalJson {
             @Nullable @JsonProperty("oracleType") Map<String, String> oracleType,
             @JsonProperty("operation") Operation operation,
             @JsonProperty("incremental") Boolean incremental,
-            @JsonProperty("dataSourceName") String dataSourceName) {
+            @JsonProperty("dataSourceName") String dataSourceName,
+            @Nullable @JsonProperty("sqlServerType") Map<String, String> sqlServerType) {
         this.data = data;
         this.es = es;
         this.table = table;
@@ -101,6 +104,7 @@ public class CanalJson {
         this.operation = operation;
         this.incremental = incremental;
         this.dataSourceName = dataSourceName;
+        this.sqlServerType = sqlServerType;
     }
 
 }

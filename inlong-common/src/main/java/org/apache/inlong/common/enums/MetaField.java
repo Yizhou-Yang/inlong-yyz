@@ -120,6 +120,8 @@ public enum MetaField {
      */
     ORACLE_TYPE,
 
+    SQLSERVER_TYPE,
+
     /**
      * Primary key field name. Currently, it is used for MySQL database.
      */
