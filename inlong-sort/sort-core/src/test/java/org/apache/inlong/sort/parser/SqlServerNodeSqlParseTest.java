@@ -82,7 +82,7 @@ public class SqlServerNodeSqlParseTest extends AbstractTestBase {
                 new FieldInfo("schema_name", new StringFormatInfo()));
         return new SqlServerExtractNode(id, "sqlserver_out", fields, null, null,
                 null, "localhost", 1433, "SA", "INLONG*123",
-                "column_type_test", "dbo", "full_types", null);
+                "column_type_test", "dbo", "dbo.full_types", null);
     }
 
     /**

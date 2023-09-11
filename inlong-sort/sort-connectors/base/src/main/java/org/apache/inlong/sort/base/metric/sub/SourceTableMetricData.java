@@ -194,6 +194,8 @@ public class SourceTableMetricData extends SourceMetricData implements SourceSub
             boolean isSnapshotRecord, Object data) {
         if (StringUtils.isBlank(database) || StringUtils.isBlank(schema) || StringUtils.isBlank(table)) {
             outputMetricsWithEstimate(data);
+            // output read phase metric
+            outputReadPhaseMetrics((isSnapshotRecord) ? ReadPhase.SNAPSHOT_PHASE : ReadPhase.INCREASE_PHASE);
             return;
         }
         // output sub source metric
@@ -215,6 +217,8 @@ public class SourceTableMetricData extends SourceMetricData implements SourceSub
             boolean isSnapshotRecord, Object data, long fetchDelay, long emitDelay) {
         if (StringUtils.isBlank(database) || StringUtils.isBlank(schema) || StringUtils.isBlank(table)) {
             outputMetricsWithEstimate(data, fetchDelay, emitDelay);
+            // output read phase metric
+            outputReadPhaseMetrics((isSnapshotRecord) ? ReadPhase.SNAPSHOT_PHASE : ReadPhase.INCREASE_PHASE);
             return;
         }
         // output sub source metric

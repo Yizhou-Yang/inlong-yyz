@@ -47,6 +47,7 @@ import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.types.RowKind;
 
 import java.io.IOException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -121,6 +122,9 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
                     .put(java.sql.Types.NCLOB, new VarBinaryType(VarBinaryType.MAX_LENGTH))
                     .put(java.sql.Types.TINYINT, new TinyIntType())
                     .put(java.sql.Types.OTHER, new VarCharType(VarCharType.MAX_LENGTH))
+                    .put(Types.NVARCHAR, new VarCharType(VarCharType.MAX_LENGTH))
+                    .put(Types.SQLXML, new VarCharType(VarCharType.MAX_LENGTH))
+                    .put(Types.ROWID, new VarBinaryType(VarBinaryType.MAX_LENGTH))
                     .build();
 
     private static final Map<Integer, LogicalType> SQL_TYPE_2_SPARK_SUPPORTED_FLINK_TYPE_MAPPING =
@@ -155,6 +159,9 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
                     .put(java.sql.Types.NCLOB, new VarBinaryType(VarBinaryType.MAX_LENGTH))
                     .put(java.sql.Types.TINYINT, new TinyIntType())
                     .put(java.sql.Types.OTHER, new VarCharType(VarCharType.MAX_LENGTH))
+                    .put(Types.NVARCHAR, new VarCharType(VarCharType.MAX_LENGTH))
+                    .put(Types.SQLXML, new VarCharType(VarCharType.MAX_LENGTH))
+                    .put(Types.ROWID, new VarBinaryType(VarBinaryType.MAX_LENGTH))
                     .build();
 
     public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
