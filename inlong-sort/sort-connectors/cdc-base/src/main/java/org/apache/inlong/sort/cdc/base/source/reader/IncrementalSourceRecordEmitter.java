@@ -17,12 +17,12 @@
 
 package org.apache.inlong.sort.cdc.base.source.reader;
 
-import static com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isHighWatermarkEvent;
-import static com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isWatermarkEvent;
-import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getFetchTimestamp;
-import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getHistoryRecord;
-import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getMessageTimestamp;
-import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
+import static org.apache.inlong.sort.cdc.base.source.meta.wartermark.WatermarkEvent.isHighWatermarkEvent;
+import static org.apache.inlong.sort.cdc.base.source.meta.wartermark.WatermarkEvent.isWatermarkEvent;
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.getFetchTimestamp;
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.getHistoryRecord;
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.getMessageTimestamp;
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.isDataChangeRecord;
 import static org.apache.inlong.sort.cdc.base.util.RecordUtils.isSchemaChangeEvent;
 
 import io.debezium.document.Array;
@@ -34,6 +34,7 @@ import java.util.Map;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
+import org.apache.inlong.sort.base.enums.ReadPhase;
 import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
 import org.apache.inlong.sort.cdc.base.debezium.history.FlinkJsonTableChangeSerializer;
 import org.apache.inlong.sort.cdc.base.source.meta.offset.Offset;
@@ -126,6 +127,10 @@ public class IncrementalSourceRecordEmitter<T>
 
     protected void updateStartingOffsetForSplit(SourceSplitState splitState, SourceRecord element) {
         if (splitState.isStreamSplitState()) {
+            // record the time metric to enter the incremental phase
+            if (sourceReaderMetrics != null) {
+                sourceReaderMetrics.outputReadPhaseMetrics(ReadPhase.INCREASE_PHASE);
+            }
             Offset position = getOffsetPosition(element);
             splitState.asStreamSplitState().setStartingOffset(position);
         }

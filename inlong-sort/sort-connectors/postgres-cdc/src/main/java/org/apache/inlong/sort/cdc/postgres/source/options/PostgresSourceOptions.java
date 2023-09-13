@@ -71,7 +71,7 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_ENABLED =
             ConfigOptions.key("scan.incremental.snapshot.enabled")
                     .booleanType()
-                    .defaultValue(false)
+                    .defaultValue(true)
                     .withDescription(
                             "Incremental snapshot is a new mechanism to read snapshot of a table. "
                                     + "Compared to the old snapshot mechanism, the incremental snapshot has many advantages, including:\n"

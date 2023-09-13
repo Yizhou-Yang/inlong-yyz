@@ -132,7 +132,7 @@ public class DebeziumChangeFetcher<T> {
     /**
      * the duration time which update ddl
      */
-    private static final long DDL_UPDATE_INTERVAL = 2000;
+    public static final long DDL_UPDATE_INTERVAL = 2000;
 
     // ------------------------------------------------------------------------
 
@@ -253,6 +253,7 @@ public class DebeziumChangeFetcher<T> {
             fetchDelay = isInDbSnapshotPhase ? 0L : processTime - messageTimestamp;
 
             if (isHeartbeatEvent(record)) {
+
                 // keep offset update
                 synchronized (checkpointLock) {
                     debeziumOffset.setSourcePartition(record.sourcePartition());
@@ -324,7 +325,8 @@ public class DebeziumChangeFetcher<T> {
         return tableChange;
     }
 
-    private TableChange initTableChange(TableId tableId, TableChangeType type, List<Map<String, Object>> columns) {
+    public static TableChange initTableChange(TableId tableId, TableChangeType type,
+            List<Map<String, Object>> columns) {
         List<Column> sortedColumns = new ArrayList<>();
         List<String> pkColumnNames = new ArrayList<>();
         String defaultCharsetName = "utf-8";
@@ -335,10 +337,9 @@ public class DebeziumChangeFetcher<T> {
             if (characterMaxLen != null) {
                 columnLength = characterMaxLen;
             }
-            Integer columnScale = -1;
             Integer numPrecision = (Integer) column.get("numeric_precision");
             if (numPrecision != null) {
-                columnScale = numPrecision;
+                columnLength = numPrecision;
             }
             boolean optional = "YES".equals(column.get("is_nullable"));
             boolean autoIncremented = false;
@@ -352,23 +353,28 @@ public class DebeziumChangeFetcher<T> {
             int position = (Integer) column.get("ordinal_position");
             String typeName = (String) column.get("data_type");
             int jdbcType = getJdbcType(typeName);
-            int componentType = jdbcType;
             String charsetName = "utf-8";
-            ColumnImpl columnImpl = new ColumnImpl(columnName, position, jdbcType, componentType, typeName, null,
-                    charsetName, defaultCharsetName, columnLength, columnScale, optional, autoIncremented, generated);
+            ColumnImpl columnImpl = new ColumnImpl(columnName, position, jdbcType, jdbcType, typeName, null,
+                    charsetName, defaultCharsetName, columnLength, (Integer) column.get("numeric_scale"), optional,
+                    autoIncremented, generated);
             sortedColumns.add(columnImpl);
         }
         TableImpl tableImpl = new TableImpl(tableId, sortedColumns, pkColumnNames, defaultCharsetName);
         return new TableChange(type, tableImpl);
     }
 
-    private int getJdbcType(String dataType) {
+    private static int getJdbcType(String dataType) {
         switch (dataType) {
             case "integer":
                 return Types.INTEGER;
             case "timestamp without time zone":
-            case "timestamp with time zone":
                 return Types.TIMESTAMP;
+            case "timestamp with time zone":
+                return Types.TIMESTAMP_WITH_TIMEZONE;
+            case "time without time zone":
+                return Types.TIME;
+            case "date":
+                return Types.DATE;
             case "smallint":
                 return Types.SMALLINT;
             case "boolean":
@@ -463,7 +469,7 @@ public class DebeziumChangeFetcher<T> {
         }
     }
 
-    private class TableChangeHolder {
+    public static class TableChangeHolder {
 
         public TableChange tableChange;
         public long timestamp;

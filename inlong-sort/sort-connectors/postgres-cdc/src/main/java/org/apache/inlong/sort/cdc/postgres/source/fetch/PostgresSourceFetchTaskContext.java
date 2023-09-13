@@ -137,13 +137,15 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                 sourceSplitBase.getTableSchemas().values());
 
         try {
-            this.schema =
-                    PostgresObjectFactory.newSchema(
-                            jdbcConnection,
-                            dbzConfig,
-                            jdbcConnection.getTypeRegistry(),
-                            topicSelector,
-                            valueConverterBuilder.build(jdbcConnection.getTypeRegistry()));
+            if (this.schema == null) {
+                this.schema =
+                        PostgresObjectFactory.newSchema(
+                                jdbcConnection,
+                                dbzConfig,
+                                jdbcConnection.getTypeRegistry(),
+                                topicSelector,
+                                valueConverterBuilder.build(jdbcConnection.getTypeRegistry()));
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize PostgresSchema", e);
         }

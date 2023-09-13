@@ -67,6 +67,8 @@ public final class Constants {
      * Timestamp when the read phase changed
      */
     public static final String READ_PHASE_TIMESTAMP = "readPhaseTimestamp";
+
+    public static final String INCREMENTAL = "incremental";
     /**
      * Time span in seconds
      */
@@ -120,6 +122,14 @@ public final class Constants {
      * It is used for metric data to build schema identify
      */
     public static final String SEMICOLON = ".";
+
+    public static final String CREATE_TABLE_COMMENT = "Create Table By InLong";
+
+    public static final String ADD_COLUMN_COMMENT = "Add Column By InLong";
+
+    public static final String APOSTROPHE = "'";
+
+    public static final String DOUBLE_QUOTES = "\"";
 
     /**
      * The caret symbol (^) at the start of a regular expression to indicate
@@ -249,7 +259,7 @@ public final class Constants {
     public static final ConfigOption<SchemaUpdateExceptionPolicy> SINK_MULTIPLE_SCHEMA_UPDATE_POLICY =
             ConfigOptions.key("sink.multiple.schema-update.policy")
                     .enumType(SchemaUpdateExceptionPolicy.class)
-                    .defaultValue(SchemaUpdateExceptionPolicy.TRY_IT_BEST)
+                    .defaultValue(SchemaUpdateExceptionPolicy.THROW_WITH_STOP)
                     .withDescription("The action to deal with schema update in multiple sink.");
 
     public static final ConfigOption<Boolean> SINK_MULTIPLE_IGNORE_SINGLE_TABLE_ERRORS =

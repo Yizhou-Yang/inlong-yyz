@@ -54,6 +54,7 @@ import org.apache.inlong.sort.protocol.node.load.PostgresLoadNode;
 import org.apache.inlong.sort.protocol.node.load.RedisLoadNode;
 import org.apache.inlong.sort.protocol.node.load.SqlServerLoadNode;
 import org.apache.inlong.sort.protocol.node.load.StarRocksLoadNode;
+import org.apache.inlong.sort.protocol.node.load.TCHouseXLoadNode;
 import org.apache.inlong.sort.protocol.node.load.TDSQLPostgresLoadNode;
 import org.apache.inlong.sort.protocol.node.transform.DistinctNode;
 import org.apache.inlong.sort.protocol.node.transform.TransformNode;
@@ -103,6 +104,7 @@ import java.util.TreeMap;
         @JsonSubTypes.Type(value = TdsqlKafkaExtractNode.class, name = "tdsqlKafkaExtract"),
         @JsonSubTypes.Type(value = RedisLoadNode.class, name = "redisLoad"),
         @JsonSubTypes.Type(value = KuduLoadNode.class, name = "kuduLoad"),
+        @JsonSubTypes.Type(value = TCHouseXLoadNode.class, name = "tCHouseXLoad"),
 })
 public interface Node {
 

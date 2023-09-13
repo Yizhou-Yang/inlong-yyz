@@ -18,6 +18,7 @@
 package org.apache.inlong.sort.cdc.postgres.table;
 
 import io.debezium.connector.AbstractSourceInfo;
+import io.debezium.connector.SnapshotRecord;
 import io.debezium.data.Envelope;
 import io.debezium.data.Envelope.FieldName;
 import io.debezium.relational.Table;
@@ -409,6 +410,9 @@ public enum PostgreSQLReadableMetaData {
             }
             List<Map<String, Object>> dataList = new ArrayList<>();
             dataList.add(field);
+
+            SnapshotRecord snapshotRecord = SnapshotRecord.fromSource(sourceStruct);
+
             CanalJson canalJson = CanalJson.builder()
                     .data(dataList)
                     .database(databaseName)
@@ -420,11 +424,40 @@ public enum PostgreSQLReadableMetaData {
                     .ts(ts)
                     .type(getCanalOpType(rowData))
                     .sqlType(getSqlType(tableSchema))
+                    .incremental(!(SnapshotRecord.TRUE == snapshotRecord))
+                    .mysqlType(getMysqlType(tableSchema))
                     .build();
-            return StringData.fromString(JsonDynamicSchemaFormat.objectMapper.writeValueAsString(canalJson));
+            return StringData.fromString(JsonDynamicSchemaFormat.OBJECT_MAPPER.writeValueAsString(canalJson));
         } catch (Exception e) {
             throw new IllegalStateException("exception occurs when get meta data", e);
         }
+    }
+
+    private static final String FORMAT_PRECISION = "%s(%d)";
+    private static final String FORMAT_PRECISION_SCALE = "%s(%d, %d)";
+
+    public static Map<String, String> getMysqlType(@Nullable TableChanges.TableChange tableSchema) {
+        if (tableSchema == null) {
+            return null;
+        }
+
+        Map<String, String> mysqlType = new LinkedHashMap<>();
+        final Table table = tableSchema.getTable();
+        table.columns()
+                .forEach(
+                        column -> {
+                            if (column.scale().isPresent()) {
+                                mysqlType.put(
+                                        column.name(),
+                                        String.format(FORMAT_PRECISION_SCALE,
+                                                column.typeName(), column.length(), column.scale().get()));
+                            } else {
+                                mysqlType.put(
+                                        column.name(),
+                                        String.format(FORMAT_PRECISION, column.typeName(), column.length()));
+                            }
+                        });
+        return mysqlType;
     }
 
     private final String key;

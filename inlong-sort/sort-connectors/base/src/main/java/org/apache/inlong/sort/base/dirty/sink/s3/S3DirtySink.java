@@ -121,9 +121,9 @@ public class S3DirtySink<T> implements DirtySink<T> {
                 throw new RuntimeException(String.format("Add batch to identifier:%s failed, the dirty data: %s.",
                         dirtyData.getIdentifier(), dirtyData.toString()), e);
             }
-            LOGGER.warn("Add batch to identifier:{} failed "
+            LOGGER.warn(String.format("Add batch to identifier:%s failed "
                     + "and the dirty data will be throw away in the future"
-                    + " because the option 'dirty.side-output.ignore-errors' is 'true'", dirtyData.getIdentifier());
+                    + " when the option 'dirty.side-output.ignore-errors' is 'true'", dirtyData.getIdentifier()), e);
         }
         if (buffered() && valid() && !flushing) {
             flush();
@@ -273,9 +273,9 @@ public class S3DirtySink<T> implements DirtySink<T> {
                                 identifier, content),
                         e);
             }
-            LOGGER.warn("Writing records to s3 of identifier:{} failed "
+            LOGGER.warn(String.format("Writing records to s3 of identifier:%s failed "
                     + "and the dirty data will be throw away in the future"
-                    + " because the option 'dirty.side-output.ignore-errors' is 'true'", identifier);
+                    + " when the option 'dirty.side-output.ignore-errors' is 'true'", identifier), e);
         }
     }
 

@@ -70,6 +70,10 @@ public interface DataSourceDialect<C extends SourceConfig> extends Serializable,
     /** The task context used for fetch task to fetch data from external systems. */
     FetchTask.Context createFetchTaskContext(SourceSplitBase sourceSplitBase, C sourceConfig);
 
+    default FetchTask.Context createFetchTaskContext(SourceSplitBase sourceSplitBase, C sourceConfig, boolean reuse) {
+        return createFetchTaskContext(sourceSplitBase, sourceConfig);
+    }
+
     /**
      * We have an empty default implementation here because most dialects do not have to implement
      * the method.

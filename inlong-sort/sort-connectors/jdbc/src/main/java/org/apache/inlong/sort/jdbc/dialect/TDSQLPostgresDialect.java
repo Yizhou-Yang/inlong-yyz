@@ -20,6 +20,7 @@ package org.apache.inlong.sort.jdbc.dialect;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.connector.jdbc.internal.converter.JdbcRowConverter;
 import org.apache.flink.connector.jdbc.internal.converter.PostgresRowConverter;
+import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.inlong.sort.jdbc.table.AbstractJdbcDialect;
@@ -153,6 +154,36 @@ public class TDSQLPostgresDialect extends AbstractJdbcDialect {
     public PreparedStatement setQueryPrimaryKeySql(Connection conn,
             String tableIdentifier) throws SQLException {
         return null;
+    }
+
+    @Override
+    public boolean parseUnknownDatabase(SQLException e) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean parseUnkownTable(SQLException e) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean parseUnkownSchema(SQLException e) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String getDefaultDatabase() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String convert2DatabaseDataType(LogicalType flinkType) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean parseResourceExistsError(SQLException e) {
+        throw new UnsupportedOperationException();
     }
 
 }

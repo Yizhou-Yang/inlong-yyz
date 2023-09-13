@@ -36,8 +36,10 @@ import org.apache.inlong.sort.base.format.JsonToRowDataConverters.JsonToRowDataC
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Debezium json dynamic format
@@ -173,6 +175,10 @@ public class DebeziumJsonDynamicSchemaFormat extends JsonDynamicSchemaFormat {
                     pkNames.add(pkNamesNode.get(i).asText());
                 }
             }
+            // remove duplicate keys
+            Set<String> set = new LinkedHashSet<>(pkNames);
+            pkNames.clear();
+            pkNames.addAll(set);
             return pkNames;
         }
         return extractPrimaryKeyNames(payload);

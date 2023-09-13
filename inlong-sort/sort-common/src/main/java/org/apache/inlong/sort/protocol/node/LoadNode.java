@@ -45,6 +45,7 @@ import org.apache.inlong.sort.protocol.node.load.OracleLoadNode;
 import org.apache.inlong.sort.protocol.node.load.PostgresLoadNode;
 import org.apache.inlong.sort.protocol.node.load.SqlServerLoadNode;
 import org.apache.inlong.sort.protocol.node.load.StarRocksLoadNode;
+import org.apache.inlong.sort.protocol.node.load.TCHouseXLoadNode;
 import org.apache.inlong.sort.protocol.node.load.TDSQLPostgresLoadNode;
 import org.apache.inlong.sort.protocol.transformation.FieldRelation;
 import org.apache.inlong.sort.protocol.transformation.FilterFunction;
@@ -76,6 +77,7 @@ import java.util.Map;
         @JsonSubTypes.Type(value = DorisLoadNode.class, name = "dorisLoad"),
         @JsonSubTypes.Type(value = StarRocksLoadNode.class, name = "starRocksLoad"),
         @JsonSubTypes.Type(value = RedisLoadNode.class, name = "redisLoad"),
+        @JsonSubTypes.Type(value = TCHouseXLoadNode.class, name = "tCHouseXLoad"),
 })
 @NoArgsConstructor
 @Data

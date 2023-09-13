@@ -17,10 +17,16 @@
 
 package org.apache.inlong.sort.jdbc.dialect;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.connector.jdbc.internal.converter.JdbcRowConverter;
+import org.apache.flink.table.types.logical.CharType;
+import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.logical.RowType.RowField;
+import org.apache.flink.table.types.logical.VarCharType;
+import org.apache.inlong.sort.base.Constants;
 import org.apache.inlong.sort.jdbc.converter.postgres.PostgresRowConverter;
 import org.apache.inlong.sort.jdbc.internal.JdbcMultiBatchingComm;
 import org.apache.inlong.sort.jdbc.table.AbstractJdbcDialect;
@@ -29,9 +35,14 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
+import static org.apache.flink.table.types.logical.LogicalTypeRoot.BIGINT;
 
 /** JDBC dialect for PostgreSQL. */
 public class PostgresDialect extends AbstractJdbcDialect {
@@ -59,7 +70,10 @@ public class PostgresDialect extends AbstractJdbcDialect {
     // https://www.postgresql.org/docs/12/datatype-numeric.html#DATATYPE-NUMERIC-DECIMAL
     private static final int MAX_DECIMAL_PRECISION = 1000;
     private static final int MIN_DECIMAL_PRECISION = 1;
-
+    private static final Set<String> RESOURCE_EXISTS_ERROS =
+            new HashSet<>(Arrays.asList("42P04", "42P06", "42P07", "42701"));
+    private static final long CHAR_MAX_LENGTH = 10485760;
+    private static final long VACHAR_MAX_LENGTH = 10485760;
     @Override
     public boolean canHandle(String url) {
         return url.startsWith("jdbc:postgresql:");
@@ -164,5 +178,141 @@ public class PostgresDialect extends AbstractJdbcDialect {
         PreparedStatement st = conn.prepareStatement(QUERY_PRIMARY_KEY_SQL);
         st.setString(1, JdbcMultiBatchingComm.getTableNameFromIdentifier(tableIdentifier));
         return st;
+    }
+
+    @Override
+    public String convert2DatabaseDataType(LogicalType flinkType) {
+        String type;
+        switch (flinkType.getTypeRoot()) {
+            case BIGINT:
+            case BOOLEAN:
+            case DECIMAL:
+            case TIME_WITHOUT_TIME_ZONE:
+            case SMALLINT:
+            case DATE:
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                type = flinkType.asSummaryString();
+                break;
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                type = "TIMESTAMPTZ";
+                break;
+            case DOUBLE:
+                type = "DOUBLE PRECISION";
+                break;
+            // support mysql
+            case INTEGER:
+                type = "INTEGER";
+                break;
+            case TINYINT:
+                type = "SMALLINT";
+                break;
+            case FLOAT:
+                type = "REAL";
+                break;
+            case VARCHAR:
+                VarCharType varCharType = (VarCharType) flinkType;
+                if (varCharType.getLength() <= VACHAR_MAX_LENGTH) {
+                    type = String.format("VARCHAR(%s)", varCharType.getLength());
+                } else {
+                    type = "TEXT";
+                }
+                break;
+            case CHAR:
+                CharType charType = (CharType) flinkType;
+                if (charType.getLength() <= CHAR_MAX_LENGTH) {
+                    type = String.format("CHAR(%s)", charType.getLength());
+                } else {
+                    type = "TEXT";
+                }
+                break;
+            default:
+                type = "VARCHAR";
+        }
+        return type;
+    }
+
+    @Override
+    public boolean parseUnknownDatabase(SQLException e) {
+        return "3D000".equals(e.getSQLState());
+    }
+
+    @Override
+    public boolean parseUnkownTable(SQLException e) {
+        return "42P01".equals(e.getSQLState());
+    }
+
+    @Override
+    public boolean parseUnkownSchema(SQLException e) {
+        return "3F000".equals(e.getSQLState());
+    }
+
+    @Override
+    public String getDefaultDatabase() {
+        return "postgres";
+    }
+
+    @Override
+    public boolean parseResourceExistsError(SQLException e) {
+        return RESOURCE_EXISTS_ERROS.contains(e.getSQLState());
+    }
+
+    @Override
+    public String escape(String origin) {
+        return origin;
+    }
+
+    @Override
+    public String buildCreateTableStatement(String tableIdentifier, List<String> primaryKeys, RowType rowType,
+            String comment) {
+        StringBuilder sb = new StringBuilder();
+        StringBuilder comments = new StringBuilder();
+        String table = formatTableIdentifier(tableIdentifier);
+        sb.append("CREATE TABLE IF NOT EXISTS ").append(table).append(" (\n");
+        Iterator<RowField> iterator = rowType.getFields().iterator();
+        while (iterator.hasNext()) {
+            RowField column = iterator.next();
+            sb.append("\t").append(escape(column.getName())).append(" ")
+                    .append(convert2DatabaseDataType(column.getType()));
+            String columnComment = column.getDescription().orElse(Constants.ADD_COLUMN_COMMENT);
+            comments.append("\nCOMMENT ON COLUMN ").append(table).append(".")
+                    .append(escape(column.getName())).append(" IS ").append(quote(columnComment)).append(";");
+            if (iterator.hasNext()) {
+                sb.append(",\n");
+            }
+        }
+        if (CollectionUtils.isNotEmpty(primaryKeys)) {
+            sb.append(",\n\t PRIMARY KEY (");
+            for (String primaryKey : primaryKeys) {
+                sb.append(escape(primaryKey)).append(",");
+            }
+            sb.deleteCharAt(sb.length() - 1);
+            sb.append(")");
+        }
+        sb.append("\n)");
+        if (StringUtils.isNotBlank(comment)) {
+            comments.append("\nCOMMENT ON TABLE ").append(table).append(" IS ").append(quote(comment)).append(";");
+        }
+        sb.append(";").append(comments);
+        return sb.toString();
+    }
+
+    @Override
+    public String buildAddColumnStatement(String tableIdentifier, List<RowField> addFields,
+            Map<String, String> positionMap) {
+        StringBuilder sb = new StringBuilder();
+        String table = formatTableIdentifier(tableIdentifier);
+        StringBuilder comments = new StringBuilder();
+        for (RowField field : addFields) {
+            String comment = field.getDescription().orElse(Constants.ADD_COLUMN_COMMENT);
+            sb.append("ADD COLUMN IF NOT EXISTS ")
+                    .append(escape(field.getName())).append(" ")
+                    .append(convert2DatabaseDataType(field.getType()));
+            sb.append(",");
+            comments.append("\nCOMMENT ON COLUMN ").append(table).append(".")
+                    .append(escape(field.getName())).append(" IS ").append(quote(comment)).append(";");
+        }
+        sb.deleteCharAt(sb.length() - 1);
+        sb.append(";").append(comments);
+        return sb.toString();
     }
 }

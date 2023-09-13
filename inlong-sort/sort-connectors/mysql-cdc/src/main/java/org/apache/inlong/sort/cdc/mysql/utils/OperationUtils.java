@@ -116,12 +116,24 @@ public class OperationUtils {
                         LOG.error("unsupported statement {}", statement);
                         throw new IllegalStateException("drop index not supported now");
                     }
+                    if (alterExpression.getConstraintName() != null) {
+                        alterColumns.add(new AlterColumn(AlterType.DROP_CONSTRAINT,
+                                new Column(reformatName(alterExpression.getConstraintName())),
+                                null));
+                        break;
+                    }
                     alterColumns.add(new AlterColumn(AlterType.DROP_COLUMN,
                             null,
                             Column.builder().name(reformatName(alterExpression.getColumnName()))
                                     .build()));
                     break;
                 case ADD:
+                    if (alterExpression.getIndex() != null) {
+                        alterColumns.add(new AlterColumn(AlterType.ADD_CONSTRAINT,
+                                null,
+                                null));
+                        break;
+                    }
                     alterColumns.add(new AlterColumn(AlterType.ADD_COLUMN,
                             parseColumnWithPosition(isFirst, sqlType,
                                     alterExpression.getColDataTypeList().get(0)),

@@ -358,9 +358,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         });
         if (schema == null) {
             try {
-                boolean incremental = Optional.ofNullable(jsonNode.get(INCREMENTAL))
-                        .map(JsonNode::asBoolean).orElse(false);
-                handleTableCreateEventFromOperator(record.getTableId(), dataSchema, incremental);
+                handleTableCreateEventFromOperator(record.getTableId(), dataSchema);
             } catch (Exception e) {
                 LOG.error("Table create error, tableId: {}, schema: {}", record.getTableId(), dataSchema);
                 if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE == multipleSinkOption
@@ -473,8 +471,8 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
     }
 
     // ================================ All coordinator handle method ==============================================
-    private void handleTableCreateEventFromOperator(TableIdentifier tableId, Schema schema, boolean incremental) {
-        if (this.autoCreateTableWhenSnapshot && !incremental) {
+    private void handleTableCreateEventFromOperator(TableIdentifier tableId, Schema schema) {
+        if (this.autoCreateTableWhenSnapshot) {
             IcebergSchemaChangeUtils.createTable(catalog, tableId, asNamespaceCatalog, schema);
         }
         handleSchemaInfoEvent(tableId, catalog.loadTable(tableId).schema());

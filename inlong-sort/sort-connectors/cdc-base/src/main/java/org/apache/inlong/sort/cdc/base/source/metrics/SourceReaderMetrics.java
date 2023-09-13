@@ -161,6 +161,8 @@ public class SourceReaderMetrics {
      * @param readPhase the readPhase of record
      */
     public void outputReadPhaseMetrics(ReadPhase readPhase) {
-        sourceTableMetricData.outputReadPhaseMetrics(readPhase);
+        if (sourceTableMetricData != null) {
+            sourceTableMetricData.outputReadPhaseMetrics(readPhase);
+        }
     }
 }

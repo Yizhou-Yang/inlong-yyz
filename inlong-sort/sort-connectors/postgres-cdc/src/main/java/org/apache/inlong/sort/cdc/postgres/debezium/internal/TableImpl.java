@@ -46,8 +46,7 @@ public final class TableImpl implements Table {
         this(table.id(), table.columns(), table.primaryKeyColumnNames(), table.defaultCharsetName());
     }
 
-    @PackagePrivate
-    TableImpl(TableId id, List<Column> sortedColumns, List<String> pkColumnNames, String defaultCharsetName) {
+    public TableImpl(TableId id, List<Column> sortedColumns, List<String> pkColumnNames, String defaultCharsetName) {
         this.id = id;
         this.columnDefs = Collections.unmodifiableList(sortedColumns);
         this.pkColumnNames =

@@ -120,6 +120,10 @@ public enum DirtyType {
      * Handle alter table error
      */
     HANDLE_ALTER_TABLE_ERROR("HandleAlterTableError"),
+    /**
+     * Apply schema change error
+     */
+    APPLY_SCHEMA_CHANGE_ERROR("ApplySchemaChangeError"),
     ;
 
     private final String format;

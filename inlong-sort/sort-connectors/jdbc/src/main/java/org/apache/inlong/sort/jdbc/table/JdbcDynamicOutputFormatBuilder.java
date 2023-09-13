@@ -77,6 +77,9 @@ public class JdbcDynamicOutputFormatBuilder implements Serializable {
     private SchemaUpdateExceptionPolicy schemaUpdateExceptionPolicy;
     private DirtyOptions dirtyOptions;
     private DirtySink<Object> dirtySink;
+    private boolean enableSchemaChange;
+    private String schemaChangePolicies;
+    private boolean autoCreateTableWhenSnapshot;
 
     public JdbcDynamicOutputFormatBuilder() {
 
@@ -287,6 +290,21 @@ public class JdbcDynamicOutputFormatBuilder implements Serializable {
         return this;
     }
 
+    public JdbcDynamicOutputFormatBuilder setEnableSchemaChange(boolean enableSchemaChange) {
+        this.enableSchemaChange = enableSchemaChange;
+        return this;
+    }
+
+    public JdbcDynamicOutputFormatBuilder setAutoCreateTableWhenSnapshot(boolean autoCreateTableWhenSnapshot) {
+        this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
+        return this;
+    }
+
+    public JdbcDynamicOutputFormatBuilder setSchemaChangePolicies(String schemaChangePolicies) {
+        this.schemaChangePolicies = schemaChangePolicies;
+        return this;
+    }
+
     public JdbcBatchingOutputFormat<RowData, ?, ?> build() {
         checkNotNull(jdbcOptions, "jdbc options can not be null");
         checkNotNull(dmlOptions, "jdbc dml options can not be null");
@@ -351,6 +369,9 @@ public class JdbcDynamicOutputFormatBuilder implements Serializable {
                 inlongMetric,
                 auditHostAndPorts,
                 schemaUpdateExceptionPolicy,
-                dirtySinkHelper);
+                dirtySinkHelper,
+                enableSchemaChange,
+                schemaChangePolicies,
+                autoCreateTableWhenSnapshot);
     }
 }

@@ -270,7 +270,7 @@ class DynamicKafkaSerializationSchema implements KafkaSerializationSchema<RowDat
             JsonNode dataNode, List<ProducerRecord<byte[], byte[]>> values) {
         String topic = null;
         try {
-            byte[] data = jsonDynamicSchemaFormat.objectMapper.writeValueAsBytes(baseMap);
+            byte[] data = JsonDynamicSchemaFormat.OBJECT_MAPPER.writeValueAsBytes(baseMap);
             topic = jsonDynamicSchemaFormat.parse(rootNode, topicPattern);
             values.add(new ProducerRecord<>(topic,
                     extractPartition(null, null, data), null, data));
@@ -306,7 +306,7 @@ class DynamicKafkaSerializationSchema implements KafkaSerializationSchema<RowDat
             JsonNode operationNode = Preconditions.checkNotNull(rootNode.get("operation"),
                     "Operation node is null");
             operation = Preconditions.checkNotNull(
-                    jsonDynamicSchemaFormat.objectMapper.convertValue(operationNode, new TypeReference<Operation>() {
+                    JsonDynamicSchemaFormat.OBJECT_MAPPER.convertValue(operationNode, new TypeReference<Operation>() {
                     }), "Operation is null");
         } catch (Exception e) {
             LOG.warn("Extract Operation from origin data failed", e);

@@ -33,7 +33,6 @@ import org.apache.inlong.sort.base.dirty.DirtyType;
 import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
 import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
 import org.apache.inlong.sort.base.schema.SchemaChangeHandleException;
-import org.apache.inlong.sort.base.schema.SchemaChangeHelper;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.iceberg.sink.multiple.IcebergSchemaChangeUtils;
 import org.apache.inlong.sort.schema.TableChange;
@@ -49,6 +48,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.inlong.sort.base.schema.SchemaChangeHelper;
 
 /**
  * Iceberg schema change helper
@@ -70,11 +70,12 @@ public class IcebergSchemaChangeHelper extends SchemaChangeHelper {
             SinkTableMetricData metricData, DirtySinkHelper<Object> dirtySinkHelper,
             Catalog catalog,
             SupportsNamespaces asNamespaceCatalog) {
-        super(dynamicSchemaFormat, schemaChange, policyMap, databasePattern,
+        super(dynamicSchemaFormat, schemaChange, policyMap, databasePattern, null,
                 tablePattern, exceptionPolicy, metricData, dirtySinkHelper);
         this.catalog = catalog;
         this.asNamespaceCatalog = asNamespaceCatalog;
     }
+
     @Override
     public void doAlterOperation(String database, String table, byte[] originData, String originSchema, JsonNode data,
             Map<SchemaChangeType, List<AlterColumn>> typeMap) {
@@ -89,13 +90,13 @@ public class IcebergSchemaChangeHelper extends SchemaChangeHelper {
                             doAddColumn(kv.getValue(), TableIdentifier.of(database, table));
                             break;
                         case DROP_COLUMN:
-                            doDropColumn(kv.getKey(), originSchema);
+                            doDropColumn(null, null, null, null, kv.getKey(), originSchema);
                             break;
                         case RENAME_COLUMN:
-                            doRenameColumn(kv.getKey(), originSchema);
+                            doRenameColumn(null, null, null, null, kv.getKey(), originSchema);
                             break;
                         case CHANGE_COLUMN_TYPE:
-                            doChangeColumnType(kv.getKey(), originSchema);
+                            doChangeColumnType(null, null, null, null, kv.getKey(), originSchema);
                             break;
                         default:
                     }
@@ -108,7 +109,7 @@ public class IcebergSchemaChangeHelper extends SchemaChangeHelper {
                             String.format("Apply alter column failed, origin schema: %s", originSchema), e);
                 }
                 LOGGER.warn("Apply alter column failed, origin schema: {}", originSchema, e);
-                handleDirtyData(data, originData, database, table, DirtyType.HANDLE_ALTER_TABLE_ERROR, e);
+                handleDirtyData(data, originData, database, null, table, DirtyType.HANDLE_ALTER_TABLE_ERROR, e);
             }
         }
     }
@@ -128,7 +129,7 @@ public class IcebergSchemaChangeHelper extends SchemaChangeHelper {
                 throw new SchemaChangeHandleException(
                         String.format("create table failed, origin schema: %s", originSchema), e);
             }
-            handleDirtyData(data, originData, database, table, DirtyType.CREATE_TABLE_ERROR, e);
+            handleDirtyData(data, originData, database, null, table, DirtyType.CREATE_TABLE_ERROR, e);
         }
     }
 

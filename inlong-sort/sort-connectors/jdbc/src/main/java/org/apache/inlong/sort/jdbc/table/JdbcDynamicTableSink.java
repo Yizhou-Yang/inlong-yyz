@@ -64,6 +64,9 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
 
     private final DirtyOptions dirtyOptions;
     private @Nullable final DirtySink<Object> dirtySink;
+    private final boolean enableSchemaChange;
+    private @Nullable final String schemaChangePolicies;
+    private final boolean autoCreateTableWhenSnapshot;
 
     public JdbcDynamicTableSink(
             JdbcOptions jdbcOptions,
@@ -80,7 +83,10 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
             String auditHostAndPorts,
             SchemaUpdateExceptionPolicy schemaUpdateExceptionPolicy,
             DirtyOptions dirtyOptions,
-            @Nullable DirtySink<Object> dirtySink) {
+            @Nullable DirtySink<Object> dirtySink,
+            boolean enableSchemaChange,
+            @Nullable String schemaChangePolicies,
+            boolean autoCreateTableWhenSnapshot) {
         this.jdbcOptions = jdbcOptions;
         this.executionOptions = executionOptions;
         this.dmlOptions = dmlOptions;
@@ -97,6 +103,9 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
         this.schemaUpdateExceptionPolicy = schemaUpdateExceptionPolicy;
         this.dirtyOptions = dirtyOptions;
         this.dirtySink = dirtySink;
+        this.enableSchemaChange = enableSchemaChange;
+        this.schemaChangePolicies = schemaChangePolicies;
+        this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
     }
 
     @Override
@@ -119,20 +128,23 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
         final TypeInformation<RowData> rowDataTypeInformation =
                 context.createTypeInformation(tableSchema.toRowDataType());
         final JdbcDynamicOutputFormatBuilder builder = new JdbcDynamicOutputFormatBuilder();
-        builder.setAppendMode(appendMode);
-        builder.setJdbcOptions(jdbcOptions);
-        builder.setJdbcDmlOptions(dmlOptions);
-        builder.setJdbcExecutionOptions(executionOptions);
-        builder.setInLongMetric(inlongMetric);
-        builder.setAuditHostAndPorts(auditHostAndPorts);
-        builder.setDirtyOptions(dirtyOptions);
-        builder.setDirtySink(dirtySink);
+        builder.setAppendMode(appendMode)
+                .setJdbcOptions(jdbcOptions)
+                .setJdbcDmlOptions(dmlOptions)
+                .setJdbcExecutionOptions(executionOptions)
+                .setInLongMetric(inlongMetric)
+                .setAuditHostAndPorts(auditHostAndPorts)
+                .setDirtyOptions(dirtyOptions)
+                .setDirtySink(dirtySink);
         if (multipleSink) {
-            builder.setSinkMultipleFormat(sinkMultipleFormat);
-            builder.setDatabasePattern(databasePattern);
-            builder.setTablePattern(tablePattern);
-            builder.setSchemaPattern(schemaPattern);
-            builder.setSchemaUpdatePolicy(schemaUpdateExceptionPolicy);
+            builder.setSinkMultipleFormat(sinkMultipleFormat)
+                    .setDatabasePattern(databasePattern)
+                    .setTablePattern(tablePattern)
+                    .setSchemaPattern(schemaPattern)
+                    .setSchemaUpdatePolicy(schemaUpdateExceptionPolicy)
+                    .setEnableSchemaChange(enableSchemaChange)
+                    .setAutoCreateTableWhenSnapshot(autoCreateTableWhenSnapshot)
+                    .setSchemaChangePolicies(schemaChangePolicies);
             return SinkFunctionProvider.of(
                     new GenericJdbcSinkFunction<>(builder.buildMulti()), jdbcOptions.getParallelism());
         } else {
@@ -145,11 +157,10 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
 
     @Override
     public DynamicTableSink copy() {
-        return new JdbcDynamicTableSink(jdbcOptions, executionOptions, dmlOptions,
-                tableSchema, appendMode, multipleSink, sinkMultipleFormat,
-                databasePattern, tablePattern, schemaPattern,
-                inlongMetric, auditHostAndPorts,
-                schemaUpdateExceptionPolicy, dirtyOptions, dirtySink);
+        return new JdbcDynamicTableSink(jdbcOptions, executionOptions, dmlOptions, tableSchema, appendMode,
+                multipleSink, sinkMultipleFormat, databasePattern, tablePattern, schemaPattern, inlongMetric,
+                auditHostAndPorts, schemaUpdateExceptionPolicy, dirtyOptions, dirtySink, enableSchemaChange,
+                schemaChangePolicies, autoCreateTableWhenSnapshot);
     }
 
     @Override

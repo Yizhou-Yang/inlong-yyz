@@ -17,6 +17,7 @@
 
 package org.apache.inlong.sort.base.schema;
 
+import org.apache.flink.table.types.logical.RowType;
 import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
 import org.apache.inlong.sort.protocol.ddl.operations.AlterOperation;
 import org.apache.inlong.sort.protocol.ddl.operations.CreateTableOperation;
@@ -41,42 +42,116 @@ public interface SchemaChangeHandle {
      * */
     void handleAlterOperation(String database, String table, byte[] originData, String originSchema,
             JsonNode data, AlterOperation operation);
+
+    default void handleAlterOperation(String database, String schema, String table, byte[] originData,
+            String originSchema,
+            JsonNode data, AlterOperation operation) {
+        handleAlterOperation(database, table, originData, originSchema, data, operation);
+    }
+
     /**
      * apply the modify column operation
      * */
-    void doAlterOperation(String database, String table, byte[] originData, String originSchema, JsonNode data,
-            Map<SchemaChangeType, List<AlterColumn>> typeMap);
+    default void doAlterOperation(String database, String schema, String table, byte[] originData, String originSchema,
+            JsonNode data, Map<SchemaChangeType, List<AlterColumn>> typeMap) {
+        doAlterOperation(database, table, originData, originSchema, data, typeMap);
+    }
+
+    void doAlterOperation(String database, String table, byte[] originData, String originSchema,
+            JsonNode data, Map<SchemaChangeType, List<AlterColumn>> typeMap);
     /**
      * apply the add column operation
      * */
-    void doAddColumn(SchemaChangeType type, String originSchema);
+    default String doAddColumn(String database, String schema, String table,
+            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema) {
+        return doAddColumn(database, table, alterColumns, type, originSchema);
+    }
+
+    String doAddColumn(String database, String table,
+            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema);
     /**
      * apply the operation of changing the column type
      * */
-    void doChangeColumnType(SchemaChangeType type, String originSchema);
+    default String doChangeColumnType(String database, String schema, String table,
+            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema) {
+        return doChangeColumnType(database, table, alterColumns, type, originSchema);
+    }
+
+    String doChangeColumnType(String database, String table,
+            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema);
+
     /**
      * apply the change column name operation
      * */
-    void doRenameColumn(SchemaChangeType type, String originSchema);
+    default String doRenameColumn(String database, String schema, String table,
+            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema) {
+        return doRenameColumn(database, table, alterColumns, type, originSchema);
+    }
+
+    String doRenameColumn(String database, String table,
+            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema);
     /**
      * apply the delete column operation
      * */
-    void doDropColumn(SchemaChangeType type, String originSchema);
+    default String doDropColumn(String database, String schema, String table,
+            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema) {
+        return doDropColumn(database, table, alterColumns, type, originSchema);
+    }
+
+    String doDropColumn(String database, String table,
+            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema);
+
     /**
      * handle the create table operation
      * */
+    default void doCreateTable(byte[] originData, String database, String schema, String table, SchemaChangeType type,
+            String originSchema, JsonNode data, CreateTableOperation operation) {
+        doCreateTable(originData, database, table, type, originSchema, data, operation);
+    }
+
     void doCreateTable(byte[] originData, String database, String table, SchemaChangeType type,
             String originSchema, JsonNode data, CreateTableOperation operation);
+
     /**
      * handle drop table operation
      * */
-    void doDropTable(SchemaChangeType type, String originSchema);
+    default void doDropTable(String database, String schema, String table, SchemaChangeType type, String originSchema) {
+        doDropTable(database, table, type, originSchema);
+    }
+
+    void doDropTable(String database, String table, SchemaChangeType type, String originSchema);
+
     /**
      * handle rename table operation
      * */
-    void doRenameTable(SchemaChangeType type, String originSchema);
+    default void doRenameTable(String database, String schema, String table, SchemaChangeType type,
+            String originSchema) {
+        doRenameTable(database, table, type, originSchema);
+    }
+
+    void doRenameTable(String database, String table, SchemaChangeType type, String originSchema);
     /**
      * handle truncate table operation
      * */
-    void doTruncateTable(SchemaChangeType type, String originSchema);
+    default void doTruncateTable(String database, String schema, String table, SchemaChangeType type,
+            String originSchema) {
+        doTruncateTable(database, table, type, originSchema);
+    }
+
+    void doTruncateTable(String database, String table, SchemaChangeType type, String originSchema);
+
+    /**
+     * Check if the schema change type is supported
+     * @param type The type {@link SchemaChangeType}
+     * @return true if support else false
+     */
+    boolean checkSchemaChangeTypeEnable(SchemaChangeType type);
+
+    /**
+     * Extact add columns
+     * @param oldSchema The old schema
+     * @param newSchema The new schema
+     * @return The list of {@link org.apache.flink.table.types.logical.RowType.RowField}
+     */
+    List<RowType.RowField> extractAddColumns(RowType oldSchema, RowType newSchema);
 }

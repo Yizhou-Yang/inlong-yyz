@@ -57,7 +57,7 @@ public class PostgreSQLQueryVisitor implements Serializable {
     public List<Map<String, Object>> getTableColumnsMetaData(String schema, String table) {
         try {
             String query = "SELECT ordinal_position, tab_columns.column_name, data_type, character_maximum_length,\n"
-                    + "numeric_precision, is_nullable, tab_constraints.constraint_type,\n"
+                    + "numeric_precision, numeric_scale, is_nullable, tab_constraints.constraint_type,\n"
                     + "col_constraints.constraint_name,col_check_constraints.check_clause\n"
                     + "FROM information_schema.columns AS tab_columns\n"
                     + "LEFT OUTER JOIN\n"

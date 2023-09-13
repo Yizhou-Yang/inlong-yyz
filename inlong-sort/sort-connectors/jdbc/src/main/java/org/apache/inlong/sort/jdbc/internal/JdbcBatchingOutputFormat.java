@@ -405,7 +405,8 @@ public class JdbcBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatchStat
         final StatementFactory stmtFactory = (StatementFactory) statementFactory.get(executor);
         final JdbcRowConverter converter = (JdbcRowConverter) rowConverter.get(executor);
         TableMetricStatementExecutor newExecutor =
-                new TableMetricStatementExecutor(stmtFactory, converter, dirtySinkHelper, sinkMetricData);
+                new TableMetricStatementExecutor(stmtFactory, converter, dirtySinkHelper, sinkMetricData,
+                        null, null);
         if (exec instanceof TableBufferedStatementExecutor) {
             Field transform = TableBufferedStatementExecutor.class.getDeclaredField("valueTransform");
             transform.setAccessible(true);

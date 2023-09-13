@@ -57,7 +57,6 @@ import java.util.ArrayList;
 import java.util.Objects;
 
 import static io.debezium.connector.postgresql.Utils.currentOffset;
-import static io.debezium.connector.postgresql.Utils.refreshSchema;
 import static io.debezium.relational.RelationalSnapshotChangeEventSource.LOG_INTERVAL;
 
 /** A {@link FetchTask} implementation for Postgres to read snapshot split. */
@@ -266,7 +265,7 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
             final RelationalSnapshotChangeEventSource.RelationalSnapshotContext ctx =
                     (RelationalSnapshotChangeEventSource.RelationalSnapshotContext) snapshotContext;
             ctx.offset = offsetContext;
-            refreshSchema(databaseSchema, jdbcConnection, false);
+            // refreshSchema(databaseSchema, jdbcConnection, false);
 
             final PostgresOffset lowWatermark = currentOffset(jdbcConnection);
             LOG.info(

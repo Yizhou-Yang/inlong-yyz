@@ -247,12 +247,16 @@ public class PostgresSourceBuilder<T> {
     @Experimental
     public static class PostgresIncrementalSource<T> extends JdbcIncrementalSource<T> {
 
+        private PostgresDialect dataSourceDialect;
+        private PostgresSourceConfigFactory configFactory;
         public PostgresIncrementalSource(
                 PostgresSourceConfigFactory configFactory,
                 DebeziumDeserializationSchema<T> deserializationSchema,
                 PostgresOffsetFactory offsetFactory,
                 PostgresDialect dataSourceDialect) {
             super(configFactory, deserializationSchema, offsetFactory, dataSourceDialect);
+            this.dataSourceDialect = dataSourceDialect;
+            this.configFactory = configFactory;
         }
 
         @Override
@@ -262,7 +266,8 @@ public class PostgresSourceBuilder<T> {
                     deserializationSchema,
                     sourceReaderMetrics,
                     sourceConfig.isIncludeSchemaChanges(),
-                    offsetFactory);
+                    offsetFactory,
+                    configFactory);
         }
     }
 }

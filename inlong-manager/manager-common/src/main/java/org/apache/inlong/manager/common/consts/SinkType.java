@@ -41,4 +41,5 @@ public class SinkType {
     public static final String DLCICEBERG = "DLCICEBERG";
     public static final String KUDU = "KUDU";
     public static final String REDIS = "REDIS";
+    public static final String TCHOUSEX = "TCHOUSEX";
 }

@@ -47,6 +47,7 @@ import org.apache.inlong.manager.pojo.sink.postgresql.PostgreSQLSink;
 import org.apache.inlong.manager.pojo.sink.redis.RedisSink;
 import org.apache.inlong.manager.pojo.sink.sqlserver.SQLServerSink;
 import org.apache.inlong.manager.pojo.sink.starrocks.StarRocksSink;
+import org.apache.inlong.manager.pojo.sink.tchousex.TCHouseXSink;
 import org.apache.inlong.manager.pojo.sink.tdsqlpostgresql.TDSQLPostgreSQLSink;
 import org.apache.inlong.manager.pojo.stream.StreamField;
 import org.apache.inlong.sort.formats.common.StringTypeInfo;
@@ -80,6 +81,7 @@ import org.apache.inlong.sort.protocol.node.load.PostgresLoadNode;
 import org.apache.inlong.sort.protocol.node.load.RedisLoadNode;
 import org.apache.inlong.sort.protocol.node.load.SqlServerLoadNode;
 import org.apache.inlong.sort.protocol.node.load.StarRocksLoadNode;
+import org.apache.inlong.sort.protocol.node.load.TCHouseXLoadNode;
 import org.apache.inlong.sort.protocol.node.load.TDSQLPostgresLoadNode;
 import org.apache.inlong.sort.protocol.transformation.ConstantParam;
 import org.apache.inlong.sort.protocol.transformation.FieldRelation;
@@ -161,6 +163,8 @@ public class LoadNodeUtils {
                 return createLoadNode((KuduSink) streamSink, fieldInfos, fieldRelations, properties);
             case SinkType.REDIS:
                 return createLoadNode((RedisSink) streamSink, fieldInfos, fieldRelations, properties);
+            case SinkType.TCHOUSEX:
+                return createLoadNode((TCHouseXSink) streamSink, fieldInfos, fieldRelations, properties);
             default:
                 throw new BusinessException(String.format("Unsupported sinkType=%s to create load node", sinkType));
         }
@@ -497,6 +501,28 @@ public class LoadNodeUtils {
                 catalogType,
                 icebergSink.getCatalogUri(),
                 icebergSink.getWarehouse());
+    }
+
+    /**
+     * Create load node of Iceberg.
+     */
+    public static TCHouseXLoadNode createLoadNode(TCHouseXSink tCHouseXSink, List<FieldInfo> fieldInfos,
+            List<FieldRelation> fieldRelations, Map<String, String> properties) {
+        return new TCHouseXLoadNode(
+                tCHouseXSink.getSinkName(),
+                tCHouseXSink.getSinkName(),
+                fieldInfos,
+                fieldRelations,
+                null,
+                null,
+                null,
+                properties,
+                tCHouseXSink.getHostname(),
+                tCHouseXSink.getPort(),
+                tCHouseXSink.getUsername(),
+                tCHouseXSink.getPassword(),
+                tCHouseXSink.getTableIdentifier(),
+                tCHouseXSink.getPrimaryKey());
     }
 
     /**

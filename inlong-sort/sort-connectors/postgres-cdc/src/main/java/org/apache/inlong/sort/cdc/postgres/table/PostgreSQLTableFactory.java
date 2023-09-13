@@ -56,6 +56,9 @@ import static org.apache.inlong.sort.cdc.postgres.source.options.PostgresSourceO
 import static org.apache.inlong.sort.cdc.postgres.source.options.PostgresSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.inlong.sort.cdc.postgres.source.options.PostgresSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.inlong.sort.cdc.postgres.source.options.PostgresSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
+import static org.apache.inlong.sort.cdc.postgres.source.options.SourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
+import static org.apache.inlong.sort.cdc.postgres.source.options.SourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS;
+import static org.apache.inlong.sort.cdc.postgres.source.options.SourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 
 /**
  * Factory for creating configured instance of
@@ -284,6 +287,9 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(ROW_KINDS_FILTERED);
         options.add(CHANGELOG_MODE);
         options.add(SCAN_STARTUP_MODE);
+        options.add(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
+        options.add(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
@@ -299,7 +305,10 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
     }
 
     private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
+    private static final String SCAN_STARTUP_MODE_VALUE_EARLIEST = "earliest-offset";
     private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
+    private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMP = "timestamp";
+
     private static StartupOptions getStartupOptions(ReadableConfig config) {
         String modeString = config.get(SCAN_STARTUP_MODE);
 
@@ -309,6 +318,12 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
+
+            case SCAN_STARTUP_MODE_VALUE_EARLIEST:
+                return StartupOptions.earliest();
+
+            case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
+                return StartupOptions.timestamp(config.get(SCAN_STARTUP_TIMESTAMP_MILLIS));
 
             default:
                 throw new ValidationException(

@@ -28,6 +28,7 @@ import org.apache.flink.connector.jdbc.internal.options.JdbcOptions;
 import org.apache.flink.connector.jdbc.internal.options.JdbcReadOptions;
 import org.apache.flink.connector.jdbc.table.JdbcDynamicTableSource;
 import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSinkFactory;
@@ -38,7 +39,11 @@ import org.apache.flink.util.Preconditions;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
@@ -47,6 +52,7 @@ import org.apache.inlong.sort.base.util.JdbcUrlUtils;
 
 import static org.apache.flink.util.Preconditions.checkState;
 import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
+import static org.apache.inlong.sort.base.Constants.SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_DATABASE_PATTERN;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
@@ -56,11 +62,16 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
 import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.apache.inlong.sort.base.dirty.utils.DirtySinkFactoryUtils;
+import org.apache.inlong.sort.protocol.enums.SchemaChangePolicy;
+import org.apache.inlong.sort.protocol.enums.SchemaChangeType;
+import org.apache.inlong.sort.util.SchemaChangeUtils;
 
 import static org.apache.inlong.sort.base.Constants.DIRTY_PREFIX;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
+import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_ENABLE;
+import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_POLICIES;
 
 /**
  * Copy from org.apache.flink:flink-connector-jdbc_2.11:1.13.5
@@ -199,13 +210,38 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
                     .withDescription("The option 'sink.multiple.schema-pattern' "
                             + "is used extract table name from the raw binary data, "
                             + "this is only used in the multiple sink writing scenario.");
-
+    private static final Map<SchemaChangeType, List<SchemaChangePolicy>> SUPPORTS_POLICY_MAP = new HashMap<>();
+    static {
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.CREATE_TABLE,
+                Arrays.asList(SchemaChangePolicy.ENABLE, SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.DROP_TABLE,
+                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.RENAME_TABLE,
+                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.TRUNCATE_TABLE,
+                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.ADD_COLUMN,
+                Arrays.asList(SchemaChangePolicy.ENABLE, SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.DROP_COLUMN,
+                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.RENAME_COLUMN,
+                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+        SUPPORTS_POLICY_MAP.put(SchemaChangeType.CHANGE_COLUMN_TYPE,
+                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                        SchemaChangePolicy.ERROR));
+    }
     @Override
     public DynamicTableSink createDynamicTableSink(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
                 FactoryUtil.createTableFactoryHelper(this, context);
         final ReadableConfig config = helper.getOptions();
-
         helper.validateExcept(DIRTY_PREFIX);
         validateConfigOptions(config);
         boolean multipleSink = config.getOptional(SINK_MULTIPLE_ENABLE).orElse(false);
@@ -213,7 +249,11 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
         String databasePattern = helper.getOptions().getOptional(SINK_MULTIPLE_DATABASE_PATTERN).orElse(null);
         String tablePattern = helper.getOptions().getOptional(SINK_MULTIPLE_TABLE_PATTERN).orElse(null);
         String schemaPattern = helper.getOptions().getOptional(SINK_MULTIPLE_SCHEMA_PATTERN).orElse(databasePattern);
-        validateSinkMultiple(multipleSink, sinkMultipleFormat, databasePattern, schemaPattern, tablePattern);
+        boolean autoCreateTableWhenSnapshot = helper.getOptions().get(SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT);
+        boolean enableSchemaChange = helper.getOptions().get(SINK_SCHEMA_CHANGE_ENABLE);
+        String schemaChangePolicies = helper.getOptions().getOptional(SINK_SCHEMA_CHANGE_POLICIES).orElse(null);
+        validateSinkMultiple(multipleSink, sinkMultipleFormat, databasePattern, schemaPattern,
+                tablePattern, enableSchemaChange, schemaChangePolicies);
         JdbcOptions jdbcOptions = getJdbcOptions(config);
         TableSchema physicalSchema =
                 TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
@@ -240,7 +280,10 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
                 auditHostAndPorts,
                 schemaUpdateExceptionPolicy,
                 dirtyOptions,
-                dirtySink);
+                dirtySink,
+                enableSchemaChange,
+                schemaChangePolicies,
+                autoCreateTableWhenSnapshot);
     }
 
     @Override
@@ -261,7 +304,8 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
     }
 
     private void validateSinkMultiple(boolean multipleSink, String sinkMultipleFormat,
-            String databasePattern, String schemaPattern, String tablePattern) {
+            String databasePattern, String schemaPattern, String tablePattern,
+            boolean enableSchemaChange, String schemaChangePolicies) {
         Preconditions.checkNotNull(multipleSink, "The option 'sink.multiple.enable' is not allowed null");
         if (multipleSink) {
             Preconditions.checkNotNull(databasePattern, "The option 'sink.multiple.database-pattern'"
@@ -277,6 +321,21 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
             Preconditions.checkArgument(supportFormats.contains(sinkMultipleFormat), String.format(
                     "Unsupported value '%s' for '%s'. Supported values are %s.",
                     sinkMultipleFormat, SINK_MULTIPLE_FORMAT.key(), supportFormats));
+            if (enableSchemaChange) {
+                Map<SchemaChangeType, SchemaChangePolicy> policyMap = SchemaChangeUtils
+                        .deserialize(schemaChangePolicies);
+                for (Entry<SchemaChangeType, SchemaChangePolicy> kv : policyMap.entrySet()) {
+                    List<SchemaChangePolicy> policies = SUPPORTS_POLICY_MAP.get(kv.getKey());
+                    if (policies == null) {
+                        throw new ValidationException(
+                                String.format("Unsupported type of schemage-change: %s", kv.getKey()));
+                    }
+                    if (!policies.contains(kv.getValue())) {
+                        throw new ValidationException(
+                                String.format("Unsupported policy of schemage-change: %s", kv.getValue()));
+                    }
+                }
+            }
         }
     }
 
@@ -395,6 +454,9 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
         optionalOptions.add(INLONG_METRIC);
         optionalOptions.add(INLONG_AUDIT);
         optionalOptions.add(AUDIT_KEYS);
+        optionalOptions.add(SINK_SCHEMA_CHANGE_ENABLE);
+        optionalOptions.add(SINK_SCHEMA_CHANGE_POLICIES);
+        optionalOptions.add(SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT);
         return optionalOptions;
     }
 

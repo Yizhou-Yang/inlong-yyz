@@ -17,7 +17,7 @@
 
 package org.apache.inlong.sort.cdc.base.source.reader.external;
 
-import com.ververica.cdc.connectors.base.utils.SourceRecordUtils;
+import org.apache.inlong.sort.cdc.base.util.SourceRecordUtils;
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.ErrorHandler;

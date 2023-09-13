@@ -52,6 +52,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TYPE_MAP_COMPATIBLE_WITH_SPARK;
@@ -79,7 +80,7 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
     /**
      * dialect sql type pattern such as DECIMAL(38, 10) from mysql or oracle etc
      */
-    private static final Pattern DIALECT_SQL_TYPE_PATTERN = Pattern.compile("\\w+\\(([\\d,\\s]*)\\)");
+    private static final Pattern DIALECT_SQL_TYPE_PATTERN = Pattern.compile("([\\w, \\s]+)\\(([\\d,\\s'\\-]*)\\)");
 
     /**
      * The first item of array
@@ -156,7 +157,7 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
                     .put(java.sql.Types.OTHER, new VarCharType(VarCharType.MAX_LENGTH))
                     .build();
 
-    public static final ObjectMapper objectMapper = new ObjectMapper();
+    public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     protected final JsonToRowDataConverters rowDataConverters;
     protected final boolean adaptSparkEngine;
 
@@ -170,6 +171,8 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
                         TimestampFormat.ISO_8601,
                         adaptSparkEngine);
     }
+
+    private BiFunction<LogicalType, String, LogicalType> handleDialectSqlTypeFunction;
 
     /**
      * Extract values by keys from the raw data
@@ -237,7 +240,7 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
      */
     @Override
     public JsonNode deserialize(byte[] message) throws IOException {
-        return objectMapper.readTree(message);
+        return OBJECT_MAPPER.readTree(message);
     }
 
     /**
@@ -352,7 +355,18 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
             if (dialectSchema != null && dialectSchema.get(name) != null) {
                 dialectType = dialectSchema.get(name).asText();
             }
-            type = handleDialectSqlType(type, dialectType);
+            try {
+                if (getHandleDialectSqlTypeFunction() == null) {
+                    type = handleDialectSqlType(type, dialectType);
+                } else {
+                    type = getHandleDialectSqlTypeFunction().apply(type, dialectType);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(
+                        String.format("Handle dialect sql type failed, the field: %s, the dialect type: %s",
+                                name, dialectType),
+                        e);
+            }
             if (pkNames.contains(name)) {
                 type = type.copy(false);
             }
@@ -376,7 +390,7 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
         if (!matcher.matches()) {
             return type;
         }
-        String[] items = matcher.group(1).split(",");
+        String[] items = matcher.group(2).split(",");
         if (type instanceof DecimalType) {
             int precision;
             int scale = DEFAULT_DECIMAL_SCALE;
@@ -392,16 +406,47 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
             }
             return new DecimalType(precision, scale);
         } else if (type instanceof CharType) {
-            return new CharType(Integer.parseInt(items[0].trim()));
+            int length = Integer.parseInt(items[0].trim());
+            if (length <= 0) {
+                length = DEFAULT_CHAR_LENGTH;
+            }
+            return new CharType(length);
         } else if (type instanceof VarCharType) {
-            return new VarCharType(Integer.parseInt(items[0].trim()));
+            int length = Integer.parseInt(items[0].trim());
+            if (length <= 0) {
+                length = Integer.MAX_VALUE;
+            }
+            return new VarCharType(length);
         } else if (type instanceof VarBinaryType) {
-            return new VarBinaryType(Integer.parseInt(items[0].trim()));
+            int length = Integer.parseInt(items[0].trim());
+            if (length <= 0) {
+                length = Integer.MAX_VALUE;
+            }
+            return new VarBinaryType(length);
         } else if (type instanceof BinaryType) {
-            return new BinaryType(Integer.parseInt(items[0].trim()));
+            int length = Integer.parseInt(items[0].trim());
+            if (length <= 0) {
+                length = 1;
+            }
+            return new BinaryType(length);
+        } else if (matcher.group(0).equalsIgnoreCase("TINYINT(1)")) {
+            return new TinyIntType();
+        } else if (matcher.group(1).equalsIgnoreCase("BIGINT UNSIGNED")) {
+            return new DecimalType(20, 0);
+        } else if (matcher.group(1).equalsIgnoreCase("BIGINT UNSIGNED ZEROFILL")) {
+            return new DecimalType(20, 0);
         } else {
             return type;
         }
+    }
+
+    public BiFunction<LogicalType, String, LogicalType> getHandleDialectSqlTypeFunction() {
+        return handleDialectSqlTypeFunction;
+    }
+
+    public void setHandleDialectSqlTypeFunction(
+            BiFunction<LogicalType, String, LogicalType> handleDialectSqlTypeFunction) {
+        this.handleDialectSqlTypeFunction = handleDialectSqlTypeFunction;
     }
 
     public LogicalType sqlType2FlinkType(int jdbcType) {
@@ -429,11 +474,11 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
         List<Map<String, String>> values = new ArrayList<>();
         if (data.isArray()) {
             for (int i = 0; i < data.size(); i++) {
-                values.add(objectMapper.convertValue(data.get(i), new TypeReference<Map<String, String>>() {
+                values.add(OBJECT_MAPPER.convertValue(data.get(i), new TypeReference<Map<String, String>>() {
                 }));
             }
         } else {
-            values.add(objectMapper.convertValue(data, new TypeReference<Map<String, String>>() {
+            values.add(OBJECT_MAPPER.convertValue(data, new TypeReference<Map<String, String>>() {
             }));
         }
         return values;

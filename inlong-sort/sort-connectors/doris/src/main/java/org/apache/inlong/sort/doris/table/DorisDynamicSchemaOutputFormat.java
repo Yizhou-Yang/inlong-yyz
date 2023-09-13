@@ -602,7 +602,13 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
 
     private void handleColumnsChange(String tableIdentifier, JsonNode rootNode, JsonNode physicalData) {
         String oldColumns = columnsMap.get(tableIdentifier);
-        String columns = parseColumns(rootNode, physicalData);
+        String columns;
+        try {
+            columns = parseColumns(rootNode, physicalData);
+        } catch (Exception e) {
+            throw new RuntimeException(String.format("Parse columns failed, the tableIdentifier: %s", tableIdentifier),
+                    e);
+        }
         if (oldColumns == null) {
             columnsMap.put(tableIdentifier, columns);
             latestData.put(tableIdentifier, rootNode);

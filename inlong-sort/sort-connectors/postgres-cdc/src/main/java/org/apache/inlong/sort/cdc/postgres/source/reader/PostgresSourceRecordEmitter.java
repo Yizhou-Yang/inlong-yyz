@@ -18,12 +18,18 @@
 package org.apache.inlong.sort.cdc.postgres.source.reader;
 
 import io.debezium.connector.AbstractSourceInfo;
+import io.debezium.connector.SnapshotRecord;
 import io.debezium.data.Envelope;
+import io.debezium.data.Envelope.FieldName;
 import io.debezium.document.Array;
+import io.debezium.relational.Column;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
+import io.debezium.relational.history.TableChanges.TableChangeType;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
@@ -35,7 +41,15 @@ import org.apache.inlong.sort.cdc.base.source.meta.split.SourceSplitState;
 import org.apache.inlong.sort.cdc.base.source.metrics.SourceReaderMetrics;
 import org.apache.inlong.sort.cdc.base.source.reader.IncrementalSourceReader;
 import org.apache.inlong.sort.cdc.base.source.reader.IncrementalSourceRecordEmitter;
-import org.apache.inlong.sort.cdc.postgres.source.utils.RecordUtils;
+import org.apache.inlong.sort.cdc.postgres.connection.PostgreSQLJdbcConnectionOptions;
+import org.apache.inlong.sort.cdc.postgres.connection.PostgreSQLJdbcConnectionProvider;
+import org.apache.inlong.sort.cdc.postgres.debezium.internal.DebeziumChangeFetcher.TableChangeHolder;
+import org.apache.inlong.sort.cdc.postgres.debezium.internal.TableImpl;
+import org.apache.inlong.sort.cdc.postgres.manager.PostgreSQLQueryVisitor;
+import org.apache.inlong.sort.cdc.postgres.source.config.PostgresSourceConfig;
+import org.apache.inlong.sort.cdc.postgres.source.config.PostgresSourceConfigFactory;
+import org.apache.kafka.connect.data.Field;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -43,12 +57,15 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
-import static com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isHighWatermarkEvent;
-import static com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isWatermarkEvent;
-import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getHistoryRecord;
-import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
-import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isSchemaChangeEvent;
+import static org.apache.inlong.sort.cdc.base.source.meta.wartermark.WatermarkEvent.isHighWatermarkEvent;
+import static org.apache.inlong.sort.cdc.base.source.meta.wartermark.WatermarkEvent.isWatermarkEvent;
+
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.getHistoryRecord;
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.isDataChangeRecord;
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.isSchemaChangeEvent;
 import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.isHeartbeatEvent;
+import static org.apache.inlong.sort.cdc.postgres.debezium.internal.DebeziumChangeFetcher.DDL_UPDATE_INTERVAL;
+import static org.apache.inlong.sort.cdc.postgres.debezium.internal.DebeziumChangeFetcher.initTableChange;
 
 /**
  * The {@link RecordEmitter} implementation for {@link IncrementalSourceReader}.
@@ -64,13 +81,23 @@ public class PostgresSourceRecordEmitter<T>
     private static final Logger LOG = LoggerFactory.getLogger(PostgresSourceRecordEmitter.class);
     private static final FlinkJsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
             new FlinkJsonTableChangeSerializer();
+    private PostgreSQLQueryVisitor postgreSQLQueryVisitor;
+    private Map<String, TableChangeHolder> tableChangeMap = new ConcurrentHashMap<>();
 
     public PostgresSourceRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
             SourceReaderMetrics sourceReaderMetrics,
             boolean includeSchemaChanges,
-            OffsetFactory offsetFactory) {
+            OffsetFactory offsetFactory,
+            PostgresSourceConfigFactory postgresSourceConfigFactory) {
         super(debeziumDeserializationSchema, sourceReaderMetrics, includeSchemaChanges, offsetFactory);
+        PostgresSourceConfig postgresSourceConfig = postgresSourceConfigFactory.create(0);
+        String url = String.format("jdbc:postgresql://%s:%s/%s", postgresSourceConfig.getHostname(),
+                postgresSourceConfig.getPort(), postgresSourceConfig.getDatabaseName());
+        PostgreSQLJdbcConnectionOptions jdbcConnectionOptions = new PostgreSQLJdbcConnectionOptions(url,
+                postgresSourceConfig.getUsername(), postgresSourceConfig.getPassword());
+        postgreSQLQueryVisitor = new PostgreSQLQueryVisitor(
+                new PostgreSQLJdbcConnectionProvider(jdbcConnectionOptions));
     }
 
     @Override
@@ -101,10 +128,9 @@ public class PostgresSourceRecordEmitter<T>
             LOG.debug("PostgresSourceRecordEmitter Process DataChangeRecord: {}; splitState = {}", element, splitState);
             updateStartingOffsetForSplit(splitState, element);
             reportMetrics(element);
-            final Map<TableId, TableChange> tableSchemas =
-                    splitState.getSourceSplitBase().getTableSchemas();
-            final TableChange tableSchema =
-                    tableSchemas.getOrDefault(RecordUtils.getTableId(element), null);
+            if (splitState.isSnapshotSplitState()) {
+                toSnapshotRecord(element);
+            }
             debeziumDeserializationSchema.deserialize(element, new Collector<T>() {
 
                 @Override
@@ -123,7 +149,7 @@ public class PostgresSourceRecordEmitter<T>
                 public void close() {
 
                 }
-            }, tableSchema);
+            }, getTableChange(element));
         } else if (isHeartbeatEvent(element)) {
             LOG.debug("PostgresSourceRecordEmitterProcess Heartbeat: {}; splitState = {}", element, splitState);
             updateStartingOffsetForSplit(splitState, element);
@@ -134,4 +160,58 @@ public class PostgresSourceRecordEmitter<T>
         }
     }
 
+    public static void toSnapshotRecord(SourceRecord element) {
+        Struct messageStruct = (Struct) element.value();
+        Struct sourceStruct = messageStruct.getStruct(FieldName.SOURCE);
+        SnapshotRecord.TRUE.toSource(sourceStruct);
+    }
+
+    private TableChange getTableChange(SourceRecord record) {
+        Envelope.Operation op = Envelope.operationFor(record);
+        Schema valueSchema;
+        if (op == Envelope.Operation.DELETE) {
+            valueSchema = record.valueSchema().field(Envelope.FieldName.BEFORE).schema();
+        } else {
+            valueSchema = record.valueSchema().field(FieldName.AFTER).schema();
+        }
+        List<Field> fields = valueSchema.fields();
+
+        TableId tableId = org.apache.inlong.sort.cdc.base.util.RecordUtils.getTableId(record);
+        String schema = tableId.schema();
+        String table = tableId.table();
+        String id = tableId.identifier();
+
+        TableChange tableChange;
+        TableChangeHolder holder;
+        if (!tableChangeMap.containsKey(id)) {
+            List<Map<String, Object>> columns = this.postgreSQLQueryVisitor.getTableColumnsMetaData(schema, table);
+            LOG.info("columns: {}", columns);
+            tableChange = initTableChange(tableId, TableChangeType.CREATE, columns);
+            holder = new TableChangeHolder();
+            holder.tableChange = tableChange;
+            holder.timestamp = System.currentTimeMillis();
+            tableChangeMap.put(id, holder);
+        } else {
+            holder = tableChangeMap.get(id);
+            tableChange = holder.tableChange;
+            // diff fieldMap and columns of tableChange, to see if new column has been added
+            if (System.currentTimeMillis() - holder.timestamp > DDL_UPDATE_INTERVAL
+                    && holder.tableChange.getTable() instanceof TableImpl) {
+                TableImpl tableImpl = (TableImpl) holder.tableChange.getTable();
+                List<Column> columnList = tableImpl.columns();
+                // only support add or remove columns
+                if (columnList.size() != fields.size()) {
+                    List<Map<String, Object>> columns = this.postgreSQLQueryVisitor.getTableColumnsMetaData(schema,
+                            table);
+                    LOG.info("columns: {}", columns);
+                    tableChange = initTableChange(tableId, TableChangeType.CREATE, columns);
+                    // update tableChange
+                    holder.tableChange = tableChange;
+                }
+                holder.timestamp = System.currentTimeMillis();
+                tableChangeMap.put(id, holder);
+            }
+        }
+        return tableChange;
+    }
 }

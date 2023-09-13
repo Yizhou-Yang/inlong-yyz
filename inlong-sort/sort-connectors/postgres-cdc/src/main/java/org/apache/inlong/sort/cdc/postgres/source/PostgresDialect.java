@@ -62,6 +62,12 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     @Nullable
     private PostgresStreamFetchTask streamFetchTask;
 
+    @Nullable
+    private transient JdbcSourceConfig taskSourceConfig;
+
+    @Nullable
+    private transient JdbcSourceFetchTaskContext fetchTaskContext;
+
     public PostgresDialect(PostgresSourceConfigFactory configFactory) {
         this.sourceConfig = configFactory.create(0);
     }
@@ -183,6 +189,20 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     public JdbcSourceFetchTaskContext createFetchTaskContext(
             SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
         return new PostgresSourceFetchTaskContext(taskSourceConfig, this);
+    }
+
+    @Override
+    public FetchTask.Context createFetchTaskContext(SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig,
+            boolean reuse) {
+        if (!reuse) {
+            return createFetchTaskContext(sourceSplitBase, taskSourceConfig);
+        }
+        if (this.taskSourceConfig == null || this.fetchTaskContext == null
+                || !this.taskSourceConfig.equals(taskSourceConfig)) {
+            this.taskSourceConfig = taskSourceConfig;
+            this.fetchTaskContext = new PostgresSourceFetchTaskContext(taskSourceConfig, this);
+        }
+        return this.fetchTaskContext;
     }
 
     @Override

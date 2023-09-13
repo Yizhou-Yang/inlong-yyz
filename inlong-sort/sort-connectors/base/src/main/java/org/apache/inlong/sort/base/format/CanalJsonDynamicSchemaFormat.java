@@ -25,8 +25,10 @@ import org.apache.flink.types.RowKind;
 import org.apache.inlong.sort.base.format.JsonToRowDataConverters.JsonToRowDataConverter;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Canal json dynamic format
@@ -98,6 +100,10 @@ public class CanalJsonDynamicSchemaFormat extends JsonDynamicSchemaFormat {
                 pkNames.add(pkNamesNode.get(i).asText());
             }
         }
+        // remove duplicate keys
+        Set<String> set = new LinkedHashSet<>(pkNames);
+        pkNames.clear();
+        pkNames.addAll(set);
         return pkNames;
     }
 

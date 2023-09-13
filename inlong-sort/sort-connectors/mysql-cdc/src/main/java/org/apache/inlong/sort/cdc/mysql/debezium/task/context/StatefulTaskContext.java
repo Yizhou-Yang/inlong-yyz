@@ -30,6 +30,7 @@ import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.data.Envelope;
+import io.debezium.jdbc.JdbcConnection;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
@@ -42,6 +43,7 @@ import io.debezium.schema.TopicSelector;
 import io.debezium.util.Clock;
 import io.debezium.util.Collect;
 import io.debezium.util.SchemaNameAdjuster;
+import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.inlong.sort.cdc.mysql.debezium.DebeziumUtils;
 import org.apache.inlong.sort.cdc.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import org.apache.inlong.sort.cdc.mysql.debezium.dispatcher.EventDispatcherImpl;
@@ -52,6 +54,7 @@ import org.apache.kafka.connect.data.Struct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +72,7 @@ public class StatefulTaskContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(StatefulTaskContext.class);
     private static final Clock clock = Clock.SYSTEM;
+    private static final String TDSQL_C_VERSION_STRING = "cynos";
 
     private final MySqlSourceConfig sourceConfig;
     private final MySqlConnectorConfig connectorConfig;
@@ -209,6 +213,13 @@ public class StatefulTaskContext {
             return true; // start at beginning ...
         }
 
+        // If the server is TDSQL-C, loosen the GTID check as it has a different logic from MySQL.
+        String serverVersion = getServerVersion();
+        if (serverVersion.contains(TDSQL_C_VERSION_STRING)) {
+            LOG.warn("GTID test is skipped for TDSQL-C instances.");
+            return true;
+        }
+
         String availableGtidStr = connection.knownGtidSet();
         if (availableGtidStr == null || availableGtidStr.trim().isEmpty()) {
             // Last offsets had GTIDs but the server does not use them ...
@@ -254,6 +265,36 @@ public class StatefulTaskContext {
         }
         LOG.info("Connector last known GTIDs are {}, but MySQL has {}", gtidSet, availableGtidSet);
         return false;
+    }
+
+    private String getServerVersion() {
+        JdbcConnection connection = null;
+        try {
+            if (sourceConfig != null) {
+                connection = DebeziumUtils.openJdbcConnection(sourceConfig);
+            } else {
+                LOG.warn("sourceConfig is null, what happened?"); // Should NOT happen, just a
+                // preventive measure
+                return "";
+            }
+
+            String version =
+                    connection.queryAndMap(
+                            "SELECT VERSION()", rs -> rs.next() ? rs.getString(1) : "");
+            LOG.info("Retrieved server version: {}", version);
+            return version;
+        } catch (SQLException ex) {
+            LOG.warn("Unexpected error while connecting to server and validating", ex);
+            return "";
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.close();
+                } catch (SQLException e) {
+                    throw new FlinkRuntimeException("Closing connection error", e);
+                }
+            }
+        }
     }
 
     private boolean checkBinlogFilename(MySqlOffsetContext offset) {

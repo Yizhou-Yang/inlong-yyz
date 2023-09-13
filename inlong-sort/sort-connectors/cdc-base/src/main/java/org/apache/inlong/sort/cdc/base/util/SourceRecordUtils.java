@@ -26,6 +26,8 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -50,6 +52,7 @@ public class SourceRecordUtils {
     public static final String SCHEMA_HEARTBEAT_EVENT_KEY_NAME =
             "io.debezium.connector.common.Heartbeat";
     private static final DocumentReader DOCUMENT_READER = DocumentReader.defaultReader();
+    private static final Logger LOG = LoggerFactory.getLogger(SourceRecordUtils.class);
 
     /** Converts a {@link ResultSet} row to an array of Objects. */
     public static Object[] rowToArray(ResultSet rs, int size) throws SQLException {
@@ -100,11 +103,16 @@ public class SourceRecordUtils {
     }
 
     public static boolean isDataChangeRecord(SourceRecord record) {
-        Schema valueSchema = record.valueSchema();
-        Struct value = (Struct) record.value();
-        return value != null
-                && valueSchema.field(Envelope.FieldName.OPERATION) != null
-                && value.getString(Envelope.FieldName.OPERATION) != null;
+        try {
+            Schema valueSchema = record.valueSchema();
+            Struct value = (Struct) record.value();
+            return value != null
+                    && valueSchema.field(Envelope.FieldName.OPERATION) != null
+                    && value.getString(Envelope.FieldName.OPERATION) != null;
+        } catch (Exception e) {
+            LOG.error("source record is{}, exception is{}", record.toString(), e);
+            return false;
+        }
     }
 
     public static boolean isHeartbeatEvent(SourceRecord record) {

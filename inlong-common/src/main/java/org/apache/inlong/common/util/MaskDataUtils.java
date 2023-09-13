@@ -35,7 +35,8 @@ public class MaskDataUtils {
             "public_key", "publicKey",
             "service.secret.key", "qcloud.dlc.secret-key",
             "gateway.url", "service.jwt.secret",
-            "fs.cosn.userinfo.secretKey", "executor.secret.key");
+            "fs.cosn.userinfo.secretKey", "executor.secret.key",
+            "dirty.side-output.s3.secret-key-id");
     private static final List<String> SEPARATORS = Arrays.asList(":", "=", "\": \"", "\":\"");
     private static final List<Character> STOP_CHARACTERS = Arrays.asList('\'', '"');
     private static final List<Character> KNOWN_DELIMITERS =

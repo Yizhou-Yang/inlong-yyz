@@ -18,7 +18,7 @@
 package org.apache.inlong.sort.cdc.postgres.source.config;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
-import io.debezium.connector.AbstractSourceInfo;
+import org.apache.inlong.sort.base.Constants;
 import org.apache.inlong.sort.cdc.base.config.JdbcSourceConfig;
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
@@ -99,7 +99,10 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
 
     @Override
     public List<String> getMetricLabelList() {
-        return Arrays.asList(AbstractSourceInfo.DATABASE_NAME_KEY,
-                AbstractSourceInfo.SCHEMA_NAME_KEY, AbstractSourceInfo.TABLE_NAME_KEY);
+        return Arrays.asList(Constants.DATABASE_NAME, Constants.SCHEMA_NAME, Constants.TABLE_NAME);
+    }
+
+    public Object getDatabaseName() {
+        return getDbzConnectorConfig().databaseName();
     }
 }
