@@ -34,7 +34,7 @@ import static org.junit.Assert.assertEquals;
 @Getter
 public abstract class SerializeBaseTest<T> {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    protected final ObjectMapper objectMapper = new ObjectMapper();
     private T testObject;
 
     /**

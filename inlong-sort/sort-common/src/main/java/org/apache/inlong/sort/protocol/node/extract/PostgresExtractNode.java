@@ -22,6 +22,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInclude.Include;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonTypeName;
 import org.apache.inlong.common.enums.MetaField;
@@ -45,6 +47,7 @@ import java.util.UUID;
  */
 @EqualsAndHashCode(callSuper = true)
 @JsonTypeName("postgresExtract")
+@JsonInclude(Include.NON_NULL)
 @Data
 public class PostgresExtractNode extends ExtractNode implements Metadata, InlongMetric, Serializable {
 
@@ -71,6 +74,29 @@ public class PostgresExtractNode extends ExtractNode implements Metadata, Inlong
     private String serverTimeZone;
     @JsonProperty("scanStartupMode")
     private String scanStartupMode;
+    @JsonProperty("slotName")
+    private String slotName;
+
+    public PostgresExtractNode(@JsonProperty("id") String id,
+            @JsonProperty("name") String name,
+            @JsonProperty("fields") List<FieldInfo> fields,
+            @JsonProperty("watermark_field") WatermarkField watermarkField,
+            @JsonProperty("properties") Map<String, String> properties,
+            @JsonProperty("primaryKey") String primaryKey,
+            @JsonProperty("tableNames") List<String> tableNames,
+            @JsonProperty("hostname") String hostname,
+            @JsonProperty("username") String username,
+            @JsonProperty("password") String password,
+            @JsonProperty("database") String database,
+            @JsonProperty("schema") String schema,
+            @JsonProperty("port") Integer port,
+            @JsonProperty("decodingPluginName") String decodingPluginName,
+            @JsonProperty("serverTimeZone") String serverTimeZone,
+            @JsonProperty("scanStartupMode") String scanStartupMode) {
+        this(id, name, fields, watermarkField, properties, primaryKey, tableNames,
+                hostname, username, password, database, schema, port, decodingPluginName,
+                serverTimeZone, scanStartupMode, generateSlotName());
+    }
 
     @JsonCreator
     public PostgresExtractNode(@JsonProperty("id") String id,
@@ -88,7 +114,8 @@ public class PostgresExtractNode extends ExtractNode implements Metadata, Inlong
             @JsonProperty("port") Integer port,
             @JsonProperty("decodingPluginName") String decodingPluginName,
             @JsonProperty("serverTimeZone") String serverTimeZone,
-            @JsonProperty("scanStartupMode") String scanStartupMode) {
+            @JsonProperty("scanStartupMode") String scanStartupMode,
+            @JsonProperty("slotName") String slotName) {
         super(id, name, fields, watermarkField, properties);
         this.primaryKey = primaryKey;
         this.tableNames = Preconditions.checkNotNull(tableNames, "tableNames is null");
@@ -101,6 +128,10 @@ public class PostgresExtractNode extends ExtractNode implements Metadata, Inlong
         this.decodingPluginName = decodingPluginName;
         this.serverTimeZone = serverTimeZone;
         this.scanStartupMode = scanStartupMode;
+        this.slotName = slotName;
+        if (StringUtils.isBlank(slotName)) {
+            this.slotName = generateSlotName();
+        }
     }
 
     /**
@@ -133,8 +164,14 @@ public class PostgresExtractNode extends ExtractNode implements Metadata, Inlong
             decodingPluginNameOption = PostgresConstant.PGOUTPUT;
         }
         options.put(PostgresConstant.DECODING_PLUGIN_NAME, decodingPluginNameOption);
-        options.put(PostgresConstant.SLOT_NAME,
-                UUID.randomUUID().toString().toLowerCase(Locale.ROOT).replaceAll("[\\-\\d]", ""));
+        String slotNameFromOptions = options.get(PostgresConstant.SLOT_NAME);
+        if (StringUtils.isNotBlank(slotNameFromOptions)) {
+            slotName = slotNameFromOptions;
+        }
+        if (StringUtils.isBlank(slotName)) {
+            slotName = generateSlotName();
+        }
+        options.put(PostgresConstant.SLOT_NAME, slotName);
         if (StringUtils.isNotBlank(serverTimeZone)) {
             options.put(PostgresConstant.SERVER_TIME_ZONE, serverTimeZone);
         }
@@ -142,6 +179,10 @@ public class PostgresExtractNode extends ExtractNode implements Metadata, Inlong
             options.put(PostgresConstant.DEBEZIUM_SNAPSHOT_MODE, scanStartupMode);
         }
         return options;
+    }
+
+    private static String generateSlotName() {
+        return UUID.randomUUID().toString().toLowerCase(Locale.ROOT).replaceAll("[\\-\\d]", "");
     }
 
     @Override

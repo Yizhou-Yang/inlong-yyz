@@ -17,11 +17,13 @@
 
 package org.apache.inlong.sort.protocol.node.extract;
 
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.inlong.common.enums.MetaField;
 import org.apache.inlong.sort.SerializeBaseTest;
 import org.apache.inlong.sort.formats.common.IntFormatInfo;
 import org.apache.inlong.sort.formats.common.StringFormatInfo;
 import org.apache.inlong.sort.protocol.FieldInfo;
+import org.apache.inlong.sort.protocol.constant.PostgresConstant;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -42,6 +44,33 @@ public class PostgresExtractNodeTest extends SerializeBaseTest<PostgresExtractNo
                 new FieldInfo("age", new IntFormatInfo()));
         return new PostgresExtractNode("1", "postgres_input", fields, null, null, null, Arrays.asList("mytable"),
                 "localhost", "username", "password", "database", "public", 5432, null, null, "initial");
+    }
+
+    @Test
+    public void testUnchangeSlotName() throws JsonProcessingException {
+        PostgresExtractNode originNode = getTestObject();
+        String slotName = originNode.tableOptions().get(PostgresConstant.SLOT_NAME);
+        PostgresExtractNode serializeNode =
+                objectMapper.readValue(objectMapper.writeValueAsString(originNode), PostgresExtractNode.class);
+        Assert.assertNotNull(slotName);
+        Assert.assertEquals(slotName, serializeNode.tableOptions().get(PostgresConstant.SLOT_NAME));
+    }
+
+    @Test
+    public void testUnchangeSlotNameForUnsetableSlotName() throws JsonProcessingException {
+        String serializeValue = "{\"type\":\"postgresExtract\",\"id\":\"1\",\"name\":\"postgres_input\","
+                + "\"fields\":[{\"type\":\"field\",\"name\":\"name\",\"formatInfo\":{\"type\":\"string\"}},"
+                + "{\"type\":\"field\",\"name\":\"age\",\"formatInfo\":{\"type\":\"int\"}}],\"tableNames\":"
+                + "[\"mytable\"],\"hostname\":\"localhost\",\"username\":\"username\",\"password\":\"password\","
+                + "\"database\":\"database\",\"schema\":\"public\",\"port\":5432,\"decodingPluginName\":null,"
+                + "\"serverTimeZone\":null,\"scanStartupMode\":\"initial\"}\n";
+        PostgresExtractNode originNode =
+                objectMapper.readValue(serializeValue, PostgresExtractNode.class);
+        String slotName = originNode.tableOptions().get(PostgresConstant.SLOT_NAME);
+        PostgresExtractNode serializeNode =
+                objectMapper.readValue(objectMapper.writeValueAsString(originNode), PostgresExtractNode.class);
+        Assert.assertNotNull(slotName);
+        Assert.assertEquals(slotName, serializeNode.tableOptions().get(PostgresConstant.SLOT_NAME));
     }
 
     @Test
