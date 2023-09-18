@@ -52,13 +52,15 @@ public class OperationHelper {
     private final JsonDynamicSchemaFormat dynamicSchemaFormat;
     private final int VARCHAR_MAX_LENGTH = 65533;
     private final int CHAR_MAX_LENGTH = 255;
+    private final boolean supportDecimalV3;
 
-    private OperationHelper(JsonDynamicSchemaFormat dynamicSchemaFormat) {
+    private OperationHelper(JsonDynamicSchemaFormat dynamicSchemaFormat, boolean supportDecimalV3) {
         this.dynamicSchemaFormat = dynamicSchemaFormat;
+        this.supportDecimalV3 = supportDecimalV3;
     }
 
-    public static OperationHelper of(JsonDynamicSchemaFormat dynamicSchemaFormat) {
-        return new OperationHelper(dynamicSchemaFormat);
+    public static OperationHelper of(JsonDynamicSchemaFormat dynamicSchemaFormat, boolean supportDecimalV3) {
+        return new OperationHelper(dynamicSchemaFormat, supportDecimalV3);
     }
 
     private String convert2DorisType(int jdbcType, boolean isNullable, List<String> precisions) {
@@ -95,7 +97,7 @@ public class OperationHelper {
                 } else {
                     decimalType = new DecimalType(isNullable, decimalType.getPrecision(), decimalType.getScale());
                 }
-                type = decimalType.asSummaryString();
+                type = handleDecimalType(decimalType);
                 break;
             case Types.CHAR:
                 LogicalType charType = dynamicSchemaFormat.sqlType2FlinkType(jdbcType);
@@ -115,8 +117,8 @@ public class OperationHelper {
                             "The length of precisions with VARCHAR must be 1");
                     // Because the precision definition of varchar by Doris is different from that of MySQL.
                     // The precision in MySQL is the number of characters, while Doris is the number of bytes,
-                    // and Chinese characters occupy 3 bytes, so the precision multiplys by 3 here.
-                    int precision = Math.min(Integer.parseInt(precisions.get(0)) * 3, VARCHAR_MAX_LENGTH);
+                    // and Chinese characters occupy 4 bytes, so the precision multiplys by 3 here.
+                    int precision = Math.min(Integer.parseInt(precisions.get(0)) * 4, VARCHAR_MAX_LENGTH);
                     varcharType = new VarCharType(isNullable, precision);
                 } else {
                     varcharType = varcharType.copy(isNullable);
@@ -157,7 +159,7 @@ public class OperationHelper {
                     }
                 }
                 decimalType = new DecimalType(isNullable, precision, scale);
-                type = decimalType.asSerializableString();
+                type = handleDecimalType(decimalType);
                 break;
             case Types.BIT:
                 type = String.format("BOOLEAN %s", isNullable ? "" : " NOT NULL");
@@ -356,8 +358,8 @@ public class OperationHelper {
             VarCharType varcharType = (VarCharType) type;
             // Because the precision definition of varchar by Doris is different from that of MySQL.
             // The precision in MySQL is the number of characters, while Doris is the number of bytes,
-            // and Chinese characters occupy 3 bytes, so the precision multiplys by 3 here.
-            int length = Math.min(varcharType.getLength() * 3, VARCHAR_MAX_LENGTH);
+            // and Chinese characters occupy 4 bytes, so the precision multiplys by 4 here.
+            int length = Math.min(varcharType.getLength() * 4, VARCHAR_MAX_LENGTH);
             varcharType = new VarCharType(type.isNullable(), length);
             dorisType = varcharType.asSummaryString();
         } else if (type instanceof CharType) {
@@ -372,10 +374,24 @@ public class OperationHelper {
             dorisType = "DATETIME";
         } else if (type instanceof TimeType || type instanceof BinaryType || type instanceof VarBinaryType) {
             dorisType = String.format("STRING%s", type.isNullable() ? "" : " NOT NULL");
+        } else if (type instanceof DecimalType) {
+            dorisType = handleDecimalType((DecimalType) type);
         } else {
             dorisType = type.asSummaryString();
         }
         return dorisType;
+    }
+
+    private String handleDecimalType(DecimalType decimalType) {
+        int precision = Math.min(decimalType.getPrecision(), 38);
+        int scale = Math.min(decimalType.getScale(), 38);
+        String type = "DECIMALV3";
+        if (!supportDecimalV3) {
+            precision = Math.min(27, precision);
+            scale = Math.min(27, scale);
+            type = "DECIMAL";
+        }
+        return String.format("%s(%s,%s)", type, precision, scale);
     }
 
     public String buildAddColumnStatement(TableSchema tableSchema, RowType rowType) {
