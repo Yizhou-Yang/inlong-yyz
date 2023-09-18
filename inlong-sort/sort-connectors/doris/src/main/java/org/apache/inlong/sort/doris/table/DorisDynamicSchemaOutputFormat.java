@@ -56,7 +56,7 @@ import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.base.util.CalculateObjectSizeUtils;
 import org.apache.inlong.sort.base.util.MetricStateUtils;
 import org.apache.inlong.sort.doris.model.RespContent;
-import org.apache.inlong.sort.doris.schema.SchemaChangeHelper;
+import org.apache.inlong.sort.doris.schema.DorisSchemaChangeHelper;
 import org.apache.inlong.sort.doris.util.DorisParseUtils;
 import org.apache.inlong.sort.util.SchemaChangeUtils;
 import org.slf4j.Logger;
@@ -156,7 +156,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
     private final String schemaChangePolicies;
     private final DirtySinkHelper<Object> dirtySinkHelper;
     private final boolean autoCreateTableWhenSnapshot;
-    private SchemaChangeHelper helper;
+    private DorisSchemaChangeHelper helper;
     private long batchBytes = 0L;
     private int size;
     private DorisStreamLoad dorisStreamLoad;
@@ -302,7 +302,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         if (multipleSink) {
             jsonDynamicSchemaFormat =
                     (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(dynamicSchemaFormat);
-            helper = SchemaChangeHelper.of(jsonDynamicSchemaFormat, options, enableSchemaChange,
+            helper = DorisSchemaChangeHelper.of(jsonDynamicSchemaFormat, options, enableSchemaChange,
                     enableSchemaChange ? SchemaChangeUtils.deserialize(schemaChangePolicies) : null, databasePattern,
                     tablePattern, executionOptions.getMaxRetries(), schemaUpdatePolicy, metricData, dirtySinkHelper);
         }
