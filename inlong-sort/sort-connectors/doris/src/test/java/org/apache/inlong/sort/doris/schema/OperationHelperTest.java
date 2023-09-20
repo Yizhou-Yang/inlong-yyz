@@ -191,7 +191,7 @@ public class OperationHelperTest {
     @Before
     public void init() {
         helper = OperationHelper.of(
-                (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat("canal-json"));
+                (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat("canal-json"), true);
     }
 
     /**
