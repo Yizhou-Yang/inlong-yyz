@@ -86,6 +86,12 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                             + "the Changelog Normalize operator. The default value is true. (For scenarios that do not "
                             + "require the -U message, this operator can be disabled.) \n");
 
+    public static final ConfigOption<String> SERVER_TIME_ZONE =
+            ConfigOptions.key("server.time.zone")
+                    .stringType()
+                    .defaultValue(null)
+                    .withDescription("MongoDB's Time zone\n");
+
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
@@ -112,7 +118,10 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         final Boolean copyExisting = config.get(COPY_EXISTING);
         final Integer copyExistingQueueSize = config.getOptional(COPY_EXISTING_QUEUE_SIZE).orElse(null);
 
-        final String zoneId = context.getConfiguration().get(TableConfigOptions.LOCAL_TIME_ZONE);
+        String timezone = config.get(SERVER_TIME_ZONE);
+        final String zoneId =
+                timezone == null ? timezone : context.getConfiguration().get(TableConfigOptions.LOCAL_TIME_ZONE);
+
         final ZoneId localTimeZone =
                 TableConfigOptions.LOCAL_TIME_ZONE.defaultValue().equals(zoneId)
                         ? ZoneId.systemDefault()
