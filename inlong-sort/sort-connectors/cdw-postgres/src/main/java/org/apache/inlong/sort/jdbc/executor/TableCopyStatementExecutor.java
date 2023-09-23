@@ -162,10 +162,10 @@ public final class TableCopyStatementExecutor implements JdbcBatchStatementExecu
         });
         threadPool.submit(copyResult);
         LOG.info("printing copy rowdata size " + rowData.size());
+        byte[] data = null;
         try {
             for (int i = 0; i < rowData.size(); i++) {
                 RowData record = rowData.get(i);
-                byte[] data;
                 try {
                     data = serializeRecord(record);
                 } catch (Exception e) {
@@ -194,6 +194,9 @@ public final class TableCopyStatementExecutor implements JdbcBatchStatementExecu
         try {
             copyResult.get();
         } catch (Exception e) {
+            if (data != null) {
+                LOG.error("exception data({}):\n[{}]\n[{}]", data.length, new String(data), data);
+            }
             throw new SQLException(e.getMessage());
         }
     }
@@ -276,7 +279,8 @@ public final class TableCopyStatementExecutor implements JdbcBatchStatementExecu
                         break;
                     case DATE:
                         Date dd = java.sql.Date.valueOf(LocalDate.ofEpochDay(rowData.getInt(index)));
-                        sb.append(dd);
+                        sb.append(String.format(
+                                "%d-%02d-%02d", dd.getYear() + 1900, dd.getMonth() + 1, dd.getDate()));
                         break;
                     case TIME_WITHOUT_TIME_ZONE: {
                         final int timestampPrecision = ((TimeType) type).getPrecision();
