@@ -655,11 +655,12 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                         case TIMESTAMP_WITHOUT_TIME_ZONE:
                             TimestampData timestamp;
                             try {
-                                timestamp = TimestampData.fromInstant(Instant.parse(fieldValue));
-                            } catch (Exception ex) {
-                                // Ignore the first parse error
+                                // timestamp format is '2011-12-03T10:15:30'
                                 timestamp = TimestampData.fromLocalDateTime(
                                         LocalDateTime.parse(fieldValue, DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                            } catch (Exception ex) {
+                                // Ignore the first parse error
+                                timestamp = TimestampData.fromInstant(Instant.parse(fieldValue));
                             }
                             record.setField(i, timestamp);
                             break;

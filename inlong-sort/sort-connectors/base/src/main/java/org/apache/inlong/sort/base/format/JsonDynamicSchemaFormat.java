@@ -18,6 +18,8 @@
 package org.apache.inlong.sort.base.format;
 
 import org.apache.commons.lang3.StringUtils;
+
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.formats.common.TimestampFormat;
@@ -52,6 +54,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -186,6 +189,9 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
     }
 
     private BiFunction<LogicalType, String, LogicalType> handleDialectSqlTypeFunction;
+
+    private final Map<Tuple2<LogicalType, String>, LogicalType> dialectType2LogicalType =
+            new HashMap<>();
 
     /**
      * Extract values by keys from the raw data
@@ -399,6 +405,16 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
         if (StringUtils.isBlank(dialectType)) {
             return type;
         }
+        final Tuple2<LogicalType, String> key = Tuple2.of(type, dialectType);
+        LogicalType resType = dialectType2LogicalType.get(key);
+        if (resType != null) {
+            return resType;
+        }
+        resType = handleDialectSqlTypeInternal(type, dialectType);
+        dialectType2LogicalType.put(key, resType);
+        return resType;
+    }
+    private LogicalType handleDialectSqlTypeInternal(LogicalType type, String dialectType) {
         Matcher matcher = DIALECT_SQL_TYPE_PATTERN.matcher(dialectType);
         if (!matcher.matches()) {
             return type;
