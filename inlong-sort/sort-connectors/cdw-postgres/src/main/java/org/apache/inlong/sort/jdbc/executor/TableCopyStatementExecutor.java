@@ -194,7 +194,7 @@ public final class TableCopyStatementExecutor implements JdbcBatchStatementExecu
         try {
             copyResult.get();
         } catch (Exception e) {
-            if (data != null) {
+            if (data != null && !e.getMessage().contains("duplicate key value violates unique")) {
                 LOG.error("exception data({}):\n[{}]\n[{}]", data.length, new String(data), data);
             }
             throw new SQLException(e.getMessage());
