@@ -150,7 +150,9 @@ public final class TableCopyStatementExecutor implements JdbcBatchStatementExecu
                     LOG.info("printing copy batch size " + count);
                     return count;
                 } catch (SQLException e) {
-                    // LOG.error("### SQLException {}", e.getMessage());
+                    if (!e.getMessage().contains("duplicate key value violates unique")) {
+                        LOG.error("### SQLException {}", e.getMessage());
+                    }
                     throw new SQLException(e.getMessage());
                 } finally {
                     try {

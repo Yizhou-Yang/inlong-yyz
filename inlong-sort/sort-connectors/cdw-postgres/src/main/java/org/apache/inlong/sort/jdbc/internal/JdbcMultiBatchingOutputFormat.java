@@ -64,6 +64,8 @@ import org.apache.inlong.sort.base.util.MetricStateUtils;
 import org.apache.inlong.sort.jdbc.schema.JdbcSchemaSchangeHelper;
 import org.apache.inlong.sort.jdbc.table.AbstractJdbcDialect;
 import org.apache.inlong.sort.jdbc.utils.JdbcMultipleUtils;
+import org.apache.inlong.sort.protocol.enums.SchemaChangePolicy;
+import org.apache.inlong.sort.protocol.enums.SchemaChangeType;
 import org.apache.inlong.sort.util.SchemaChangeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -232,8 +234,19 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         dirtySinkHelper.open(new Configuration());
         jsonDynamicSchemaFormat =
                 (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(sinkMultipleFormat);
+
+        Map<SchemaChangeType, SchemaChangePolicy> policyMap = null;
+        if (enableSchemaChange) {
+            policyMap = SchemaChangeUtils.deserialize(schemaChangePolicies);
+        } else {
+            policyMap = new HashMap<>();
+            for (SchemaChangeType type : SchemaChangeType.values()) {
+                policyMap.put(type, SchemaChangePolicy.LOG);
+            }
+        }
+
         helper = JdbcSchemaSchangeHelper.of(jsonDynamicSchemaFormat, enableSchemaChange,
-                enableSchemaChange ? SchemaChangeUtils.deserialize(schemaChangePolicies) : null, databasePattern,
+                policyMap, databasePattern,
                 schemaPattern, tablePattern, schemaUpdateExceptionPolicy, sinkMetricData, dirtySinkHelper,
                 autoCreateTableWhenSnapshot, this, firstDataMap, rowTypeMap,
                 executionOptions.getMaxRetries());
@@ -710,7 +723,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
 
     /**
      * Write all recorde from recordsMap to db
-     *
+     * <p>
      * First batch writing.
      * If batch-writing occur exception, then rewrite one-by-one retry-times set by user.
      */
