@@ -215,6 +215,13 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
                     .withDescription("The option 'sink.multiple.schema-pattern' "
                             + "is used extract table name from the raw binary data, "
                             + "this is only used in the multiple sink writing scenario.");
+
+    public static final ConfigOption<Integer> SINK_CONCURRENCY_WRITE =
+            ConfigOptions.key("sink.concurrency.write")
+                    .intType()
+                    .defaultValue(1)
+                    .withDescription("The max number of concurrent threads to write data.");
+
     private static final Map<SchemaChangeType, List<SchemaChangePolicy>> SUPPORTS_POLICY_MAP = new HashMap<>();
     static {
         SUPPORTS_POLICY_MAP.put(SchemaChangeType.CREATE_TABLE,
@@ -272,6 +279,7 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
         // Build the dirty data side-output
         final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(helper.getOptions());
         final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
+        int concurrencyWrite = config.get(SINK_CONCURRENCY_WRITE);
         return new JdbcDynamicTableSink(
                 jdbcOptions,
                 getJdbcExecutionOptions(config),
@@ -290,7 +298,8 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
                 dirtySink,
                 enableSchemaChange,
                 schemaChangePolicies,
-                autoCreateTableWhenSnapshot);
+                autoCreateTableWhenSnapshot,
+                concurrencyWrite);
     }
 
     @Override
@@ -465,6 +474,7 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
         optionalOptions.add(SINK_SCHEMA_CHANGE_ENABLE);
         optionalOptions.add(SINK_SCHEMA_CHANGE_POLICIES);
         optionalOptions.add(SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT);
+        optionalOptions.add(SINK_CONCURRENCY_WRITE);
         return optionalOptions;
     }
 

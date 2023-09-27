@@ -68,6 +68,7 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
     private @Nullable final String schemaChangePolicies;
     private final boolean autoCreateTableWhenSnapshot;
 
+    private final int concurrencyWrite;
     public JdbcDynamicTableSink(
             JdbcOptions jdbcOptions,
             JdbcExecutionOptions executionOptions,
@@ -86,7 +87,8 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
             @Nullable DirtySink<Object> dirtySink,
             boolean enableSchemaChange,
             @Nullable String schemaChangePolicies,
-            boolean autoCreateTableWhenSnapshot) {
+            boolean autoCreateTableWhenSnapshot,
+            int concurrencyWrite) {
         this.jdbcOptions = jdbcOptions;
         this.executionOptions = executionOptions;
         this.dmlOptions = dmlOptions;
@@ -106,6 +108,7 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
         this.enableSchemaChange = enableSchemaChange;
         this.schemaChangePolicies = schemaChangePolicies;
         this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
+        this.concurrencyWrite = concurrencyWrite;
     }
 
     @Override
@@ -144,7 +147,8 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
                     .setSchemaUpdatePolicy(schemaUpdateExceptionPolicy)
                     .setEnableSchemaChange(enableSchemaChange)
                     .setAutoCreateTableWhenSnapshot(autoCreateTableWhenSnapshot)
-                    .setSchemaChangePolicies(schemaChangePolicies);
+                    .setSchemaChangePolicies(schemaChangePolicies)
+                    .setConcurrencyWrite(concurrencyWrite);
             return SinkFunctionProvider.of(
                     new GenericJdbcSinkFunction<>(builder.buildMulti()), jdbcOptions.getParallelism());
         } else {
@@ -160,7 +164,7 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
         return new JdbcDynamicTableSink(jdbcOptions, executionOptions, dmlOptions, tableSchema, appendMode,
                 multipleSink, sinkMultipleFormat, databasePattern, tablePattern, schemaPattern, inlongMetric,
                 auditHostAndPorts, schemaUpdateExceptionPolicy, dirtyOptions, dirtySink, enableSchemaChange,
-                schemaChangePolicies, autoCreateTableWhenSnapshot);
+                schemaChangePolicies, autoCreateTableWhenSnapshot, concurrencyWrite);
     }
 
     @Override
