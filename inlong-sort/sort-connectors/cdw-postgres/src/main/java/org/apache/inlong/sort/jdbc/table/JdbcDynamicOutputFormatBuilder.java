@@ -91,8 +91,6 @@ public class JdbcDynamicOutputFormatBuilder implements Serializable {
     private String schemaChangePolicies;
     private boolean autoCreateTableWhenSnapshot;
 
-    private int concurrencyWrite = 1;
-
     public JdbcDynamicOutputFormatBuilder() {
 
     }
@@ -367,11 +365,6 @@ public class JdbcDynamicOutputFormatBuilder implements Serializable {
         return this;
     }
 
-    public JdbcDynamicOutputFormatBuilder setConcurrencyWrite(int concurrencyWrite) {
-        this.concurrencyWrite = concurrencyWrite;
-        return this;
-    }
-
     public JdbcMultiBatchingOutputFormat<RowData, ?, ?> buildMulti() {
         checkNotNull(jdbcOptions, "jdbc options can not be null");
         checkNotNull(dmlOptions, "jdbc dml options can not be null");
@@ -393,7 +386,6 @@ public class JdbcDynamicOutputFormatBuilder implements Serializable {
                 dirtySinkHelper,
                 enableSchemaChange,
                 schemaChangePolicies,
-                autoCreateTableWhenSnapshot,
-                concurrencyWrite);
+                autoCreateTableWhenSnapshot);
     }
 }
