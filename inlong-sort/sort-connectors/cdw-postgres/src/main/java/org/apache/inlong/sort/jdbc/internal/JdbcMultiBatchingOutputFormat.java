@@ -762,14 +762,12 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         }
 
         if (tasks.size() > 0) {
+            LOG.info("waiting for {} flush tasks to finished, parallism is {}", tasks.size(), concurrencyWrite);
             waitFlushTasks(tasks);
         }
     }
 
     private void waitFlushTasks(List<FutureTask<Void>> tasks) throws IOException {
-        final int taskSize = tasks.size();
-        final long startMs = System.currentTimeMillis();
-        LOG.info("waiting for {} flush tasks to finished, parallism is {}", taskSize, concurrencyWrite);
         Iterator<FutureTask<Void>> iterator = tasks.iterator();
         while (iterator.hasNext()) {
             try {
@@ -779,7 +777,6 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 throw new IOException("Fail to flush data", e);
             }
         }
-        LOG.info("{} flush tasks finished, time cost {}ms", taskSize, System.currentTimeMillis() - startMs);
     }
 
     private void flushTable(String tableIdentifier, List<GenericRowData> tableIdRecordList) throws IOException {
