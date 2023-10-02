@@ -19,13 +19,16 @@ package org.apache.inlong.sort.jdbc.table;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
+import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.inlong.sort.jdbc.options.JdbcExecutionOptions;
 import org.apache.flink.connector.jdbc.internal.options.JdbcDmlOptions;
 import org.apache.flink.connector.jdbc.internal.options.JdbcOptions;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
-import org.apache.flink.table.connector.sink.SinkFunctionProvider;
 import org.apache.flink.table.data.RowData;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
@@ -67,6 +70,8 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
     private final boolean enableSchemaChange;
     private @Nullable final String schemaChangePolicies;
     private final boolean autoCreateTableWhenSnapshot;
+    private final String uid;
+    private final String uidHash;
 
     public JdbcDynamicTableSink(
             JdbcOptions jdbcOptions,
@@ -86,7 +91,9 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
             @Nullable DirtySink<Object> dirtySink,
             boolean enableSchemaChange,
             @Nullable String schemaChangePolicies,
-            boolean autoCreateTableWhenSnapshot) {
+            boolean autoCreateTableWhenSnapshot,
+            @Nullable String uid,
+            @Nullable String uidHash) {
         this.jdbcOptions = jdbcOptions;
         this.executionOptions = executionOptions;
         this.dmlOptions = dmlOptions;
@@ -106,6 +113,8 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
         this.enableSchemaChange = enableSchemaChange;
         this.schemaChangePolicies = schemaChangePolicies;
         this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
+        this.uid = uid;
+        this.uidHash = uidHash;
     }
 
     @Override
@@ -136,6 +145,8 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
                 .setAuditHostAndPorts(auditHostAndPorts)
                 .setDirtyOptions(dirtyOptions)
                 .setDirtySink(dirtySink);
+
+        SinkFunction<RowData> sinkFunction;
         if (multipleSink) {
             builder.setSinkMultipleFormat(sinkMultipleFormat)
                     .setDatabasePattern(databasePattern)
@@ -145,14 +156,34 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
                     .setEnableSchemaChange(enableSchemaChange)
                     .setAutoCreateTableWhenSnapshot(autoCreateTableWhenSnapshot)
                     .setSchemaChangePolicies(schemaChangePolicies);
-            return SinkFunctionProvider.of(
-                    new GenericJdbcSinkFunction<>(builder.buildMulti()), jdbcOptions.getParallelism());
+            sinkFunction = new GenericJdbcSinkFunction<>(builder.buildMulti());
         } else {
             builder.setRowDataTypeInfo(rowDataTypeInformation);
             builder.setFieldDataTypes(tableSchema.getFieldDataTypes());
-            return SinkFunctionProvider.of(
-                    new GenericJdbcSinkFunction<>(builder.build()), jdbcOptions.getParallelism());
+            sinkFunction = new GenericJdbcSinkFunction<>(builder.build());
         }
+
+        return new DataStreamSinkProvider() {
+
+            @Override
+            public DataStreamSink<?> consumeDataStream(DataStream<RowData> dataStream) {
+                DataStreamSink<RowData> sink =
+                        dataStream
+                                .addSink(sinkFunction);
+
+                if (jdbcOptions.getParallelism() != null) {
+                    sink = sink.setParallelism(jdbcOptions.getParallelism());
+                }
+                if (uid != null) {
+                    sink = sink.uid(uid);
+                }
+                if (uidHash != null) {
+                    sink = sink.setUidHash(uidHash);
+                }
+
+                return sink;
+            }
+        };
     }
 
     @Override
@@ -160,7 +191,7 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
         return new JdbcDynamicTableSink(jdbcOptions, executionOptions, dmlOptions, tableSchema, appendMode,
                 multipleSink, sinkMultipleFormat, databasePattern, tablePattern, schemaPattern, inlongMetric,
                 auditHostAndPorts, schemaUpdateExceptionPolicy, dirtyOptions, dirtySink, enableSchemaChange,
-                schemaChangePolicies, autoCreateTableWhenSnapshot);
+                schemaChangePolicies, autoCreateTableWhenSnapshot, uid, uidHash);
     }
 
     @Override

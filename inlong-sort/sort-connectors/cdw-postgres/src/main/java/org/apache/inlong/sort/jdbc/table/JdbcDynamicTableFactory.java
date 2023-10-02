@@ -215,6 +215,19 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
                     .withDescription("The option 'sink.multiple.schema-pattern' "
                             + "is used extract table name from the raw binary data, "
                             + "this is only used in the multiple sink writing scenario.");
+
+    public static final ConfigOption<String> SINK_UID =
+            ConfigOptions.key("sink.uid")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The uid for the sink operator");
+
+    public static final ConfigOption<String> SINK_UID_HASH =
+            ConfigOptions.key("sink.uid-hash")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The uid-hash for the sink operator");
+
     private static final Map<SchemaChangeType, List<SchemaChangePolicy>> SUPPORTS_POLICY_MAP = new HashMap<>();
     static {
         SUPPORTS_POLICY_MAP.put(SchemaChangeType.CREATE_TABLE,
@@ -272,6 +285,8 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
         // Build the dirty data side-output
         final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(helper.getOptions());
         final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
+        String uid = config.get(SINK_UID);
+        String uidHash = config.get(SINK_UID_HASH);
         return new JdbcDynamicTableSink(
                 jdbcOptions,
                 getJdbcExecutionOptions(config),
@@ -290,7 +305,9 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
                 dirtySink,
                 enableSchemaChange,
                 schemaChangePolicies,
-                autoCreateTableWhenSnapshot);
+                autoCreateTableWhenSnapshot,
+                uid,
+                uidHash);
     }
 
     @Override
@@ -465,6 +482,8 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
         optionalOptions.add(SINK_SCHEMA_CHANGE_ENABLE);
         optionalOptions.add(SINK_SCHEMA_CHANGE_POLICIES);
         optionalOptions.add(SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT);
+        optionalOptions.add(SINK_UID);
+        optionalOptions.add(SINK_UID_HASH);
         return optionalOptions;
     }
 
