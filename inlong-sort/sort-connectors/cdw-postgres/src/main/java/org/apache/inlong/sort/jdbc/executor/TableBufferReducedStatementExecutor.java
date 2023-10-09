@@ -17,7 +17,7 @@
 
 package org.apache.inlong.sort.jdbc.executor;
 
-import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.connector.jdbc.internal.executor.JdbcBatchStatementExecutor;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.RowKind;
@@ -49,8 +49,9 @@ public final class TableBufferReducedStatementExecutor
     private final Function<RowData, RowData> keyExtractor;
     private final Function<RowData, RowData> valueTransform;
     private Connection connection;
-    // the mapping is [KEY, <+/-, VALUE>]
-    private final Map<RowData, Tuple2<RowKind, RowData>> reduceBuffer = new HashMap<>();
+
+    // the mapping is [KEY, has met deleted / <+/-, VALUE>]
+    private final Map<RowData, Tuple3<Boolean, RowKind, RowData>> reduceBuffer = new HashMap<>();
 
     public TableBufferReducedStatementExecutor(
             JdbcBatchStatementExecutor<RowData> insertExecutor,
@@ -86,25 +87,40 @@ public final class TableBufferReducedStatementExecutor
     public void addToBatch(RowData record) throws SQLException {
         RowData key = keyExtractor.apply(record);
         RowData value = valueTransform.apply(record); // copy or not
-        reduceBuffer.put(key, Tuple2.of(record.getRowKind(), value));
+
+        reduceBuffer.compute(key, (ignored, oldV) -> {
+            if (record.getRowKind() == RowKind.DELETE) {
+                return Tuple3.of(true, record.getRowKind(), value);
+            } else if (oldV == null) {
+                return Tuple3.of(false, record.getRowKind(), value);
+            } else {
+                return Tuple3.of(oldV.f0, record.getRowKind(), value);
+            }
+        });
     }
 
     @Override
     public void executeBatch() throws SQLException {
-        // LOG.warn("using custom table buffer reduced executor!");
-        for (Map.Entry<RowData, Tuple2<RowKind, RowData>> entry : reduceBuffer.entrySet()) {
-            switch (entry.getValue().f0) {
+        for (Map.Entry<RowData, Tuple3<Boolean, RowKind, RowData>> entry : reduceBuffer.entrySet()) {
+            if (entry.getValue().f0) {
+                deleteExecutor.addToBatch(entry.getKey());
+            }
+
+            switch (entry.getValue().f1) {
                 case INSERT:
                     insertDeleteExecutor.addToBatch(entry.getKey());
-                    insertExecutor.addToBatch(entry.getValue().f1);
-                    backUpInsertExecutor.addToBatch(entry.getValue().f1);
+                    insertExecutor.addToBatch(entry.getValue().f2);
+                    backUpInsertExecutor.addToBatch(entry.getValue().f2);
                     break;
                 case UPDATE_AFTER:
-                    updateDeleteExecutor.addToBatch(entry.getKey());
-                    updateInsertExecutor.addToBatch(entry.getValue().f1);
+                    if (!entry.getValue().f0) {
+                        updateDeleteExecutor.addToBatch(entry.getKey());
+                    }
+                    updateInsertExecutor.addToBatch(entry.getValue().f2);
                     break;
                 case DELETE:
-                    deleteExecutor.addToBatch(entry.getKey());
+                    // Must have marked as deleted received.
+                    // deleteExecutor.addToBatch(entry.getKey());
                     break;
                 case UPDATE_BEFORE:
                     break;// 直接丢弃
@@ -116,6 +132,8 @@ public final class TableBufferReducedStatementExecutor
                                     entry.getValue().f0));
             }
         }
+
+        deleteExecutor.executeBatch();
         try {
             insertExecutor.executeBatch();
         } catch (SQLException e) {
@@ -132,7 +150,7 @@ public final class TableBufferReducedStatementExecutor
             }
             ((TableBatchDeleteExecutor) insertDeleteExecutor).clearBatch();
         }
-        deleteExecutor.executeBatch();
+
         try {
             connection.setAutoCommit(false);
             updateDeleteExecutor.executeBatch();
