@@ -70,6 +70,8 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
     private final boolean enableSchemaChange;
     private @Nullable final String schemaChangePolicies;
     private final boolean autoCreateTableWhenSnapshot;
+
+    private final int concurrencyWrite;
     private final String uid;
     private final String uidHash;
 
@@ -92,6 +94,7 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
             boolean enableSchemaChange,
             @Nullable String schemaChangePolicies,
             boolean autoCreateTableWhenSnapshot,
+            int concurrencyWrite,
             @Nullable String uid,
             @Nullable String uidHash) {
         this.jdbcOptions = jdbcOptions;
@@ -113,6 +116,7 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
         this.enableSchemaChange = enableSchemaChange;
         this.schemaChangePolicies = schemaChangePolicies;
         this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
+        this.concurrencyWrite = concurrencyWrite;
         this.uid = uid;
         this.uidHash = uidHash;
     }
@@ -155,7 +159,8 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
                     .setSchemaUpdatePolicy(schemaUpdateExceptionPolicy)
                     .setEnableSchemaChange(enableSchemaChange)
                     .setAutoCreateTableWhenSnapshot(autoCreateTableWhenSnapshot)
-                    .setSchemaChangePolicies(schemaChangePolicies);
+                    .setSchemaChangePolicies(schemaChangePolicies)
+                    .setConcurrencyWrite(concurrencyWrite);
             sinkFunction = new GenericJdbcSinkFunction<>(builder.buildMulti());
         } else {
             builder.setRowDataTypeInfo(rowDataTypeInformation);
@@ -191,7 +196,7 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
         return new JdbcDynamicTableSink(jdbcOptions, executionOptions, dmlOptions, tableSchema, appendMode,
                 multipleSink, sinkMultipleFormat, databasePattern, tablePattern, schemaPattern, inlongMetric,
                 auditHostAndPorts, schemaUpdateExceptionPolicy, dirtyOptions, dirtySink, enableSchemaChange,
-                schemaChangePolicies, autoCreateTableWhenSnapshot, uid, uidHash);
+                schemaChangePolicies, autoCreateTableWhenSnapshot, concurrencyWrite, uid, uidHash);
     }
 
     @Override

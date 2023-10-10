@@ -92,9 +92,14 @@ import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalQueries;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -141,12 +146,12 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     private transient ScheduledFuture<?> scheduledFuture;
     private transient RuntimeContext runtimeContext;
     private transient JsonDynamicSchemaFormat jsonDynamicSchemaFormat;
-    private transient Map<String, JdbcExec> jdbcExecMap = new HashMap<>();
-    private transient Map<String, SimpleJdbcConnectionProvider> connectionExecProviderMap = new HashMap<>();
-    private transient Map<String, RowType> rowTypeMap = new HashMap<>();
-    private transient Map<String, List<String>> pkNameMap = new HashMap<>();
+    private transient Map<String, JdbcExec> jdbcExecMap = new ConcurrentHashMap<>();
+    private transient Map<String, SimpleJdbcConnectionProvider> connectionExecProviderMap = new ConcurrentHashMap<>();
+    private transient Map<String, RowType> rowTypeMap = new ConcurrentHashMap<>();
+    private transient Map<String, List<String>> pkNameMap = new ConcurrentHashMap<>();
     private transient Map<String, List<GenericRowData>> recordsMap = new HashMap<>();
-    private transient Map<String, Exception> tableExceptionMap = new HashMap<>();
+    private transient Map<String, Exception> tableExceptionMap = new ConcurrentHashMap<>();
     private transient Boolean stopWritingWhenTableException;
 
     private transient ListState<MetricState> metricStateListState;
@@ -157,6 +162,10 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     private final boolean autoCreateTableWhenSnapshot;
     private JdbcSchemaSchangeHelper helper;
     private final Map<String, JsonNode> firstDataMap = new HashMap<>();
+
+    private final int concurrencyWrite;
+
+    private transient ExecutorService flushExecutorService = null;
 
     static {
         SQL_TIME_FORMAT = (new DateTimeFormatterBuilder()).appendPattern("HH:mm:ss")
@@ -182,7 +191,8 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             DirtySinkHelper<Object> dirtySinkHelper,
             boolean enableSchemaChange,
             @Nullable String schemaChangePolicies,
-            boolean autoCreateTableWhenSnapshot) {
+            boolean autoCreateTableWhenSnapshot,
+            int concurrencyWrite) {
         super(connectionProvider);
         this.executionOptions = checkNotNull(executionOptions);
         this.dmlOptions = dmlOptions;
@@ -199,6 +209,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         this.enableSchemaChange = enableSchemaChange;
         this.schemaChangePolicies = schemaChangePolicies;
         this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
+        this.concurrencyWrite = concurrencyWrite;
     }
 
     /**
@@ -222,12 +233,12 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             sinkMetricData = new SinkTableMetricData(metricOption, runtimeContext.getMetricGroup());
             sinkMetricData.registerSubMetricsGroup(metricState);
         }
-        jdbcExecMap = new HashMap<>();
-        connectionExecProviderMap = new HashMap<>();
-        pkNameMap = new HashMap<>();
-        rowTypeMap = new HashMap<>();
+        jdbcExecMap = new ConcurrentHashMap<>();
+        connectionExecProviderMap = new ConcurrentHashMap<>();
+        pkNameMap = new ConcurrentHashMap<>();
+        rowTypeMap = new ConcurrentHashMap<>();
         recordsMap = new HashMap<>();
-        tableExceptionMap = new HashMap<>();
+        tableExceptionMap = new ConcurrentHashMap<>();
         stopWritingWhenTableException =
                 schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.ALERT_WITH_IGNORE)
                         || schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.STOP_PARTIAL);
@@ -271,6 +282,8 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                             executionOptions.getBatchIntervalMs(),
                             TimeUnit.MILLISECONDS);
         }
+
+        this.flushExecutorService = Executors.newFixedThreadPool(this.concurrencyWrite);
     }
 
     /**
@@ -728,6 +741,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
      * If batch-writing occur exception, then rewrite one-by-one retry-times set by user.
      */
     protected void attemptFlush() throws IOException {
+        List<FutureTask<Void>> tasks = new ArrayList<>();
         for (Map.Entry<String, List<GenericRowData>> entry : recordsMap.entrySet()) {
             String tableIdentifier = entry.getKey();
             boolean stopTableIdentifierWhenException = stopWritingWhenTableException
@@ -739,43 +753,73 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             if (CollectionUtils.isEmpty(tableIdRecordList)) {
                 continue;
             }
+            final FutureTask<Void> futureTask = new FutureTask<>(() -> {
+                flushTable(tableIdentifier, tableIdRecordList);
+                return null;
+            });
+            flushExecutorService.submit(futureTask);
+            tasks.add(futureTask);
+        }
 
-            JdbcExec jdbcStatementExecutor = null;
-            Boolean flushFlag = false;
-            Exception tableException = null;
-            boolean hasExecuteBatch = false;
+        if (tasks.size() > 0) {
+            waitFlushTasks(tasks);
+        }
+    }
+
+    private void waitFlushTasks(List<FutureTask<Void>> tasks) throws IOException {
+        final int taskSize = tasks.size();
+        final long startMs = System.currentTimeMillis();
+        LOG.info("waiting for {} flush tasks to finished, parallism is {}", taskSize, concurrencyWrite);
+        Iterator<FutureTask<Void>> iterator = tasks.iterator();
+        while (iterator.hasNext()) {
             try {
-                jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);
-                totalDataSize = 0L;
-                for (GenericRowData record : tableIdRecordList) {
-                    totalDataSize = totalDataSize + record.toString().getBytes(StandardCharsets.UTF_8).length;
-                    jdbcStatementExecutor.addToBatch((JdbcIn) record);
-                }
-                if (dirtySinkHelper.getDirtySink() != null) {
-                    fillDirtyData(jdbcStatementExecutor, tableIdentifier);
-                }
-                hasExecuteBatch = true;
-                jdbcStatementExecutor.executeBatch();
-                flushFlag = true;
-                if (!schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE)) {
+                iterator.next().get();
+                iterator.remove();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new IOException("Fail to flush data", e);
+            }
+        }
+        LOG.info("{} flush tasks finished, time cost {}ms", taskSize, System.currentTimeMillis() - startMs);
+    }
+
+    private void flushTable(String tableIdentifier, List<GenericRowData> tableIdRecordList) throws IOException {
+        JdbcExec jdbcStatementExecutor = null;
+        Boolean flushFlag = false;
+        Exception tableException = null;
+        boolean hasExecuteBatch = false;
+        try {
+            jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);
+            long totalDataSize = 0L;
+            for (GenericRowData record : tableIdRecordList) {
+                totalDataSize = totalDataSize + record.toString().getBytes(StandardCharsets.UTF_8).length;
+                jdbcStatementExecutor.addToBatch((JdbcIn) record);
+            }
+            if (dirtySinkHelper.getDirtySink() != null) {
+                fillDirtyData(jdbcStatementExecutor, tableIdentifier);
+            }
+            hasExecuteBatch = true;
+            jdbcStatementExecutor.executeBatch();
+            flushFlag = true;
+            if (!schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE)) {
+                outputMetrics(tableIdentifier, (long) tableIdRecordList.size(),
+                        totalDataSize, false);
+            } else {
+                try {
+                    outputMetrics(tableIdRecordList.size(), tableIdentifier);
+                } catch (Exception e) {
+                    LOG.error("dirty metric calculation exception:{}", e);
                     outputMetrics(tableIdentifier, (long) tableIdRecordList.size(),
                             totalDataSize, false);
-                } else {
-                    try {
-                        outputMetrics(tableIdRecordList.size(), tableIdentifier);
-                    } catch (Exception e) {
-                        LOG.error("dirty metric calculation exception:{}", e);
-                        outputMetrics(tableIdentifier, (long) tableIdRecordList.size(),
-                                totalDataSize, false);
-                    }
                 }
-            } catch (SQLException e) {
+            }
+        } catch (SQLException e) {
+            synchronized (this) {
                 LOG.warn("execute batch error", e);
                 if (hasExecuteBatch && helper.handleResourceNotExists(tableIdentifier, e)) {
                     try {
                         jdbcStatementExecutor.executeBatch();
                         tableIdRecordList.clear();
-                        continue;
+                        return;
                     } catch (SQLException ex) {
                         tableException = ex;
                         LOG.warn("Flush all data for tableIdentifier:{} get err:", tableIdentifier, ex);
@@ -792,7 +836,9 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                         }
                     }
                 }
-            } catch (Exception e) {
+            }
+        } catch (Exception e) {
+            synchronized (this) {
                 tableException = e;
                 LOG.warn("Flush all data for tableIdentifier:{} get err:", tableIdentifier, e);
                 if (dirtySinkHelper.getDirtySink() == null) {
@@ -807,13 +853,15 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                             "unable to flush; interrupted while doing another attempt", e);
                 }
             }
+        }
 
-            if (!flushFlag) {
+        if (!flushFlag) {
+            synchronized (this) {
                 if (schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.STOP_PARTIAL)) {
                     LOG.error("exception detected, skipping table " + tableIdentifier);
                     tableExceptionMap.put(tableIdentifier, tableException);
                     tableIdRecordList.clear();
-                    continue;
+                    return;
                 }
 
                 if (schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.THROW_WITH_STOP)) {
@@ -859,8 +907,8 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                     outputMetrics(tableIdentifier, 1, totalDataSize, !flushFlag);
                 }
             }
-            tableIdRecordList.clear();
         }
+        tableIdRecordList.clear();
     }
 
     /**
@@ -959,6 +1007,11 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 }
             } catch (Exception e) {
                 LOG.warn("Close JDBC writer failed.", e);
+            }
+
+            if (flushExecutorService != null) {
+                flushExecutorService.shutdown();
+                flushExecutorService = null;
             }
         }
         super.close();

@@ -216,6 +216,12 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
                             + "is used extract table name from the raw binary data, "
                             + "this is only used in the multiple sink writing scenario.");
 
+    public static final ConfigOption<Integer> SINK_CONCURRENCY_WRITE =
+            ConfigOptions.key("sink.concurrency.write")
+                    .intType()
+                    .defaultValue(1)
+                    .withDescription("The max number of concurrent threads to write data.");
+
     public static final ConfigOption<String> SINK_UID =
             ConfigOptions.key("sink.uid")
                     .stringType()
@@ -285,6 +291,7 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
         // Build the dirty data side-output
         final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(helper.getOptions());
         final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
+        int concurrencyWrite = config.get(SINK_CONCURRENCY_WRITE);
         String uid = config.get(SINK_UID);
         String uidHash = config.get(SINK_UID_HASH);
         return new JdbcDynamicTableSink(
@@ -306,6 +313,7 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
                 enableSchemaChange,
                 schemaChangePolicies,
                 autoCreateTableWhenSnapshot,
+                concurrencyWrite,
                 uid,
                 uidHash);
     }
@@ -482,6 +490,7 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
         optionalOptions.add(SINK_SCHEMA_CHANGE_ENABLE);
         optionalOptions.add(SINK_SCHEMA_CHANGE_POLICIES);
         optionalOptions.add(SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT);
+        optionalOptions.add(SINK_CONCURRENCY_WRITE);
         optionalOptions.add(SINK_UID);
         optionalOptions.add(SINK_UID_HASH);
         return optionalOptions;

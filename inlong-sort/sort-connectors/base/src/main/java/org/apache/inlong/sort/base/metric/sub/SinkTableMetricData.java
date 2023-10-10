@@ -23,7 +23,6 @@ import org.apache.inlong.sort.base.metric.MetricOption.RegisteredMetric;
 import org.apache.inlong.sort.base.metric.MetricState;
 import org.apache.inlong.sort.base.metric.SinkMetricData;
 
-import com.google.common.collect.Maps;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.metrics.MetricGroup;
 import org.slf4j.Logger;
@@ -32,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static org.apache.inlong.sort.base.Constants.DELIMITER;
@@ -51,7 +51,7 @@ public class SinkTableMetricData extends SinkMetricData implements SinkSubMetric
     /**
      * The sub sink metric data container of sink metric data
      */
-    private final Map<String, SinkMetricData> subSinkMetricMap = Maps.newHashMap();
+    private final Map<String, SinkMetricData> subSinkMetricMap = new ConcurrentHashMap<>();
 
     public SinkTableMetricData(MetricOption option, MetricGroup metricGroup) {
         super(option, metricGroup);
@@ -247,6 +247,16 @@ public class SinkTableMetricData extends SinkMetricData implements SinkSubMetric
         // sink metric and sub sink metric output metrics
         this.invoke(rowCount, rowSize);
         subSinkMetricData.invoke(rowCount, rowSize);
+    }
+
+    @Override
+    public synchronized void invoke(long rowCount, long rowSize) {
+        super.invoke(rowCount, rowSize);
+    }
+
+    @Override
+    public synchronized void invokeDirty(long rowCount, long rowSize) {
+        super.invokeDirty(rowCount, rowSize);
     }
 
     /**
