@@ -83,6 +83,12 @@ public class RespContent {
     @JsonProperty(value = "ErrorURL")
     private String errorURL;
 
+    @JsonProperty(value = "TableMaxTabletVersionCount")
+    private Integer tableMaxTabletVersionCount;
+
+    @JsonProperty(value = "ConfMaxTabletVersionNum")
+    private Integer confMaxTabletVersionNum;
+
     @Override
     public String toString() {
         try {

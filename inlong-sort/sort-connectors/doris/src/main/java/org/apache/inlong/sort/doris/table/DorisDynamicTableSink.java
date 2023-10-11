@@ -29,6 +29,7 @@ import org.apache.inlong.sort.base.dirty.DirtyOptions;
 import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.doris.internal.GenericDorisSinkFunction;
+import org.apache.inlong.sort.doris.model.RateControlParams;
 
 import javax.annotation.Nullable;
 
@@ -58,6 +59,7 @@ public class DorisDynamicTableSink implements DynamicTableSink {
     @Nullable
     private final String schemaChangePolicies;
     private final boolean autoCreateTableWhenSnapshot;
+    private final RateControlParams rateControlParams;
 
     public DorisDynamicTableSink(DorisOptions options,
             DorisReadOptions readOptions,
@@ -76,7 +78,8 @@ public class DorisDynamicTableSink implements DynamicTableSink {
             @Nullable DirtySink<Object> dirtySink,
             boolean enableSchemaChange,
             @Nullable String schemaChangePolicies,
-            boolean autoCreateTableWhenSnapshot) {
+            boolean autoCreateTableWhenSnapshot,
+            RateControlParams rateControlParams) {
         this.options = options;
         this.readOptions = readOptions;
         this.executionOptions = executionOptions;
@@ -95,6 +98,7 @@ public class DorisDynamicTableSink implements DynamicTableSink {
         this.enableSchemaChange = enableSchemaChange;
         this.schemaChangePolicies = schemaChangePolicies;
         this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
+        this.rateControlParams = rateControlParams;
     }
 
     @Override
@@ -136,7 +140,8 @@ public class DorisDynamicTableSink implements DynamicTableSink {
                 .setDirtySink(dirtySink)
                 .setEnableSchemaChange(enableSchemaChange)
                 .setSchemaChangePolicies(schemaChangePolicies)
-                .setAutoCreateTableWhenSnapshot(autoCreateTableWhenSnapshot);
+                .setAutoCreateTableWhenSnapshot(autoCreateTableWhenSnapshot)
+                .setRateControlParams(rateControlParams);
         return SinkFunctionProvider.of(
                 new GenericDorisSinkFunction<>(builder.build()), parallelism);
     }
@@ -160,7 +165,8 @@ public class DorisDynamicTableSink implements DynamicTableSink {
                 dirtySink,
                 enableSchemaChange,
                 schemaChangePolicies,
-                autoCreateTableWhenSnapshot);
+                autoCreateTableWhenSnapshot,
+                rateControlParams);
     }
 
     @Override
