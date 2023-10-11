@@ -40,6 +40,7 @@ import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.apache.inlong.sort.base.dirty.utils.DirtySinkFactoryUtils;
 import org.apache.inlong.sort.base.format.DynamicSchemaFormatFactory;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
+import org.apache.inlong.sort.doris.model.RateControlParams;
 import org.apache.inlong.sort.protocol.enums.SchemaChangePolicy;
 import org.apache.inlong.sort.protocol.enums.SchemaChangeType;
 import org.apache.inlong.sort.util.SchemaChangeUtils;
@@ -183,6 +184,26 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
             .defaultValue(DorisExecutionOptions.DEFAULT_MAX_BATCH_BYTES)
             .withDescription("the flush max bytes (includes all append, upsert and delete records), over this number"
                     + " in batch, will flush data. The default value is 10MB.");
+    private static final ConfigOption<Integer> SINK_RATE_TREND_CYCLE = ConfigOptions
+            .key("sink.rate.trend.cycle")
+            .intType()
+            .defaultValue(10)
+            .withDescription("N imports form a trend cycle, trend cycle versions is average value of N imports");
+    private static final ConfigOption<Integer> SINK_RATE_TREND_NUMBER = ConfigOptions
+            .key("sink.rate.trend.number")
+            .intType()
+            .defaultValue(3)
+            .withDescription("Compare m trend cycle versions to form a trend");
+    private static final ConfigOption<Integer> SINK_RATE_RECOVERY_CYCLE = ConfigOptions
+            .key("sink.rate.recover.cycle")
+            .intType()
+            .defaultValue(5)
+            .withDescription("Release the speed limit when 5 imports rate is less 1/10");
+    private static final ConfigOption<Boolean> SINK_RATE_LIMIT_ENABLE = ConfigOptions
+            .key("sink.rate.limit.enable")
+            .booleanType()
+            .defaultValue(false)
+            .withDescription("true is enable rate limit, default is close rate limit");
     private static final Map<SchemaChangeType, List<SchemaChangePolicy>> SUPPORTS_POLICY_MAP = new HashMap<>();
 
     static {
@@ -262,6 +283,10 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
         options.add(SINK_SCHEMA_CHANGE_ENABLE);
         options.add(SINK_SCHEMA_CHANGE_POLICIES);
         options.add(SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT);
+        options.add(SINK_RATE_RECOVERY_CYCLE);
+        options.add(SINK_RATE_TREND_CYCLE);
+        options.add(SINK_RATE_TREND_NUMBER);
+        options.add(SINK_RATE_LIMIT_ENABLE);
         return options;
     }
 
@@ -378,7 +403,13 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
                 dirtySink,
                 enableSchemaChange,
                 schemaChangePolicies,
-                autoCreateTableWhenSnapshot);
+                autoCreateTableWhenSnapshot,
+                getDorisRateControlParams(helper.getOptions()));
+    }
+
+    private RateControlParams getDorisRateControlParams(ReadableConfig options) {
+        return new RateControlParams(options.get(SINK_RATE_TREND_CYCLE), options.get(SINK_RATE_TREND_NUMBER),
+                options.get(SINK_RATE_RECOVERY_CYCLE), options.get(SINK_RATE_LIMIT_ENABLE));
     }
 
     private void validateSinkMultiple(DataType physicalDataType, boolean multipleSink, String sinkMultipleFormat,

@@ -55,9 +55,11 @@ import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.base.util.CalculateObjectSizeUtils;
 import org.apache.inlong.sort.base.util.MetricStateUtils;
+import org.apache.inlong.sort.doris.model.RateControlParams;
 import org.apache.inlong.sort.doris.model.RespContent;
 import org.apache.inlong.sort.doris.schema.DorisSchemaChangeHelper;
 import org.apache.inlong.sort.doris.util.DorisParseUtils;
+import org.apache.inlong.sort.doris.util.RateLimitUtils;
 import org.apache.inlong.sort.util.SchemaChangeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +78,7 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -174,6 +177,16 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
     private String lineDelimiter;
     private String columns;
     private transient Schema schema;
+    private final RateControlParams rateControlParams;
+    // key is tableIdentifier, value is rate limit factor, default factor is 0, it means no sleep.
+    // factor will control sleep time Thread.sleep(factor * executionOptions.getBatchIntervalMs()) for table
+    private Map<String, Integer> tableMapRateLimitFactor;
+    // key is tableIdentifier, values is version average value
+    private Map<String, List<Integer>> tableMapVersionAverageValue;
+    // key is tableIdentifier, values is trend cycle N imports version data
+    private Map<String, List<Integer>> tableMapTrendCycleVersion;
+    // key is tableIdentifier, value low rate times, less than 1/10
+    private Map<String, Integer> tableMapKeepLowRateTimes;
 
     public DorisDynamicSchemaOutputFormat(DorisOptions option,
             DorisReadOptions readOptions,
@@ -193,7 +206,8 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             @Nullable DirtySink<Object> dirtySink,
             boolean enableSchemaChange,
             @Nullable String schemaChangePolicies,
-            boolean autoCreateTableWhenSnapshot) {
+            boolean autoCreateTableWhenSnapshot,
+            RateControlParams rateControlParams) {
         this.options = option;
         this.readOptions = readOptions;
         this.executionOptions = executionOptions;
@@ -212,6 +226,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         this.enableSchemaChange = enableSchemaChange;
         this.schemaChangePolicies = schemaChangePolicies;
         this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
+        this.rateControlParams = rateControlParams;
         handleStreamLoadProp();
     }
 
@@ -314,6 +329,12 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                     flush();
                 }
             }, executionOptions.getBatchIntervalMs(), executionOptions.getBatchIntervalMs(), TimeUnit.MILLISECONDS);
+        }
+        if (rateControlParams.getRateLimitEnable()) {
+            tableMapRateLimitFactor = new ConcurrentHashMap<>();
+            tableMapVersionAverageValue = new ConcurrentHashMap<>();
+            tableMapTrendCycleVersion = new ConcurrentHashMap<>();
+            tableMapKeepLowRateTimes = new ConcurrentHashMap<>();
         }
     }
 
@@ -690,6 +711,9 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         }
 
         for (Entry<String, List> kvs : batchMap.entrySet()) {
+            if (rateControlParams.getRateLimitEnable()) {
+                RateLimitUtils.waite(tableMapRateLimitFactor.get(kvs.getKey()), executionOptions.getBatchIntervalMs());
+            }
             flushSingleTable(kvs.getKey(), kvs.getValue());
         }
         if (!errorTables.isEmpty()) {
@@ -875,6 +899,13 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         while (tryTimes < executionOptions.getMaxRetries()) {
             try {
                 respContent = dorisStreamLoad.load(tableWithDb[0], tableWithDb[1], result);
+                if (rateControlParams.getRateLimitEnable() && respContent.getTableMaxTabletVersionCount() != null
+                        && respContent.getConfMaxTabletVersionNum() != null) {
+                    RateLimitUtils.updateTableMapRateLimitFactor(tableIdentifier, tableMapTrendCycleVersion,
+                            tableMapVersionAverageValue, tableMapKeepLowRateTimes, tableMapRateLimitFactor,
+                            rateControlParams, respContent.getTableMaxTabletVersionCount(),
+                            respContent.getConfMaxTabletVersionNum());
+                }
                 break;
             } catch (StreamLoadException e) {
                 if (multipleSink && autoCreateTableWhenSnapshot && DorisParseUtils
@@ -963,6 +994,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         private boolean enableSchemaChange;
         private String schemaChangePolicies;
         private boolean autoCreateTableWhenSnapshot;
+        private RateControlParams rateControlParams;
 
         public Builder() {
             this.optionsBuilder = DorisOptions.builder().setTableIdentifier("");
@@ -1074,6 +1106,11 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             return this;
         }
 
+        public Builder setRateControlParams(RateControlParams rateControlParams) {
+            this.rateControlParams = rateControlParams;
+            return this;
+        }
+
         @SuppressWarnings({"rawtypes"})
         public DorisDynamicSchemaOutputFormat build() {
             LogicalType[] logicalTypes = null;
@@ -1100,7 +1137,8 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                     dirtySink,
                     enableSchemaChange,
                     schemaChangePolicies,
-                    autoCreateTableWhenSnapshot);
+                    autoCreateTableWhenSnapshot,
+                    rateControlParams);
         }
     }
 }
