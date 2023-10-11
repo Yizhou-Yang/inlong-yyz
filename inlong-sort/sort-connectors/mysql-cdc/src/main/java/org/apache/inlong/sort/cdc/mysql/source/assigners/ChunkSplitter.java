@@ -254,17 +254,23 @@ public class ChunkSplitter {
         final List<ChunkRange> splits = new ArrayList<>();
         Object chunkStart = null;
         Object chunkEnd = ObjectUtils.plus(min, chunkSize);
-        while (ObjectUtils.compare(chunkEnd, max, collationType) <= 0) {
+        boolean overflow = false;
+        while (!overflow && ObjectUtils.compare(chunkEnd, max, collationType) <= 0) {
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
             chunkStart = chunkEnd;
             chunkEnd = ObjectUtils.plus(chunkEnd, chunkSize);
+            overflow =
+                    (chunkEnd instanceof Integer && (int) chunkStart > 0 && (int) chunkEnd < 0)
+                            || (chunkEnd instanceof Long
+                                    && (long) chunkStart > 0
+                                    && (long) chunkEnd < 0);
         }
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));
         return splits;
     }
 
-    // ------------------------------------------------------------------------------------------
+    // ------------------------------------------------------------------------------------------chunkEnd
 
     /**
      * Split table into unevenly sized chunks by continuously calculating next chunk max value.
