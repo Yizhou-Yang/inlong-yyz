@@ -26,6 +26,9 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.inlong.sort.cdc.mongodb.DebeziumSourceFunction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.ZoneId;
 import java.util.HashSet;
@@ -60,6 +63,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
     private static final String IDENTIFIER = "mongodb-cdc-inlong";
 
     private static final String DOCUMENT_ID_FIELD = "_id";
+
+    private static final Logger LOG = LoggerFactory.getLogger(MongoDBTableSourceFactory.class);
 
     public static final ConfigOption<String> ROW_KINDS_FILTERED =
             ConfigOptions.key("row-kinds-filtered")
@@ -119,13 +124,16 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         final Integer copyExistingQueueSize = config.getOptional(COPY_EXISTING_QUEUE_SIZE).orElse(null);
 
         String timezone = config.get(SERVER_TIME_ZONE);
+
         final String zoneId =
-                timezone == null ? timezone : context.getConfiguration().get(TableConfigOptions.LOCAL_TIME_ZONE);
+                timezone == null ? context.getConfiguration().get(TableConfigOptions.LOCAL_TIME_ZONE) : timezone;
 
         final ZoneId localTimeZone =
                 TableConfigOptions.LOCAL_TIME_ZONE.defaultValue().equals(zoneId)
                         ? ZoneId.systemDefault()
                         : ZoneId.of(zoneId);
+
+        LOG.info("timezone is" + localTimeZone + zoneId);
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
 
