@@ -103,6 +103,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -166,6 +168,8 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     private final int concurrencyWrite;
 
     private transient ExecutorService flushExecutorService = null;
+
+    private transient AtomicReference<Throwable> flushFailure;
 
     static {
         SQL_TIME_FORMAT = (new DateTimeFormatterBuilder()).appendPattern("HH:mm:ss")
@@ -256,6 +260,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             }
         }
 
+        this.flushFailure = new AtomicReference<>();
         helper = JdbcSchemaSchangeHelper.of(jsonDynamicSchemaFormat, enableSchemaChange,
                 policyMap, databasePattern,
                 schemaPattern, tablePattern, schemaUpdateExceptionPolicy, sinkMetricData, dirtySinkHelper,
@@ -274,6 +279,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                                             flush();
                                         } catch (Exception e) {
                                             LOG.info("Synchronized flush get Exception:", e);
+                                            flushFailure.set(e);
                                         }
                                     }
                                 }
@@ -452,6 +458,9 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
      */
     @Override
     public final synchronized void writeRecord(In row) throws IOException {
+        if (flushFailure.get() != null) {
+            throw new IOException("Flush has ever failed.", flushFailure.get());
+        }
         checkFlushException();
         if (row instanceof RowData) {
             RowData rowData = (RowData) row;
@@ -773,10 +782,12 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         Iterator<FutureTask<Void>> iterator = tasks.iterator();
         while (iterator.hasNext()) {
             try {
-                iterator.next().get();
+                iterator.next().get(30, TimeUnit.SECONDS);
                 iterator.remove();
             } catch (InterruptedException | ExecutionException e) {
                 throw new IOException("Fail to flush data", e);
+            } catch (TimeoutException e) {
+                throw new RuntimeException("Flush timeout", e);
             }
         }
         LOG.info("{} flush tasks finished, time cost {}ms", taskSize, System.currentTimeMillis() - startMs);
