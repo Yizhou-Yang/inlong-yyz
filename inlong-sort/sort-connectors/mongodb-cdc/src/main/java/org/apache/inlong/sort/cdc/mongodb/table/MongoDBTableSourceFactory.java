@@ -211,6 +211,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
         options.add(CHUNK_META_GROUP_SIZE);
         options.add(CHANGELOG_NORMALIZE_ENABLED);
+        options.add(SERVER_TIME_ZONE);
         return options;
     }
 }
