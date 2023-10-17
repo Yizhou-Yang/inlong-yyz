@@ -26,7 +26,6 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.inlong.sort.cdc.mongodb.DebeziumSourceFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,7 +132,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                         ? ZoneId.systemDefault()
                         : ZoneId.of(zoneId);
 
-        LOG.info("timezone is" + localTimeZone + zoneId);
+        //LOG.info("timezone is" + localTimeZone + zoneId);
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
 
