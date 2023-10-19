@@ -25,6 +25,7 @@ import org.apache.flink.shaded.guava18.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.BooleanType;
@@ -45,12 +46,15 @@ import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.types.RowKind;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.BiFunction;
@@ -73,6 +77,8 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TYPE_MAP_COMPA
  */
 @SuppressWarnings("LanguageDetectionInspection")
 public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaFormat<JsonNode> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(JsonDynamicSchemaFormat.class);
 
     public static final int DEFAULT_DECIMAL_PRECISION = 38;
     public static final int DEFAULT_DECIMAL_SCALE = 5;
@@ -411,7 +417,12 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
                     scale = DEFAULT_DECIMAL_SCALE;
                 }
             }
-            return new DecimalType(precision, scale);
+            try {
+                return new DecimalType(precision, scale);
+            } catch (ValidationException e) {
+                LOGGER.warn("The precision or scale is unvalid and it will be converted to STRING", e);
+                return new VarCharType(VarCharType.MAX_LENGTH);
+            }
         } else if (type instanceof CharType) {
             int length = Integer.parseInt(items[0].trim());
             if (length <= 0) {
@@ -438,13 +449,25 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
             return new BinaryType(length);
         } else if (matcher.group(0).equalsIgnoreCase("TINYINT(1)")) {
             return new TinyIntType();
-        } else if (matcher.group(1).equalsIgnoreCase("BIGINT UNSIGNED")) {
-            return new DecimalType(20, 0);
-        } else if (matcher.group(1).equalsIgnoreCase("BIGINT UNSIGNED ZEROFILL")) {
-            return new DecimalType(20, 0);
         } else {
-            return type;
+            return numberTypeScopeExpand(type, matcher.group(1));
         }
+    }
+
+    private LogicalType numberTypeScopeExpand(LogicalType originType, String typeOfString) {
+        String type = typeOfString.toUpperCase(Locale.ROOT);
+        if (type.startsWith("BIGINT UNSIGNED") || type.startsWith("UNSIGNED BIGINT")) {
+            return new DecimalType(20, 0);
+        }
+        if (type.startsWith("UNSIGNED TINYINT") || type.startsWith("TINYINT UNSIGNED")) {
+            return new SmallIntType();
+        } else if (type.startsWith("UNSIGNED MEDIUMINT") || type.startsWith("MEDIUMINT UNSIGNED")
+                || type.startsWith("UNSIGNED SMALLINT") || type.startsWith("SMALLINT UNSIGNED")) {
+            return new IntType();
+        } else if (type.startsWith("UNSIGNED INT") || type.startsWith("INT UNSIGNED")) {
+            return new BigIntType();
+        }
+        return originType;
     }
 
     public BiFunction<LogicalType, String, LogicalType> getHandleDialectSqlTypeFunction() {
