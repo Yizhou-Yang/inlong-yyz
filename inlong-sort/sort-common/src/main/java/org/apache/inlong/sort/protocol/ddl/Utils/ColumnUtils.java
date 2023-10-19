@@ -19,6 +19,7 @@ package org.apache.inlong.sort.protocol.ddl.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import net.sf.jsqlparser.statement.create.table.ColDataType;
 import net.sf.jsqlparser.statement.create.table.ColumnDefinition;
@@ -58,10 +59,18 @@ public class ColumnUtils {
 
         ColumnBuilder columnBuilder = Column.builder();
         String columnName = reformatName(columnDefinition.getColumnName());
+        Integer jdbcType = sqlType.get(columnName);
+        if (jdbcType == null) {
+            columnName = columnName.toUpperCase(Locale.ROOT);
+            jdbcType = sqlType.get(columnName);
+        }
+        if (jdbcType == null) {
+            throw new IllegalStateException(String.format("Get jdbc type for column %s is null", columnName));
+        }
         columnBuilder.name(columnName)
                 .definition(definitions).isNullable(parseNullable(columnSpecs))
                 .defaultValue(parseDefaultValue(columnSpecs))
-                .jdbcType(sqlType.get(columnName))
+                .jdbcType(jdbcType)
                 .comment(parseComment(columnSpecs));
 
         if (isFirst) {
