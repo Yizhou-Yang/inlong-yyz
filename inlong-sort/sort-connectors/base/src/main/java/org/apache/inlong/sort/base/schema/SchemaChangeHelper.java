@@ -21,6 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
@@ -341,8 +342,7 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
     }
 
     public RowField convert2RowField(Column column) {
-        LogicalType logicalType = dynamicSchemaFormat
-                .sqlType2FlinkType(column.getJdbcType());
+        LogicalType logicalType = dynamicSchemaFormat.sqlType2FlinkType(column.getJdbcType());
         List<String> definitions = column.getDefinition();
         switch (logicalType.getTypeRoot()) {
             case VARCHAR:
@@ -422,7 +422,13 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
                     if (definitions.size() == 2) {
                         scale = Integer.parseInt(definitions.get(1));
                     }
-                    logicalType = new DecimalType(column.isNullable(), precision, scale);
+                    try {
+                        logicalType = new DecimalType(column.isNullable(), precision, scale);
+                    } catch (ValidationException e) {
+                        logicalType = new VarCharType(VarCharType.MAX_LENGTH);
+                        LOGGER.warn("The precision or scale is unvalid and it will be converted to STRING, "
+                                + "the column: {}", column, e);
+                    }
                 } else {
                     logicalType = logicalType.copy(column.isNullable());
                 }
@@ -430,7 +436,7 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
             default:
                 logicalType = logicalType.copy(column.isNullable());
         }
-        String comment = column.getComment() == null ? Constants.ADD_COLUMN_COMMENT
+        String comment = StringUtils.isBlank(column.getComment()) ? Constants.ADD_COLUMN_COMMENT
                 : column.getComment() + " " + Constants.ADD_COLUMN_COMMENT;
         return new RowField(column.getName(), logicalType, comment);
     }

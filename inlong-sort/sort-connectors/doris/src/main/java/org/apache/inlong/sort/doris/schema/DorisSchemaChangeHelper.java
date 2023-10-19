@@ -17,12 +17,14 @@
 
 package org.apache.inlong.sort.doris.schema;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.flink.cfg.DorisOptions;
 import org.apache.doris.shaded.org.apache.commons.codec.binary.Base64;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.util.Preconditions;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
@@ -33,6 +35,7 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.apache.inlong.sort.base.Constants;
 import org.apache.inlong.sort.base.dirty.DirtySinkHelper;
 import org.apache.inlong.sort.base.dirty.DirtyType;
 import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
@@ -45,6 +48,8 @@ import org.apache.inlong.sort.doris.model.DorisResponse;
 import org.apache.inlong.sort.doris.model.DorisVersion;
 import org.apache.inlong.sort.doris.model.TableSchema;
 import org.apache.inlong.sort.doris.util.DorisParseUtils;
+import org.apache.inlong.sort.protocol.ddl.Column;
+import org.apache.inlong.sort.protocol.ddl.enums.PositionType;
 import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
 import org.apache.inlong.sort.protocol.ddl.operations.CreateTableOperation;
 import org.apache.inlong.sort.protocol.enums.SchemaChangePolicy;
@@ -54,6 +59,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -113,6 +119,13 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
     public void doAlterOperation(String database, String table, byte[] originData, String originSchema, JsonNode data,
             Map<SchemaChangeType, List<AlterColumn>> typeMap) {
         StringJoiner joiner = new StringJoiner(",");
+        RowType rowType = null;
+        try {
+            List<String> primaryKeys = dynamicSchemaFormat.extractPrimaryKeyNames(data);
+            rowType = dynamicSchemaFormat.extractSchema(data, primaryKeys);
+        } catch (Exception e) {
+            LOGGER.warn("Extract schema from data failed, {}", new String(originData), e);
+        }
         for (Entry<SchemaChangeType, List<AlterColumn>> kv : typeMap.entrySet()) {
             SchemaChangePolicy policy = policyMap.get(kv.getKey());
             doSchemaChangeBase(kv.getKey(), policy, originSchema);
@@ -121,7 +134,8 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
                 try {
                     switch (kv.getKey()) {
                         case ADD_COLUMN:
-                            alterStatement = doAddColumn(database, table, kv.getValue(), kv.getKey(), originSchema);
+                            alterStatement = doAddColumn(database, table, kv.getValue(), kv.getKey(),
+                                    originSchema, rowType);
                             break;
                         case DROP_COLUMN:
                             alterStatement = doDropColumn(database, table, kv.getValue(), kv.getKey(), originSchema);
@@ -176,10 +190,50 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
         return operationHelper.buildDropColumnStatement(alterColumns);
     }
 
+    public String doAddColumn(String database, String table, List<AlterColumn> alterColumns,
+            SchemaChangeType type, String originSchema, RowType rowType) {
+        Preconditions.checkState(alterColumns != null
+                && !alterColumns.isEmpty(), "Alter columns is empty");
+        Map<String, String> positionMap = new HashMap<>();
+        List<RowField> fields = alterColumns.stream().map(s -> {
+            Column column = s.getNewColumn();
+            Preconditions.checkNotNull(column, "New column is null");
+            Preconditions.checkState(column.getName() != null && !column.getName().trim().isEmpty(),
+                    "The column name is blank");
+            parsePosition(column, positionMap);
+            return convert2RowField(column);
+        }).collect(Collectors.toList());
+        return operationHelper.buildAddColumnStatement(fields, positionMap, rowType);
+    }
+
     @Override
     public String doAddColumn(String database, String table, List<AlterColumn> alterColumns,
             SchemaChangeType type, String originSchema) {
-        return operationHelper.buildAddColumnStatement(alterColumns);
+        Preconditions.checkState(alterColumns != null
+                && !alterColumns.isEmpty(), "Alter columns is empty");
+        Map<String, String> positionMap = new HashMap<>();
+        List<RowField> fields = alterColumns.stream().map(s -> {
+            Column column = s.getNewColumn();
+            Preconditions.checkNotNull(column, "New column is null");
+            Preconditions.checkState(column.getName() != null && !column.getName().trim().isEmpty(),
+                    "The column name is blank");
+            parsePosition(column, positionMap);
+            return convert2RowField(column);
+        }).collect(Collectors.toList());
+        return operationHelper.buildAddColumnStatement(fields, positionMap, null);
+    }
+
+    private void parsePosition(Column column, Map<String, String> positionMap) {
+        if (column.getPosition() != null && column.getPosition().getPositionType() != null) {
+            if (column.getPosition().getPositionType() == PositionType.FIRST) {
+                positionMap.put(column.getName(), null);
+            } else if (column.getPosition().getPositionType() == PositionType.AFTER) {
+                Preconditions.checkState(column.getPosition().getColumnName() != null
+                        && !column.getPosition().getColumnName().trim().isEmpty(),
+                        "The column name of Position is empty");
+                positionMap.put(column.getName(), column.getPosition().getColumnName());
+            }
+        }
     }
 
     @Override
@@ -189,7 +243,22 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
         if (policy == SchemaChangePolicy.ENABLE) {
             try {
                 List<String> primaryKeys = dynamicSchemaFormat.extractPrimaryKeyNames(data);
-                String stmt = operationHelper.buildCreateTableStatement(database, table, primaryKeys, operation);
+                Preconditions.checkState(operation.getColumns() != null && !operation.getColumns().isEmpty(),
+                        String.format("The columns of table: %s.%s is empty", database, table));
+                List<RowField> fields = new ArrayList<>();
+                for (Column column : operation.getColumns()) {
+                    fields.add(convert2RowField(column));
+                }
+                String comment = StringUtils.isBlank(operation.getComment()) ? Constants.CREATE_TABLE_COMMENT
+                        : operation.getComment() + " " + Constants.CREATE_TABLE_COMMENT;
+                RowType rowType = null;
+                try {
+                    rowType = dynamicSchemaFormat.extractSchema(data, primaryKeys);
+                } catch (Exception e) {
+                    LOGGER.warn("Extract schema from data failed, {}", new String(originData), e);
+                }
+                String stmt = operationHelper.buildCreateTableStatement(database, table,
+                        primaryKeys, new RowType(fields), comment, rowType);
                 boolean result = executeStatement(database, stmt);
                 if (!result) {
                     LOGGER.error("Create table failed,statement: {}", stmt);
@@ -385,7 +454,7 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
      * @param tableIdentifier The identifier of table, format by 'database.table'
      * @param data The origin data
      */
-    public boolean applySchemaChange(String tableIdentifier, JsonNode data, boolean autoCreateTableWhenSnapshot) {
+    public boolean applySchemaChange(String tableIdentifier, JsonNode data) {
         boolean result = false;
         String[] tableIdentififerArr = tableIdentifier.split("\\.");
         String database = tableIdentififerArr[0], table = tableIdentififerArr[1];
@@ -394,8 +463,9 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
             List<String> pkNames = dynamicSchemaFormat.extractPrimaryKeyNames(data);
             RowType rowType = dynamicSchemaFormat.extractSchema(data, pkNames);
             if (tableSchema == null) {
-                if (autoCreateTableWhenSnapshot) {
-                    String stmt = operationHelper.buildCreateTableStatement(database, table, pkNames, rowType);
+                if (checkSchemaChangeTypeEnable(SchemaChangeType.CREATE_TABLE)) {
+                    String stmt = operationHelper.buildCreateTableStatement(database, table, pkNames,
+                            rowType, Constants.CREATE_TABLE_COMMENT, null);
                     try {
                         result = executeStatement(database, stmt);
                     } catch (IOException e) {
@@ -406,10 +476,19 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
                     }
                     LOGGER.warn("Create table auto failed maybe it is already created,statement: {}", stmt);
                     tableSchema = getSchema(database, table);
+                } else {
+                    return false;
                 }
             }
             if (tableSchema != null) {
-                String stmt = operationHelper.buildAddColumnStatement(tableSchema, rowType);
+                if (!checkSchemaChangeTypeEnable(SchemaChangeType.ADD_COLUMN)) {
+                    return false;
+                }
+                List<RowField> addFiels = operationHelper.extractAddFields(tableSchema, rowType);
+                if (addFiels.isEmpty()) {
+                    return true;
+                }
+                String stmt = operationHelper.buildAddColumnStatement(addFiels, new HashMap<>(), null);
                 if (stmt != null) {
                     stmt = operationHelper.buildAlterStatementCommon(database, table) + stmt;
                     try {
@@ -437,6 +516,9 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
     }
 
     public boolean createDatabaseAuto(String tableIdentifier, JsonNode data) {
+        if (!checkSchemaChangeTypeEnable(SchemaChangeType.CREATE_TABLE)) {
+            return false;
+        }
         boolean result = false;
         String database = tableIdentifier.split("\\.")[0];
         try {

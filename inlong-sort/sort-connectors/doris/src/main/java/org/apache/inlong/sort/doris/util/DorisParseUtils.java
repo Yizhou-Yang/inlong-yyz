@@ -40,13 +40,15 @@ public class DorisParseUtils {
     private static final Pattern HEX_PATTERN = Pattern.compile("\\\\x(\\d{2})");
 
     private static final Pattern UNKOWN_TABLE_PATTERN = Pattern
-            .compile(".*errcode = 7, detailmessage = unknown table.*");
+            .compile(".*errcode = 7, detailmessage = unknown table.*", Pattern.DOTALL);
     private static final Pattern UNKOWN_DATABASE_PATTERN = Pattern
-            .compile(".*errcode = 2, detailmessage = unknown database.*");
+            .compile(".*errcode = 2, detailmessage = unknown database.*", Pattern.DOTALL);
     private static final List<Pattern> EXISTS_PATTERNS = Arrays.asList(
-            Pattern.compile(".*errcode = 2, detailmessage = table .* already exists.*"),
-            Pattern.compile(".*errcode = 2, detailmessage = can not add column which already exists in base table:.*"),
-            Pattern.compile(".*errcode = 2, detailmessage = can't create database .*; database exists.*"));
+            Pattern.compile(".*errcode = 2, detailmessage = table .* already exists.*", Pattern.DOTALL),
+            Pattern.compile(".*errcode = 2, detailmessage = can not add column which already exists in base table:.*",
+                    Pattern.DOTALL),
+            Pattern.compile(".*errcode = 2, detailmessage = can't create database .*; database exists.*",
+                    Pattern.DOTALL));
 
     /**
      * A utility function used to determine the DORIS_DELETE_SIGN for a row change.
