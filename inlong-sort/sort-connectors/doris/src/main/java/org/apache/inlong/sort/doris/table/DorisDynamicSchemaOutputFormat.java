@@ -637,7 +637,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         }
         if (!columns.equals(oldColumns)) {
             flushSingleTable(tableIdentifier, batchMap.get(tableIdentifier));
-            helper.applySchemaChange(tableIdentifier, rootNode, autoCreateTableWhenSnapshot);
+            helper.applySchemaChange(tableIdentifier, rootNode);
             latestData.put(tableIdentifier, rootNode);
             columnsMap.put(tableIdentifier, columns);
             batchMap.remove(tableIdentifier);
@@ -912,13 +912,15 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                         .parseUnkownDatabaseError(e.getMessage())) {
                     if (helper.createDatabaseAuto(tableIdentifier, latestData.get(tableIdentifier))) {
                         continue;
+                    } else {
+                        throw new IOException(e);
                     }
                 }
-                if (multipleSink && autoCreateTableWhenSnapshot && DorisParseUtils
-                        .parseUnkownTableError(e.getMessage())) {
-                    if (helper.applySchemaChange(tableIdentifier, latestData.get(tableIdentifier),
-                            autoCreateTableWhenSnapshot)) {
+                if (multipleSink && DorisParseUtils.parseUnkownTableError(e.getMessage())) {
+                    if (helper.applySchemaChange(tableIdentifier, latestData.get(tableIdentifier))) {
                         continue;
+                    } else {
+                        throw new IOException(e);
                     }
                 }
                 tryTimes++;
