@@ -179,6 +179,10 @@ public abstract class AbstractJdbcDialect implements JdbcDialect {
 
     public abstract boolean parseUnkownSchema(SQLException e);
 
+    public abstract boolean parseUnkownColumn(SQLException e);
+
+    public abstract String extractUnkownColumn(SQLException e);
+
     public String buildCreateDatabaseStatement(String database) {
         return "CREATE DATABASE " + escape(database);
     }

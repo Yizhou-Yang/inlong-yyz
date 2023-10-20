@@ -50,6 +50,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /** JDBC dialect for PostgreSQL. */
@@ -89,6 +91,9 @@ public class PostgresDialect extends AbstractJdbcDialect {
 
     private static final Set<String> RESOURCE_EXISTS_ERROS =
             new HashSet<>(Arrays.asList("42P04", "42P06", "42P07", "42701"));
+
+    private static final Pattern UNKNOWN_COLUMN_PATTERN = Pattern.compile("java.sql.SQLException: ERROR"
+            + ": column \"?'?([a-zA-Z0-9_]+)\"?'? of relation .* does not exist.*", Pattern.DOTALL);
 
     public static final Logger LOG = LoggerFactory.getLogger(PostgresDialect.class);
 
@@ -456,6 +461,20 @@ public class PostgresDialect extends AbstractJdbcDialect {
     @Override
     public boolean parseUnkownSchema(SQLException e) {
         return "3F000".equals(e.getSQLState());
+    }
+
+    @Override
+    public boolean parseUnkownColumn(SQLException e) {
+        return UNKNOWN_COLUMN_PATTERN.matcher(e.getMessage()).matches();
+    }
+
+    @Override
+    public String extractUnkownColumn(SQLException e) {
+        Matcher matcher = UNKNOWN_COLUMN_PATTERN.matcher(e.getMessage());
+        if (matcher.matches()) {
+            return matcher.group(1);
+        }
+        return null;
     }
 
     @Override

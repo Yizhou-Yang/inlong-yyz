@@ -63,6 +63,7 @@ import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.base.util.MetricStateUtils;
 import org.apache.inlong.sort.jdbc.schema.JdbcSchemaSchangeHelper;
 import org.apache.inlong.sort.jdbc.table.AbstractJdbcDialect;
+import org.apache.inlong.sort.jdbc.utils.JdbcMultipleUtils;
 import org.apache.inlong.sort.util.SchemaChangeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -985,6 +986,12 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
 
     public JdbcOptions getJdbcOptions() {
         return jdbcOptions;
+    }
+
+    public void updateRowType(String database, String schema, String table, JsonNode data) {
+        rowTypeMap.put(JdbcMultipleUtils.buildTableIdentifier(database, schema, table),
+                jsonDynamicSchemaFormat.extractSchema(data));
+        updateOneExecutor(true, JdbcMultipleUtils.buildTableIdentifier(database, schema, table));
     }
 
     /**
