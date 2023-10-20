@@ -49,6 +49,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -216,6 +217,33 @@ public class JdbcSchemaSchangeHelper extends SchemaChangeHelper {
                         length += stmt.getBytes(StandardCharsets.UTF_8).length;
                     }
                     executeStatement(stmt, database);
+                } else if (dialect.parseUnkownColumn(e)) {
+                    String unknownColumn = dialect.extractUnkownColumn(e);
+                    if (unknownColumn != null) {
+                        RowType rowType = rowTypeMap.get(tableIdentifier);
+                        if (rowType == null) {
+                            LOGGER.warn("Ignore the unknown column handle because the rowtype is null for {}",
+                                    tableIdentifier);
+                            return false;
+                        }
+                        int columnIndex = rowType.getFieldIndex(unknownColumn);
+                        if (columnIndex == -1) {
+                            LOGGER.warn(
+                                    "Ignore the unknown column handle because the unknown column is not found in schema for {}",
+                                    tableIdentifier);
+                            return false;
+                        }
+                        stmt = dialect.buildAlterTableStatement(tableIdentifier) + " "
+                                + dialect.buildAddColumnStatement(tableIdentifier,
+                                        Collections.singletonList(rowType.getFields().get(columnIndex)));
+                        sb.append(stmt);
+                        length += stmt.getBytes(StandardCharsets.UTF_8).length;
+                        executeStatement(stmt, database);
+                        return true;
+                    }
+                    LOGGER.warn("Ignore the unknown column handle because the unknown column is null for {}",
+                            tableIdentifier);
+                    return false;
                 } else {
                     throw new SchemaChangeHandleException("Unsupported operation", e);
                 }
@@ -305,8 +333,7 @@ public class JdbcSchemaSchangeHelper extends SchemaChangeHelper {
                 LOGGER.info("Alter table success,statement: {}", alterStatement);
                 reportWriteMetric(originData, database, schema, table);
                 // Refresh schema of table when do alter table success to avoid report write metric twice.
-                rowTypeMap.put(JdbcMultipleUtils.buildTableIdentifier(database, schema, table),
-                        dynamicSchemaFormat.extractSchema(data));
+                outputFormat.updateRowType(database, schema, table, data);
             } catch (Exception e) {
                 if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
                     throw new SchemaChangeHandleException(
