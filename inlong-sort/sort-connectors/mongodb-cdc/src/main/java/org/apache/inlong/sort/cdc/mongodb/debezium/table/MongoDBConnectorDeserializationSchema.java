@@ -217,7 +217,7 @@ public class MongoDBConnectorDeserializationSchema
     }
 
     @Override
-    public void deserialize(SourceRecord record, Collector<RowData> out, Boolean isStreamingPhase) throws Exception {
+    public void deserialize(SourceRecord record, Collector<RowData> out, boolean isStreamingPhase) throws Exception {
         this.deserialize(record, out);
     }
 

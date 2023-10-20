@@ -17,8 +17,6 @@
 
 package org.apache.inlong.sort.cdc.oracle.debezium.table;
 
-import static org.apache.flink.util.Preconditions.checkNotNull;
-
 import io.debezium.data.Envelope;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
@@ -31,21 +29,9 @@ import io.debezium.time.NanoTime;
 import io.debezium.time.NanoTimestamp;
 import io.debezium.time.Timestamp;
 import io.debezium.time.ZonedTimestamp;
-import java.io.Serializable;
-import java.math.BigDecimal;
-import java.nio.ByteBuffer;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
@@ -72,6 +58,23 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.inlong.sort.base.Constants.DDL_FIELD_NAME;
+import static org.apache.inlong.sort.cdc.base.relational.JdbcSourceEventDispatcher.HISTORY_RECORD_FIELD;
+
 /**
  * Deserialization schema from Debezium object to Flink Table/SQL internal data structure {@link
  * RowData}.
@@ -89,6 +92,8 @@ public final class RowDataDebeziumDeserializeSchema
     private static final DateTimeFormatter timeFormatter = DateTimeFormatter.ISO_TIME;
 
     private static final ZoneId ZONE_UTC = ZoneId.of("UTC");
+
+    public final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * TypeInformation of the produced {@link RowData}. *
@@ -118,6 +123,8 @@ public final class RowDataDebeziumDeserializeSchema
 
     private boolean sourceMultipleEnable;
 
+    private boolean schemaChange;
+
     private ZoneId serverTimeZone;
 
     RowDataDebeziumDeserializeSchema(
@@ -128,7 +135,8 @@ public final class RowDataDebeziumDeserializeSchema
             ZoneId serverTimeZone,
             boolean appendSource,
             DeserializationRuntimeConverterFactory userDefinedConverterFactory,
-            boolean sourceMultipleEnable) {
+            boolean sourceMultipleEnable,
+            boolean schemaChange) {
         this.hasMetadata = checkNotNull(metadataConverters).length > 0;
         this.appendMetadataCollector = new AppendMetadataCollector(metadataConverters, sourceMultipleEnable);
         this.sourceMultipleEnable = sourceMultipleEnable;
@@ -141,6 +149,7 @@ public final class RowDataDebeziumDeserializeSchema
         this.resultTypeInfo = checkNotNull(resultTypeInfo);
         this.validator = checkNotNull(validator);
         this.appendSource = checkNotNull(appendSource);
+        this.schemaChange = schemaChange;
     }
 
     /**
@@ -686,75 +695,80 @@ public final class RowDataDebeziumDeserializeSchema
 
             @Override
             public Object convert(Object dbzObj, Schema schema) throws Exception {
-                ConnectSchema connectSchema = (ConnectSchema) schema;
-                List<Field> fields = connectSchema.fields();
-
-                Map<String, Object> data = new HashMap<>();
-                Struct struct = (Struct) dbzObj;
-
-                for (Field field : fields) {
-                    String fieldName = field.name();
-                    Object fieldValue = struct.getWithoutDefault(fieldName);
-                    Schema fieldSchema = schema.field(fieldName).schema();
-                    String schemaName = fieldSchema.name();
-                    if (schemaName != null) {
-                        // normal type doesn't have schema name
-                        // schema names are time schemas
-                        fieldValue = getValueWithSchema(fieldValue, schemaName);
+                if (dbzObj instanceof Struct) {
+                    ConnectSchema connectSchema = (ConnectSchema) schema;
+                    List<Field> fields = connectSchema.fields();
+                    Map<String, Object> data = new HashMap<>();
+                    Struct struct = (Struct) dbzObj;
+                    for (Field field : fields) {
+                        String fieldName = field.name();
+                        Object fieldValue = struct.getWithoutDefault(fieldName);
+                        Schema fieldSchema = schema.field(fieldName).schema();
+                        String schemaName = fieldSchema.name();
+                        if (schemaName != null) {
+                            // normal type doesn't have schema name
+                            // schema names are time schemas
+                            fieldValue = getValueWithSchema(fieldValue, schemaName);
+                        }
+                        data.put(fieldName, fieldValue);
                     }
-                    data.put(fieldName, fieldValue);
+                    GenericRowData row = new GenericRowData(1);
+                    row.setField(0, data);
+                    return row;
                 }
-
-                GenericRowData row = new GenericRowData(1);
-                row.setField(0, data);
-
-                return row;
+                return constructDdlRow(dbzObj);
             }
 
             @Override
             public Object convert(Object dbzObj, Schema schema, TableChange tableSchema) throws Exception {
-                ConnectSchema connectSchema = (ConnectSchema) schema;
-                List<Field> fields = connectSchema.fields();
-
-                Map<String, Object> data = new HashMap<>();
-                Struct struct = (Struct) dbzObj;
-
-                for (Field field : fields) {
-                    String fieldName = field.name();
-                    Object fieldValue = struct.getWithoutDefault(fieldName);
-                    Schema fieldSchema = schema.field(fieldName).schema();
-                    String schemaName = fieldSchema.name();
-
-                    // struct type convert normal type
-                    if (fieldValue instanceof Struct) {
-                        Column column = tableSchema.getTable().columnWithName(fieldName);
-                        LogicalType logicType = RecordUtils.convertLogicType(column, (Struct) fieldValue);
-                        DeserializationRuntimeConverter fieldConverter = createConverter(
-                                logicType,
-                                serverTimeZone,
-                                userDefinedConverterFactory);
-                        fieldValue =
-                                convertField(fieldConverter, fieldValue, fieldSchema);
-                        if (fieldValue instanceof DecimalData) {
-                            fieldValue = ((DecimalData) fieldValue).toBigDecimal();
+                if (dbzObj instanceof Struct) {
+                    ConnectSchema connectSchema = (ConnectSchema) schema;
+                    List<Field> fields = connectSchema.fields();
+                    Map<String, Object> data = new HashMap<>();
+                    Struct struct = (Struct) dbzObj;
+                    for (Field field : fields) {
+                        String fieldName = field.name();
+                        Object fieldValue = struct.getWithoutDefault(fieldName);
+                        Schema fieldSchema = schema.field(fieldName).schema();
+                        String schemaName = fieldSchema.name();
+                        // struct type convert normal type
+                        if (fieldValue instanceof Struct) {
+                            Column column = tableSchema.getTable().columnWithName(fieldName);
+                            LogicalType logicType = RecordUtils.convertLogicType(column, (Struct) fieldValue);
+                            DeserializationRuntimeConverter fieldConverter = createConverter(
+                                    logicType,
+                                    serverTimeZone,
+                                    userDefinedConverterFactory);
+                            fieldValue =
+                                    convertField(fieldConverter, fieldValue, fieldSchema);
+                            if (fieldValue instanceof DecimalData) {
+                                fieldValue = ((DecimalData) fieldValue).toBigDecimal();
+                            }
+                            if (fieldValue instanceof TimestampData) {
+                                fieldValue = ((TimestampData) fieldValue).toTimestamp();
+                            }
                         }
-                        if (fieldValue instanceof TimestampData) {
-                            fieldValue = ((TimestampData) fieldValue).toTimestamp();
+                        if (schemaName != null) {
+                            fieldValue = getValueWithSchema(fieldValue, schemaName);
                         }
+                        if (fieldValue instanceof ByteBuffer) {
+                            fieldValue = new String(((ByteBuffer) fieldValue).array());
+                        }
+                        data.put(fieldName, fieldValue);
                     }
-                    if (schemaName != null) {
-                        fieldValue = getValueWithSchema(fieldValue, schemaName);
-                    }
-                    if (fieldValue instanceof ByteBuffer) {
-                        fieldValue = new String(((ByteBuffer) fieldValue).array());
-                    }
-
-                    data.put(fieldName, fieldValue);
+                    GenericRowData row = new GenericRowData(1);
+                    row.setField(0, data);
+                    return row;
                 }
+                return constructDdlRow(dbzObj);
+            }
 
+            private GenericRowData constructDdlRow(Object ddl) {
+                Map<String, Object> data = new HashMap<>();
                 GenericRowData row = new GenericRowData(1);
                 row.setField(0, data);
-
+                data.put(DDL_FIELD_NAME, ddl);
+                row.setField(0, data);
                 return row;
             }
         };
@@ -795,41 +809,18 @@ public final class RowDataDebeziumDeserializeSchema
 
     @Override
     public void deserialize(SourceRecord record, Collector<RowData> out) throws Exception {
-        Envelope.Operation op = Envelope.operationFor(record);
-        Struct value = (Struct) record.value();
-        Schema valueSchema = record.valueSchema();
-        if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
-            GenericRowData insert = extractAfterRow(value, valueSchema, null);
-            validator.validate(insert, RowKind.INSERT);
-            insert.setRowKind(RowKind.INSERT);
-            emit(record, insert, null, out);
-        } else if (op == Envelope.Operation.DELETE) {
-            GenericRowData delete = extractBeforeRow(value, valueSchema, null);
-            validator.validate(delete, RowKind.DELETE);
-            delete.setRowKind(RowKind.DELETE);
-            emit(record, delete, null, out);
-        } else {
-            if (!appendSource) {
-                GenericRowData before = extractBeforeRow(value, valueSchema, null);
-                validator.validate(before, RowKind.UPDATE_BEFORE);
-                before.setRowKind(RowKind.UPDATE_BEFORE);
-                emit(record, before, null, out);
-            }
-
-            GenericRowData after = extractAfterRow(value, valueSchema, null);
-            validator.validate(after, RowKind.UPDATE_AFTER);
-            after.setRowKind(RowKind.UPDATE_AFTER);
-            emit(record, after, null, out);
-        }
+        deserialize(record, out, null);
     }
 
     @Override
-    public void deserialize(SourceRecord record, Collector<RowData> out,
-            TableChange tableSchema)
-            throws Exception {
+    public void deserialize(SourceRecord record, Collector<RowData> out, TableChange tableSchema) throws Exception {
         Envelope.Operation op = Envelope.operationFor(record);
         Struct value = (Struct) record.value();
         Schema valueSchema = record.valueSchema();
+        if (schemaChange && RecordUtils.isDdlRecord(value)) {
+            extractDdlRecord(record, out, tableSchema, value);
+            return;
+        }
         if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
             GenericRowData insert = extractAfterRow(value, valueSchema, tableSchema);
             validator.validate(insert, RowKind.INSERT);
@@ -853,6 +844,21 @@ public final class RowDataDebeziumDeserializeSchema
             after.setRowKind(RowKind.UPDATE_AFTER);
             emit(record, after, tableSchema, out);
         }
+    }
+
+    private void extractDdlRecord(SourceRecord record, Collector<RowData> out, TableChange tableSchema,
+            Struct value) {
+        try {
+            GenericRowData insert = (GenericRowData) physicalConverter.convert(
+                    objectMapper.readTree(value.get(HISTORY_RECORD_FIELD).toString()).get(DDL_FIELD_NAME).asText(),
+                    null);
+            insert.setRowKind(RowKind.INSERT);
+            emit(record, insert, tableSchema, out);
+        } catch (Exception e) {
+            LOG.error("Failed to extract DDL record {}", record, e);
+            throw new RuntimeException(e);
+        }
+
     }
 
     private GenericRowData extractAfterRow(Struct value, Schema valueSchema,
@@ -912,6 +918,7 @@ public final class RowDataDebeziumDeserializeSchema
         private boolean sourceMultipleEnable = false;
         private DeserializationRuntimeConverterFactory userDefinedConverterFactory =
                 DeserializationRuntimeConverterFactory.DEFAULT;
+        private boolean schemaChange = false;
 
         public Builder setPhysicalRowType(RowType physicalRowType) {
             this.physicalRowType = physicalRowType;
@@ -920,6 +927,11 @@ public final class RowDataDebeziumDeserializeSchema
 
         public Builder setSourceMultipleEnable(boolean sourceMultipleEnable) {
             this.sourceMultipleEnable = sourceMultipleEnable;
+            return this;
+        }
+
+        public Builder setSchemaChange(boolean schemaChange) {
+            this.schemaChange = schemaChange;
             return this;
         }
 
@@ -963,7 +975,8 @@ public final class RowDataDebeziumDeserializeSchema
                     serverTimeZone,
                     appendSource,
                     userDefinedConverterFactory,
-                    sourceMultipleEnable);
+                    sourceMultipleEnable,
+                    schemaChange);
         }
     }
 }

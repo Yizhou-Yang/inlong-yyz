@@ -17,20 +17,11 @@
 
 package org.apache.inlong.sort.cdc.base.source.reader;
 
-import static org.apache.inlong.sort.cdc.base.source.meta.wartermark.WatermarkEvent.isHighWatermarkEvent;
-import static org.apache.inlong.sort.cdc.base.source.meta.wartermark.WatermarkEvent.isWatermarkEvent;
-import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.getFetchTimestamp;
-import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.getHistoryRecord;
-import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.getMessageTimestamp;
-import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.isDataChangeRecord;
-import static org.apache.inlong.sort.cdc.base.util.RecordUtils.isSchemaChangeEvent;
-
+import io.debezium.connector.AbstractSourceInfo;
+import io.debezium.data.Envelope;
 import io.debezium.document.Array;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
@@ -42,10 +33,21 @@ import org.apache.inlong.sort.cdc.base.source.meta.offset.OffsetFactory;
 import org.apache.inlong.sort.cdc.base.source.meta.split.SourceRecords;
 import org.apache.inlong.sort.cdc.base.source.meta.split.SourceSplitState;
 import org.apache.inlong.sort.cdc.base.source.metrics.SourceReaderMetrics;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import static org.apache.inlong.sort.cdc.base.source.meta.wartermark.WatermarkEvent.isHighWatermarkEvent;
+import static org.apache.inlong.sort.cdc.base.source.meta.wartermark.WatermarkEvent.isWatermarkEvent;
+import static org.apache.inlong.sort.cdc.base.util.RecordUtils.isSchemaChangeEvent;
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.getFetchTimestamp;
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.getHistoryRecord;
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.getMessageTimestamp;
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.isDataChangeRecord;
 import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.isHeartbeatEvent;
 
 /**
@@ -77,7 +79,7 @@ public class IncrementalSourceRecordEmitter<T>
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceReaderMetrics = sourceReaderMetrics;
         this.includeSchemaChanges = includeSchemaChanges;
-        this.outputCollector = new OutputCollector<>();
+        this.outputCollector = new OutputCollector<>(sourceReaderMetrics);
         this.offsetFactory = offsetFactory;
     }
 
@@ -108,13 +110,13 @@ public class IncrementalSourceRecordEmitter<T>
                 splitState.asStreamSplitState().recordSchema(tableChange.getId(), tableChange);
             }
             if (includeSchemaChanges) {
-                emitElement(element, output);
+                emitElement(element, splitState, output);
             }
         } else if (isDataChangeRecord(element)) {
             LOG.trace("Process DataChangeRecord: {}; splitState = {}", element, splitState);
             updateStartingOffsetForSplit(splitState, element);
             reportMetrics(element);
-            emitElement(element, output);
+            emitElement(element, splitState, output);
         } else if (isHeartbeatEvent(element)) {
             LOG.trace("Process Heartbeat: {}; splitState = {}", element, splitState);
             updateStartingOffsetForSplit(splitState, element);
@@ -153,9 +155,17 @@ public class IncrementalSourceRecordEmitter<T>
         return offsetFactory.newOffset(offsetStrMap);
     }
 
-    protected void emitElement(SourceRecord element, SourceOutput<T> output) throws Exception {
+    protected void emitElement(SourceRecord element, SourceSplitState splitState, SourceOutput<T> output)
+            throws Exception {
+        emitElement(element, splitState, output, null);
+    }
+
+    protected void emitElement(SourceRecord element, SourceSplitState splitState,
+            SourceOutput<T> output, TableChanges.TableChange tableSchema) throws Exception {
         outputCollector.output = output;
-        debeziumDeserializationSchema.deserialize(element, outputCollector);
+        outputCollector.element = element;
+        outputCollector.splitState = splitState;
+        debeziumDeserializationSchema.deserialize(element, outputCollector, tableSchema);
     }
 
     protected void reportMetrics(SourceRecord element) {
@@ -178,9 +188,22 @@ public class IncrementalSourceRecordEmitter<T>
     private static class OutputCollector<T> implements Collector<T> {
 
         private SourceOutput<T> output;
+        private SourceRecord element;
+        private SourceSplitState splitState;
+        private final SourceReaderMetrics sourceReaderMetrics;
+
+        private OutputCollector(SourceReaderMetrics sourceReaderMetrics) {
+            this.sourceReaderMetrics = sourceReaderMetrics;
+        }
 
         @Override
         public void collect(T record) {
+            Struct value = (Struct) element.value();
+            Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+            String dbName = source.getString(AbstractSourceInfo.DATABASE_NAME_KEY);
+            String schemaName = source.getString(AbstractSourceInfo.SCHEMA_NAME_KEY);
+            String tableName = source.getString(AbstractSourceInfo.TABLE_NAME_KEY);
+            sourceReaderMetrics.outputMetrics(dbName, schemaName, tableName, splitState.isSnapshotSplitState(), value);
             output.collect(record);
         }
 

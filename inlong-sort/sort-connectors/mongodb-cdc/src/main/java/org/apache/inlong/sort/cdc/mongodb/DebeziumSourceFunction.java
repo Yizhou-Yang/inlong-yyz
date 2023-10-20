@@ -508,7 +508,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                             }
 
                             @Override
-                            public void deserialize(SourceRecord record, Collector<T> out, Boolean isStreamingPhase)
+                            public void deserialize(SourceRecord record, Collector<T> out, boolean isStreamingPhase)
                                     throws Exception {
                                 if (record != null && MongoRecordUtils.isHeartbeatEvent(record)) {
                                     if (sourceMetricData != null && isStreamingPhase) {

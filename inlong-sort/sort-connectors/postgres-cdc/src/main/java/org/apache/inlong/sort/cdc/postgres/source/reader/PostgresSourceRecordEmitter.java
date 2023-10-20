@@ -122,7 +122,7 @@ public class PostgresSourceRecordEmitter<T>
                 splitState.asStreamSplitState().recordSchema(tableChange.getId(), tableChange);
             }
             if (includeSchemaChanges) {
-                emitElement(element, output);
+                emitElement(element, splitState, output);
             }
         } else if (isDataChangeRecord(element)) {
             LOG.debug("PostgresSourceRecordEmitter Process DataChangeRecord: {}; splitState = {}", element, splitState);
