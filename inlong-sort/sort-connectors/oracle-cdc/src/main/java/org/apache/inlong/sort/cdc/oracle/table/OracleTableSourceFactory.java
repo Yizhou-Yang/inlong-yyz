@@ -18,7 +18,6 @@
 package org.apache.inlong.sort.cdc.oracle.table;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
-import java.time.Duration;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
@@ -26,11 +25,11 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-
-import java.util.HashSet;
-import java.util.Set;
 import org.apache.inlong.sort.cdc.base.debezium.table.DebeziumOptions;
 
+import java.time.Duration;
+import java.util.HashSet;
+import java.util.Set;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_TIMEOUT;
@@ -55,6 +54,7 @@ import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProper
 import static org.apache.flink.util.Preconditions.checkState;
 import static org.apache.inlong.sort.base.Constants.APPEND_MODE;
 import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
+import static org.apache.inlong.sort.base.Constants.INCLUDE_SCHEMA_CHANGE;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SOURCE_MULTIPLE_ENABLE;
@@ -98,7 +98,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
         String serverTimezone = config.get(SERVER_TIME_ZONE);
         final boolean isAppend = config.get(APPEND_MODE);
-
+        final boolean includeSchemaChange = config.get(INCLUDE_SCHEMA_CHANGE);
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
             validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
@@ -132,7 +132,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 distributionFactorUpper,
                 distributionFactorLower,
                 chunkKeyColumn,
-                isAppend);
+                isAppend,
+                includeSchemaChange);
     }
 
     @Override
@@ -172,6 +173,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         options.add(AUDIT_KEYS);
         options.add(APPEND_MODE);
+        options.add(INCLUDE_SCHEMA_CHANGE);
         return options;
     }
 

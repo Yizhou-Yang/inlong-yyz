@@ -439,4 +439,10 @@ public final class Constants {
             .withDescription(
                     "The name of datasource, it is used to distinguish different datasource in the same job.");
 
+    public static final ConfigOption<Boolean> INCLUDE_SCHEMA_CHANGE =
+            ConfigOptions.key("include-schema-change")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Whether include schema change in cdc connector");
+
 }

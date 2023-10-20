@@ -17,9 +17,9 @@
 
 package org.apache.inlong.sort.cdc.oracle.source.utils;
 
-import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.rowToArray;
 import static org.apache.flink.table.api.DataTypes.FIELD;
 import static org.apache.flink.table.api.DataTypes.ROW;
+import static org.apache.inlong.sort.cdc.base.util.SourceRecordUtils.rowToArray;
 
 import com.ververica.cdc.connectors.oracle.source.utils.OracleTypeUtils;
 import io.debezium.connector.oracle.OracleConnection;
@@ -46,6 +46,7 @@ import java.util.stream.Collectors;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.inlong.sort.cdc.oracle.source.meta.offset.RedoLogOffset;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.source.SourceRecord;
 
 /** Utils to prepare Oracle SQL statement.
@@ -54,6 +55,13 @@ import org.apache.kafka.connect.source.SourceRecord;
 public class OracleUtils {
 
     private OracleUtils() {
+    }
+
+    private static final String SCHEMA_CHANGE_EVENT_KEY_NAME = "io.debezium.connector.oracle.SchemaChangeKey";
+
+    public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
+        Schema keySchema = sourceRecord.keySchema();
+        return keySchema != null && SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name());
     }
 
     public static Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)

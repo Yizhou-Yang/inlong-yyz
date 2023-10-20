@@ -65,6 +65,7 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
         super(deserializationSchema, sourceReaderMetrics, false, offsetFactory);
     }
 
+    @Override
     protected void processElement(
             SourceRecord element, SourceOutput<T> output, SourceSplitState splitState)
             throws Exception {

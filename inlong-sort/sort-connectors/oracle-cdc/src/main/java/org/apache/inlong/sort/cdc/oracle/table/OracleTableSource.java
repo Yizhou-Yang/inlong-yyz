@@ -17,18 +17,7 @@
 
 package org.apache.inlong.sort.cdc.oracle.table;
 
-import static org.apache.flink.util.Preconditions.checkNotNull;
-
 import com.ververica.cdc.connectors.base.options.StartupOptions;
-import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Properties;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import javax.annotation.Nullable;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
@@ -44,10 +33,21 @@ import org.apache.flink.types.RowKind;
 import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
 import org.apache.inlong.sort.cdc.base.debezium.table.MetadataConverter;
 import org.apache.inlong.sort.cdc.base.source.jdbc.JdbcIncrementalSource;
+import org.apache.inlong.sort.cdc.oracle.OracleSource;
 import org.apache.inlong.sort.cdc.oracle.debezium.DebeziumSourceFunction;
 import org.apache.inlong.sort.cdc.oracle.debezium.table.RowDataDebeziumDeserializeSchema;
-import org.apache.inlong.sort.cdc.oracle.OracleSource;
 import org.apache.inlong.sort.cdc.oracle.source.OracleSourceBuilder;
+
+import javax.annotation.Nullable;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Properties;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * A {@link DynamicTableSource} that describes how to create a Oracle binlog from a logical
@@ -79,6 +79,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final double distributionFactorLower;
     private final String chunkKeyColumn;
     private final boolean isAppend;
+    private final boolean includeSchemaChange;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -114,7 +115,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             double distributionFactorUpper,
             double distributionFactorLower,
             @Nullable String chunkKeyColumn,
-            boolean isAppend) {
+            boolean isAppend,
+            boolean includeSchemaChange) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -141,6 +143,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.distributionFactorLower = distributionFactorLower;
         this.chunkKeyColumn = chunkKeyColumn;
         this.isAppend = isAppend;
+        this.includeSchemaChange = includeSchemaChange;
     }
 
     @Override
@@ -170,6 +173,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         .setUserDefinedConverterFactory(
                                 OracleDeserializationConverterFactory.instance())
                         .setSourceMultipleEnable(sourceMultipleEnable)
+                        .setSchemaChange(includeSchemaChange)
                         .build();
         if (enableParallelRead) {
             JdbcIncrementalSource<RowData> oracleChangeEventSource =
@@ -194,8 +198,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .distributionFactorLower(distributionFactorLower)
                             .inlongMetric(inlongMetric)
                             .inlongAudit(inlongAudit)
+                            .includeSchemaChanges(includeSchemaChange)
                             .build();
-
             return SourceProvider.of(oracleChangeEventSource);
         } else {
             OracleSource.Builder<RowData> builder =
@@ -261,7 +265,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         distributionFactorUpper,
                         distributionFactorLower,
                         chunkKeyColumn,
-                        isAppend);
+                        isAppend,
+                        includeSchemaChange);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

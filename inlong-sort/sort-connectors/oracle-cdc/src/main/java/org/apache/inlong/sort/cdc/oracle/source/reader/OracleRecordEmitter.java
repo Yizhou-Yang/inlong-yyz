@@ -18,16 +18,12 @@
 package org.apache.inlong.sort.cdc.oracle.source.reader;
 
 import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
-import io.debezium.connector.AbstractSourceInfo;
-import io.debezium.data.Envelope;
 import io.debezium.document.Array;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
-import java.util.Map;
 import org.apache.flink.api.connector.source.SourceOutput;
-import org.apache.flink.util.Collector;
 import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
 import org.apache.inlong.sort.cdc.base.source.meta.offset.Offset;
 import org.apache.inlong.sort.cdc.base.source.meta.offset.OffsetFactory;
@@ -35,16 +31,16 @@ import org.apache.inlong.sort.cdc.base.source.meta.split.SourceSplitState;
 import org.apache.inlong.sort.cdc.base.source.metrics.SourceReaderMetrics;
 import org.apache.inlong.sort.cdc.base.source.reader.IncrementalSourceRecordEmitter;
 import org.apache.inlong.sort.cdc.base.util.RecordUtils;
-import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import static com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isHighWatermarkEvent;
 import static com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isWatermarkEvent;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getHistoryRecord;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
-import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isSchemaChangeEvent;
+import static org.apache.inlong.sort.cdc.oracle.source.utils.OracleUtils.isSchemaChangeEvent;
 
 /**
  * Inheriting from IncrementalSourceRecordEmitter, and override the processElement method to collect metric of Oracle.
@@ -76,11 +72,13 @@ public class OracleRecordEmitter<T> extends IncrementalSourceRecordEmitter<T> {
             Array tableChanges =
                     historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
             TableChanges changes = TABLE_CHANGE_SERIALIZER.deserialize(tableChanges, true);
-            for (TableChanges.TableChange tableChange : changes) {
+            for (TableChange tableChange : changes) {
                 splitState.asStreamSplitState().recordSchema(tableChange.getId(), tableChange);
             }
             if (includeSchemaChanges) {
-                emitElement(element, output);
+                final TableChange tableSchema = splitState.asStreamSplitState()
+                        .getTableSchemas().getOrDefault(RecordUtils.getTableId(element), null);
+                emitElement(element, splitState, output, tableSchema);
             }
         } else if (isDataChangeRecord(element)) {
             if (splitState.isStreamSplitState()) {
@@ -92,25 +90,7 @@ public class OracleRecordEmitter<T> extends IncrementalSourceRecordEmitter<T> {
                     splitState.getSourceSplitBase().getTableSchemas();
             final TableChange tableSchema =
                     tableSchemas.getOrDefault(RecordUtils.getTableId(element), null);
-            debeziumDeserializationSchema.deserialize(element, new Collector<T>() {
-
-                @Override
-                public void collect(T record) {
-                    Struct value = (Struct) element.value();
-                    Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                    String dbName = source.getString(AbstractSourceInfo.DATABASE_NAME_KEY);
-                    String schemaName = source.getString(AbstractSourceInfo.SCHEMA_NAME_KEY);
-                    String tableName = source.getString(AbstractSourceInfo.TABLE_NAME_KEY);
-                    sourceReaderMetrics
-                            .outputMetrics(dbName, schemaName, tableName, splitState.isSnapshotSplitState(), value);
-                    output.collect(record);
-                }
-
-                @Override
-                public void close() {
-
-                }
-            }, tableSchema);
+            emitElement(element, splitState, output, tableSchema);
         } else {
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);

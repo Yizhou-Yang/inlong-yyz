@@ -24,13 +24,13 @@ import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.GenericMapData;
@@ -40,9 +40,15 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
 import org.apache.inlong.sort.cdc.base.debezium.table.MetadataConverter;
+import org.apache.inlong.sort.cdc.base.util.RecordUtils;
 import org.apache.inlong.sort.formats.json.canal.CanalJson;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+
+import static org.apache.inlong.sort.base.Constants.DDL_FIELD_NAME;
+import static org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat.OBJECT_MAPPER;
+import static org.apache.inlong.sort.cdc.oracle.source.utils.OperationUtils.generateOperation;
+import static org.apache.inlong.sort.cdc.oracle.source.utils.OperationUtils.getSqlType;
 
 /** Defines the supported metadata columns for {@link OracleTableSource}. */
 public enum OracleReadableMetaData {
@@ -371,23 +377,31 @@ public enum OracleReadableMetaData {
         String schemaName = getMetaData(record, AbstractSourceInfo.SCHEMA_NAME_KEY);
         // opTs
         long opTs = (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY);
-        // ts
-        long ts = (Long) messageStruct.get(FieldName.TIMESTAMP);
         // actual data
         GenericRowData data = rowData;
         Map<String, Object> field = (Map<String, Object>) data.getField(0);
         List<Map<String, Object>> dataList = new ArrayList<>();
         dataList.add(field);
-
         CanalJson canalJson = CanalJson.builder()
                 .data(dataList).database(databaseName).schema(schemaName)
-                .sql("").es(opTs).isDdl(false).pkNames(getPkNames(tableSchema))
+                .es(opTs).pkNames(getPkNames(tableSchema))
                 .oracleType(getOracleType(tableSchema))
-                .table(tableName).ts(ts)
+                .table(tableName)
                 .type(getOpType(record)).sqlType(getSqlType(tableSchema)).build();
+        if (RecordUtils.isDdlRecord(messageStruct)) {
+            String sql = (String) field.get(DDL_FIELD_NAME);
+            canalJson.setSql(sql);
+            canalJson.setOperation(generateOperation(sql, tableSchema));
+            canalJson.setDdl(true);
+            canalJson.setData(dataList);
+        } else {
+            canalJson.setDdl(false);
+            canalJson.setTs((Long) messageStruct.get(FieldName.TIMESTAMP));
+            dataList.add(field);
+            canalJson.setData(dataList);
+        }
         try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            return StringData.fromString(objectMapper.writeValueAsString(canalJson));
+            return StringData.fromString(OBJECT_MAPPER.writeValueAsString(canalJson));
         } catch (Exception e) {
             throw new IllegalStateException("exception occurs when get meta data", e);
         }
@@ -456,22 +470,6 @@ public enum OracleReadableMetaData {
             }
         }
         return oracleType;
-    }
-
-    public static Map<String, Integer> getSqlType(@Nullable TableChanges.TableChange tableSchema) {
-        if (tableSchema == null) {
-            return null;
-        }
-        Map<String, Integer> sqlType = new LinkedHashMap<>();
-        final Table table = tableSchema.getTable();
-        table.columns()
-                .forEach(
-                        column -> {
-                            sqlType.put(
-                                    column.name(),
-                                    column.jdbcType());
-                        });
-        return sqlType;
     }
 
     private static String getMetaData(SourceRecord record, String tableNameKey) {
