@@ -256,7 +256,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             // add column key when fieldNames is not empty
             if (!props.containsKey(COLUMNS_KEY) && fieldNames != null && fieldNames.length > 0) {
                 String columns =
-                        Arrays.stream(fieldNames).map(item -> String.format("`%s`", item.trim().replace("`", "")))
+                        Arrays.stream(fieldNames).map(item -> String.format("`%s`", item.trim().replace("`", "``")))
                                 .collect(Collectors.joining(","));
                 props.put(COLUMNS_KEY, columns);
             }
