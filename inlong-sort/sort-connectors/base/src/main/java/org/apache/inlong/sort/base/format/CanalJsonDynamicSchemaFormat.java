@@ -42,6 +42,7 @@ public class CanalJsonDynamicSchemaFormat extends JsonDynamicSchemaFormat {
     private static final String SCHEMA = "sqlType";
     private static final String MYSQL_TYPE = "mysqlType";
     private static final String ORACLE_TYE = "oracleType";
+    private static final String SQLSERVER_TYPE = "sqlServerType";
     private static final String OP_TYPE = "type";
     private static final String OP_INSERT = "INSERT";
     private static final String OP_UPDATE = "UPDATE";
@@ -126,6 +127,9 @@ public class CanalJsonDynamicSchemaFormat extends JsonDynamicSchemaFormat {
         JsonNode dialectSchema = data.get(MYSQL_TYPE);
         if (dialectSchema == null) {
             dialectSchema = data.get(ORACLE_TYE);
+        }
+        if (dialectSchema == null) {
+            dialectSchema = data.get(SQLSERVER_TYPE);
         }
         if (schema == null) {
             throw new IllegalArgumentException(String.format("Not found schema from: %s", data));
