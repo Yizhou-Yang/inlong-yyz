@@ -21,6 +21,8 @@ import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventType;
 
 import java.sql.SQLException;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import io.debezium.jdbc.JdbcConnection;
@@ -89,6 +91,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
     private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
+    private final Set<TableId> pureBinlogPhaseTables;
     private Tables.TableFilter capturedTableFilter;
     private final Map<TableId, ChunkSplitter.CollationType> collationTypeMap;
 
@@ -98,6 +101,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
         this.executor = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
+        this.pureBinlogPhaseTables = new HashSet<>();
         this.collationTypeMap = new HashMap<>();
     }
 
@@ -269,9 +273,13 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     }
 
     private boolean hasEnterPureBinlogPhase(TableId tableId, BinlogOffset position) {
+        if (pureBinlogPhaseTables.contains(tableId)) {
+            return true;
+        }
         // the existed tables those have finished snapshot reading
         if (maxSplitHighWatermarkMap.containsKey(tableId)
                 && position.isAtOrAfter(maxSplitHighWatermarkMap.get(tableId))) {
+            pureBinlogPhaseTables.add(tableId);
             return true;
         }
         // capture dynamically new added tables
@@ -310,6 +318,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         }
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;
+        this.pureBinlogPhaseTables.clear();
     }
 
     private Predicate<Event> createEventFilter(BinlogOffset startingOffset) {
