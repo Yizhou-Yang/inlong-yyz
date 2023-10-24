@@ -256,7 +256,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             // add column key when fieldNames is not empty
             if (!props.containsKey(COLUMNS_KEY) && fieldNames != null && fieldNames.length > 0) {
                 String columns =
-                        Arrays.stream(fieldNames).map(item -> String.format("`%s`", item.trim().replace("`", "``")))
+                        Arrays.stream(fieldNames).map(item -> String.format("`%s`", item.trim().replace("`", "")))
                                 .collect(Collectors.joining(","));
                 props.put(COLUMNS_KEY, columns);
             }
@@ -853,7 +853,11 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                                 }
                             }
                         }
-                        columns = StringUtils.join(fieldNameSet, ",");
+                        // add backticks around each string element
+                        columns = StringUtils.join(fieldNameSet.stream()
+                                .map(fieldName -> "`" + fieldName + "`")
+                                .collect(Collectors.toList()), ',');
+                        //LOG.info("add column:" + columns);
                         executionOptions.getStreamLoadProp().put(COLUMNS_KEY, columns);
                     }
                     int idx = 0;
