@@ -855,9 +855,10 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                         }
                         // add backticks around each string element
                         columns = StringUtils.join(fieldNameSet.stream()
+                                .map(fieldName -> String.format("`%s`", fieldName.trim().replace("`", "")))
                                 .map(fieldName -> "`" + fieldName + "`")
                                 .collect(Collectors.toList()), ',');
-                        //LOG.info("add column:" + columns);
+                        // LOG.info("add column:" + columns);
                         executionOptions.getStreamLoadProp().put(COLUMNS_KEY, columns);
                     }
                     int idx = 0;

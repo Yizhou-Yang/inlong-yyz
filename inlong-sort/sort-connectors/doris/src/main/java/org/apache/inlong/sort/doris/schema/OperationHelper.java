@@ -166,8 +166,8 @@ public class OperationHelper {
         sb.append("\nCOMMENT ").append(builComment(comment));
         sb.append("\nDISTRIBUTED BY HASH(").append(keys).append(")");
         // Add light schema change support for it if the version of doris is greater than 1.2.0 or equals 1.2.0
-         sb.append("\nPROPERTIES (\n\t\"light_schema_change\" = \"true\"\n)");
-//        sb.append("\nPROPERTIES (\n\t\"replication_num\" = \"1\"\n)");
+        sb.append("\nPROPERTIES (\n\t\"light_schema_change\" = \"true\"\n)");
+        // sb.append("\nPROPERTIES (\n\t\"replication_num\" = \"1\"\n)");
         return sb.toString();
     }
 
