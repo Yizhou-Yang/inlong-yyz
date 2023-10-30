@@ -35,7 +35,6 @@ import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.table.types.logical.ZonedTimestampType;
 import org.apache.flink.util.Preconditions;
 import org.apache.inlong.sort.base.Constants;
-import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
 import org.apache.inlong.sort.doris.model.TableSchema;
 import org.apache.inlong.sort.protocol.ddl.Column;
 import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
@@ -53,18 +52,16 @@ public class OperationHelper {
 
     private static final String APOSTROPHE = "'";
     private static final String DOUBLE_QUOTES = "\"";
-    private final JsonDynamicSchemaFormat dynamicSchemaFormat;
     private final int VARCHAR_MAX_LENGTH = 16383; // The max value is 65533/4;
     private final int CHAR_MAX_LENGTH = 255;
     private final boolean supportDecimalV3;
 
-    private OperationHelper(JsonDynamicSchemaFormat dynamicSchemaFormat, boolean supportDecimalV3) {
-        this.dynamicSchemaFormat = dynamicSchemaFormat;
+    private OperationHelper(boolean supportDecimalV3) {
         this.supportDecimalV3 = supportDecimalV3;
     }
 
-    public static OperationHelper of(JsonDynamicSchemaFormat dynamicSchemaFormat, boolean supportDecimalV3) {
-        return new OperationHelper(dynamicSchemaFormat, supportDecimalV3);
+    public static OperationHelper of(boolean supportDecimalV3) {
+        return new OperationHelper(supportDecimalV3);
     }
 
     private String handleVarcharType(VarCharType varcharType) {
@@ -73,10 +70,10 @@ public class OperationHelper {
         // and Chinese characters occupy 4 bytes, so the precision multiplys by 4 here.
         int length = varcharType.getLength();
         if (length > VARCHAR_MAX_LENGTH) {
-            return String.format("STRING %s", varcharType.isNullable() ? "" : " NOT NULL");
+            return "STRING";
         }
         length = varcharType.getLength() * 4;
-        return String.format("VARCHAR(%s) %s", length, varcharType.isNullable() ? "" : " NOT NULL");
+        return String.format("VARCHAR(%s)", length);
     }
 
     private String quote(String value) {
@@ -176,13 +173,17 @@ public class OperationHelper {
         RowField[] fieldArray = new RowField[fields.size()];
         if (primaryKeys != null && !primaryKeys.isEmpty()) {
             index = primaryKeys.size();
-            int primaryInex = 0;
+            Map<String, RowField> primaryFields = new HashMap<>(primaryKeys.size());
             for (RowField field : fields) {
                 if (primaryKeys.contains(field.getName())) {
-                    fieldArray[primaryInex++] = field;
+                    primaryFields.put(field.getName(), field);
                 } else {
                     fieldArray[index++] = field;
                 }
+            }
+            int primaryInex = 0;
+            for (String primaryKey : primaryKeys) {
+                fieldArray[primaryInex++] = primaryFields.get(primaryKey);
             }
         } else {
             for (RowField field : fields) {
@@ -207,7 +208,7 @@ public class OperationHelper {
                 || type instanceof ZonedTimestampType) {
             dorisType = "DATETIME";
         } else if (type instanceof TimeType || type instanceof BinaryType || type instanceof VarBinaryType) {
-            dorisType = String.format("STRING%s", type.isNullable() ? "" : " NOT NULL");
+            dorisType = "STRING";
         } else if (type instanceof DecimalType) {
             dorisType = handleDecimalType((DecimalType) type);
         } else {

@@ -342,6 +342,11 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
     }
 
     public RowField convert2RowField(Column column) {
+        return convert2RowField(column, false);
+    }
+
+    public RowField convert2RowField(Column column, boolean keepOriginNullable) {
+        boolean nullable = !keepOriginNullable || column.isNullable();
         LogicalType logicalType = dynamicSchemaFormat.sqlType2FlinkType(column.getJdbcType());
         List<String> definitions = column.getDefinition();
         switch (logicalType.getTypeRoot()) {
@@ -370,9 +375,9 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
                     } catch (NumberFormatException e) {
                         LOGGER.warn("Parse the length of VARCHAR failed", e);
                     }
-                    logicalType = new VarCharType(column.isNullable(), length);
+                    logicalType = new VarCharType(nullable, length);
                 } else {
-                    logicalType = logicalType.copy(column.isNullable());
+                    logicalType = logicalType.copy(nullable);
                 }
                 break;
             case CHAR:
@@ -398,9 +403,9 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
                     } catch (NumberFormatException e) {
                         LOGGER.warn("Parse the length of VARCHAR failed", e);
                     }
-                    logicalType = new CharType(column.isNullable(), length);
+                    logicalType = new CharType(nullable, length);
                 } else {
-                    logicalType = logicalType.copy(column.isNullable());
+                    logicalType = logicalType.copy(nullable);
                 }
                 break;
             case DECIMAL:
@@ -423,18 +428,18 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
                         scale = Integer.parseInt(definitions.get(1));
                     }
                     try {
-                        logicalType = new DecimalType(column.isNullable(), precision, scale);
+                        logicalType = new DecimalType(nullable, precision, scale);
                     } catch (ValidationException e) {
                         logicalType = new VarCharType(VarCharType.MAX_LENGTH);
                         LOGGER.warn("The precision or scale is unvalid and it will be converted to STRING, "
                                 + "the column: {}", column, e);
                     }
                 } else {
-                    logicalType = logicalType.copy(column.isNullable());
+                    logicalType = logicalType.copy(nullable);
                 }
                 break;
             default:
-                logicalType = logicalType.copy(column.isNullable());
+                logicalType = logicalType.copy(nullable);
         }
         String comment = StringUtils.isBlank(column.getComment()) ? Constants.ADD_COLUMN_COMMENT
                 : column.getComment() + " " + Constants.ADD_COLUMN_COMMENT;

@@ -96,7 +96,7 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
                 tablePattern, exceptionPolicy, metricData, dirtySinkHelper);
         this.options = Preconditions.checkNotNull(options, "doris options is null");
         this.maxRetries = maxRetries;
-        operationHelper = OperationHelper.of(dynamicSchemaFormat, checkSupportDecimalV3());
+        operationHelper = OperationHelper.of(checkSupportDecimalV3());
     }
 
     private boolean checkSupportDecimalV3() {
