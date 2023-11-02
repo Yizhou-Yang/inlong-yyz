@@ -17,6 +17,7 @@
 
 package org.apache.inlong.sort.cdc.oracle.debezium.table;
 
+import com.ververica.cdc.debezium.utils.TemporalConversions;
 import io.debezium.data.Envelope;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
@@ -42,13 +43,8 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Collector;
-import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
-import org.apache.inlong.sort.cdc.base.debezium.table.AppendMetadataCollector;
-import org.apache.inlong.sort.cdc.base.debezium.table.DeserializationRuntimeConverter;
-import org.apache.inlong.sort.cdc.base.debezium.table.DeserializationRuntimeConverterFactory;
-import org.apache.inlong.sort.cdc.base.debezium.table.MetadataConverter;
-import org.apache.inlong.sort.cdc.base.util.RecordUtils;
-import org.apache.inlong.sort.cdc.base.util.TemporalConversions;
+import org.apache.inlong.sort.cdc.oracle.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.oracle.source.utils.RecordUtils;
 import org.apache.kafka.connect.data.ConnectSchema;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
@@ -73,15 +69,14 @@ import java.util.Map;
 import java.util.Optional;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.inlong.sort.base.Constants.DDL_FIELD_NAME;
-import static org.apache.inlong.sort.cdc.base.relational.JdbcSourceEventDispatcher.HISTORY_RECORD_FIELD;
+import static org.apache.inlong.sort.cdc.oracle.source.relational.JdbcSourceEventDispatcher.HISTORY_RECORD_FIELD;
 
 /**
  * Deserialization schema from Debezium object to Flink Table/SQL internal data structure {@link
  * RowData}.
  */
 public final class RowDataDebeziumDeserializeSchema
-        implements
-            DebeziumDeserializationSchema<RowData> {
+        implements DebeziumDeserializationSchema<RowData> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RowDataDebeziumDeserializeSchema.class);
 
@@ -121,11 +116,11 @@ public final class RowDataDebeziumDeserializeSchema
      */
     private final ValueValidator validator;
 
-    private boolean sourceMultipleEnable;
+    private final boolean sourceMultipleEnable;
 
-    private boolean schemaChange;
+    private final boolean schemaChange;
 
-    private ZoneId serverTimeZone;
+    private final ZoneId serverTimeZone;
 
     RowDataDebeziumDeserializeSchema(
             RowType physicalDataType,

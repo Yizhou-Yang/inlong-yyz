@@ -28,7 +28,6 @@ import net.sf.jsqlparser.statement.create.table.ColumnDefinition;
 import net.sf.jsqlparser.statement.create.table.CreateTable;
 import net.sf.jsqlparser.statement.drop.Drop;
 import net.sf.jsqlparser.statement.truncate.Truncate;
-import org.apache.inlong.sort.cdc.base.debezium.table.RowDataDebeziumDeserializeSchema;
 import org.apache.inlong.sort.protocol.ddl.Column;
 import org.apache.inlong.sort.protocol.ddl.enums.AlterType;
 import org.apache.inlong.sort.protocol.ddl.enums.IndexType;
@@ -63,7 +62,7 @@ import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.reformatName
  */
 public class OperationUtils {
 
-    private static final Logger LOG = LoggerFactory.getLogger(RowDataDebeziumDeserializeSchema.class);
+    private static final Logger LOG = LoggerFactory.getLogger(OperationUtils.class);
     public static final String PRIMARY_KEY = "PRIMARY KEY";
     public static final String NORMAL_INDEX = "NORMAL_INDEX";
     public static final String FIRST = "FIRST";

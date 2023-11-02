@@ -18,14 +18,16 @@
 package org.apache.inlong.sort.cdc.oracle.table;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
+import com.ververica.cdc.connectors.base.utils.OptionUtils;
+import com.ververica.cdc.debezium.table.DebeziumOptions;
 import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.inlong.sort.cdc.base.debezium.table.DebeziumOptions;
 
 import java.time.Duration;
 import java.util.HashSet;
@@ -42,6 +44,7 @@ import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SERVER
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
@@ -50,6 +53,7 @@ import static com.ververica.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static com.ververica.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.PORT;
+import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.URL;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 import static org.apache.flink.util.Preconditions.checkState;
 import static org.apache.inlong.sort.base.Constants.APPEND_MODE;
@@ -73,6 +77,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         helper.validateExcept(DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX);
 
         final ReadableConfig config = helper.getOptions();
+        String url = config.get(URL);
         String hostname = config.get(HOSTNAME);
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
@@ -99,6 +104,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         String serverTimezone = config.get(SERVER_TIME_ZONE);
         final boolean isAppend = config.get(APPEND_MODE);
         final boolean includeSchemaChange = config.get(INCLUDE_SCHEMA_CHANGE);
+        boolean closeIdlerReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
             validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
@@ -108,8 +114,10 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
             validateDistributionFactorUpper(distributionFactorUpper);
             validateDistributionFactorLower(distributionFactorLower);
         }
+        OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
         return new OracleTableSource(
                 physicalSchema,
+                url,
                 port,
                 hostname,
                 databaseName,
@@ -132,6 +140,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 distributionFactorUpper,
                 distributionFactorLower,
                 chunkKeyColumn,
+                closeIdlerReaders,
                 isAppend,
                 includeSchemaChange);
     }
@@ -156,6 +165,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(URL);
         options.add(PORT);
         options.add(SCAN_STARTUP_MODE);
         options.add(INLONG_METRIC);
@@ -171,6 +181,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
+        options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(AUDIT_KEYS);
         options.add(APPEND_MODE);
         options.add(INCLUDE_SCHEMA_CHANGE);

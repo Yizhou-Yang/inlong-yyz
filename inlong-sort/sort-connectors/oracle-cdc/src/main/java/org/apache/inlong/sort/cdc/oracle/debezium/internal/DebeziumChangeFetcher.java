@@ -17,6 +17,11 @@
 
 package org.apache.inlong.sort.cdc.oracle.debezium.internal;
 
+import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
+import com.ververica.cdc.debezium.internal.DebeziumOffset;
+import com.ververica.cdc.debezium.internal.DebeziumOffsetSerializer;
+import com.ververica.cdc.debezium.internal.Handover;
+import com.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.connector.SnapshotRecord;
 import io.debezium.data.Envelope;
 import io.debezium.engine.ChangeEvent;
@@ -30,15 +35,11 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.util.Collector;
-import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
-import org.apache.inlong.sort.cdc.base.debezium.history.FlinkJsonTableChangeSerializer;
-import org.apache.inlong.sort.cdc.base.debezium.internal.DebeziumOffset;
-import org.apache.inlong.sort.cdc.base.debezium.internal.DebeziumOffsetSerializer;
-import org.apache.inlong.sort.cdc.base.debezium.internal.Handover;
-import org.apache.inlong.sort.cdc.base.debezium.internal.SchemaRecord;
-import org.apache.inlong.sort.cdc.base.util.RecordUtils;
+import org.apache.inlong.sort.cdc.oracle.debezium.DebeziumDeserializationSchema;
+import org.apache.inlong.sort.cdc.oracle.source.utils.RecordUtils;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -173,6 +174,14 @@ public class DebeziumChangeFetcher<T> {
             }
         } catch (Handover.ClosedException e) {
             // ignore
+        }catch (RetriableException e) {
+            // Retriable exception should be ignored by DebeziumChangeFetcher,
+            // refer https://issues.redhat.com/browse/DBZ-2531 for more information.
+            // Because Retriable exception is ignored by the DebeziumEngine and
+            // the retry is handled in io.debezium.connector.common.BaseSourceTask.poll()
+            LOG.info(
+                    "Ignore the RetriableException, the underlying DebeziumEngine will restart automatically",
+                    e);
         }
     }
 
@@ -237,7 +246,7 @@ public class DebeziumChangeFetcher<T> {
 
             deserialization.deserialize(record, debeziumCollector, getTableChange(record));
 
-            if (!isSnapshotRecord(record)) {
+            if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
                 LOG.debug("Snapshot phase finishes.");
                 isInDbSnapshotPhase = false;
             }
@@ -249,8 +258,7 @@ public class DebeziumChangeFetcher<T> {
     }
 
     private TableChange getTableChange(SourceRecord record) {
-        SchemaRecord schemaRecord = FlinkDatabaseSchemaHistory.latestTables.get(RecordUtils.getTableId(
-                record));
+        SchemaRecord schemaRecord = FlinkDatabaseSchemaHistory.latestTables.get(RecordUtils.getTableId(record));
         return FlinkJsonTableChangeSerializer.fromDocument(
                 schemaRecord.toDocument(), true);
     }

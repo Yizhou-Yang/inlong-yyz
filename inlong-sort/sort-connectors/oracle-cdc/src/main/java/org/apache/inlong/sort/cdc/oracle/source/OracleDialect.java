@@ -17,9 +17,12 @@
 
 package org.apache.inlong.sort.cdc.oracle.source;
 
-import static org.apache.inlong.sort.cdc.oracle.source.utils.OracleConnectionUtils.createOracleConnection;
-import static org.apache.inlong.sort.cdc.oracle.source.utils.OracleConnectionUtils.currentRedoLogOffset;
-
+import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
+import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
+import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
+import com.ververica.cdc.connectors.oracle.source.OraclePooledDataSourceFactory;
+import com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils;
+import com.ververica.cdc.connectors.oracle.source.utils.OracleSchema;
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
@@ -30,24 +33,19 @@ import java.util.List;
 import java.util.Map;
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.util.FlinkRuntimeException;
-import org.apache.inlong.sort.cdc.base.config.JdbcSourceConfig;
-import org.apache.inlong.sort.cdc.base.dialect.JdbcDataSourceDialect;
-import org.apache.inlong.sort.cdc.base.relational.connection.JdbcConnectionPoolFactory;
-import org.apache.inlong.sort.cdc.base.source.assigner.splitter.ChunkSplitter;
-import org.apache.inlong.sort.cdc.base.source.meta.offset.Offset;
-import org.apache.inlong.sort.cdc.base.source.meta.split.SourceSplitBase;
-import org.apache.inlong.sort.cdc.base.source.reader.external.FetchTask;
+import org.apache.inlong.sort.cdc.oracle.dialect.JdbcDataSourceDialect;
+import org.apache.inlong.sort.cdc.oracle.source.assigner.splitter.ChunkSplitter;
 import org.apache.inlong.sort.cdc.oracle.source.config.OracleSourceConfig;
 import org.apache.inlong.sort.cdc.oracle.source.config.OracleSourceConfigFactory;
+import org.apache.inlong.sort.cdc.oracle.source.meta.split.SourceSplitBase;
+import org.apache.inlong.sort.cdc.oracle.source.reader.external.FetchTask;
 import org.apache.inlong.sort.cdc.oracle.source.reader.fetch.OracleScanFetchTask;
 import org.apache.inlong.sort.cdc.oracle.source.reader.fetch.OracleSourceFetchTaskContext;
 import org.apache.inlong.sort.cdc.oracle.source.reader.fetch.OracleStreamFetchTask;
 import org.apache.inlong.sort.cdc.oracle.source.splitter.OracleChunkSplitter;
-import org.apache.inlong.sort.cdc.oracle.source.utils.OracleConnectionUtils;
-import org.apache.inlong.sort.cdc.oracle.source.utils.OracleSchema;
 
 /** The {@link JdbcDataSourceDialect} implementation for Oracle datasource.
- *  Copy from com.ververica:flink-connector-oracle-cdc:2.3.0
+ *  Copy from com.ververica:flink-connector-oracle-cdc:2.4.1
  */
 @Experimental
 public class OracleDialect implements JdbcDataSourceDialect {
@@ -70,7 +68,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
     @Override
     public Offset displayCurrentOffset(JdbcSourceConfig sourceConfig) {
         try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
-            return currentRedoLogOffset(jdbcConnection);
+            return OracleConnectionUtils.currentRedoLogOffset(jdbcConnection);
         } catch (Exception e) {
             throw new FlinkRuntimeException("Read the redoLog offset error", e);
         }
@@ -117,7 +115,8 @@ public class OracleDialect implements JdbcDataSourceDialect {
     public Map<TableId, TableChange> discoverDataCollectionSchemas(JdbcSourceConfig sourceConfig) {
         final List<TableId> capturedTableIds = discoverDataCollections(sourceConfig);
 
-        try (OracleConnection jdbc = createOracleConnection(sourceConfig.getDbzConfiguration())) {
+        try (OracleConnection jdbc = OracleConnectionUtils
+                .createOracleConnection(sourceConfig.getDbzConfiguration())) {
             // fetch table schemas
             Map<TableId, TableChange> tableSchemas = new HashMap<>();
             for (TableId tableId : capturedTableIds) {

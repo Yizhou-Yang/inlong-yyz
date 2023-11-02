@@ -17,9 +17,12 @@
 
 package org.apache.inlong.sort.cdc.oracle.debezium.internal;
 
-import static io.debezium.relational.history.TableChanges.TableChange;
-
+import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
+import com.ververica.cdc.debezium.internal.FlinkDatabaseHistory;
+import com.ververica.cdc.debezium.internal.SchemaRecord;
+import com.ververica.cdc.debezium.utils.DatabaseHistoryUtil;
 import io.debezium.config.Configuration;
+import io.debezium.pipeline.spi.Offsets;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.ddl.DdlParser;
@@ -30,14 +33,12 @@ import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecordComparator;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.schema.DatabaseSchema;
+
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import org.apache.inlong.sort.cdc.base.debezium.history.FlinkJsonTableChangeSerializer;
-import org.apache.inlong.sort.cdc.base.debezium.internal.FlinkDatabaseHistory;
-import org.apache.inlong.sort.cdc.base.debezium.internal.SchemaRecord;
-import org.apache.inlong.sort.cdc.base.util.DatabaseHistoryUtil;
+import static io.debezium.relational.history.TableChanges.TableChange;
 
 /**
  * The {@link FlinkDatabaseSchemaHistory} only stores the latest schema of the monitored tables.
@@ -59,7 +60,7 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
     public static ConcurrentMap<TableId, SchemaRecord> latestTables;
     private String instanceName;
     private DatabaseHistoryListener listener;
-    private boolean storeOnlyMonitoredTablesDdl;
+    private boolean storeOnlyCapturedTables;
     private boolean skipUnparseableDDL;
     private boolean useCatalogBeforeSchema;
 
@@ -86,7 +87,7 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
             boolean useCatalogBeforeSchema) {
         this.instanceName = config.getString(DATABASE_HISTORY_INSTANCE_NAME);
         this.listener = listener;
-        this.storeOnlyMonitoredTablesDdl = config.getBoolean(STORE_ONLY_MONITORED_TABLES_DDL);
+        this.storeOnlyCapturedTables = config.getBoolean(STORE_ONLY_MONITORED_TABLES_DDL);
         this.skipUnparseableDDL = config.getBoolean(SKIP_UNPARSEABLE_DDL_STATEMENTS);
         this.useCatalogBeforeSchema = useCatalogBeforeSchema;
 
@@ -164,6 +165,20 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
     }
 
     @Override
+    public void recover(
+            Map<Map<String, ?>, Map<String, ?>> offsets, Tables schema, DdlParser ddlParser) {
+        listener.recoveryStarted();
+        for (SchemaRecord record : latestTables.values()) {
+            TableChange tableChange =
+                    FlinkJsonTableChangeSerializer.fromDocument(
+                            record.getTableChangeDoc(), useCatalogBeforeSchema);
+            schema.overwriteTable(tableChange.getTable());
+        }
+        listener.recoveryStopped();
+    }
+
+
+    @Override
     public void stop() {
         if (instanceName != null) {
             DatabaseHistoryUtil.removeHistory(instanceName);
@@ -188,7 +203,7 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
 
     @Override
     public boolean storeOnlyCapturedTables() {
-        return storeOnlyMonitoredTablesDdl;
+        return storeOnlyCapturedTables;
     }
 
     @Override

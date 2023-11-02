@@ -17,11 +17,21 @@
 
 package org.apache.inlong.sort.cdc.oracle.debezium;
 
+import static com.ververica.cdc.debezium.internal.Handover.ClosedException.isGentlyClosedException;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC_STATE_NAME;
 import static org.apache.inlong.sort.base.Constants.NUM_BYTES_IN;
 import static org.apache.inlong.sort.base.Constants.NUM_RECORDS_IN;
 
 import com.ververica.cdc.debezium.Validator;
+import com.ververica.cdc.debezium.internal.DebeziumChangeConsumer;
+import com.ververica.cdc.debezium.internal.DebeziumOffset;
+import com.ververica.cdc.debezium.internal.DebeziumOffsetSerializer;
+import com.ververica.cdc.debezium.internal.FlinkDatabaseHistory;
+import org.apache.inlong.sort.cdc.oracle.debezium.internal.FlinkDatabaseSchemaHistory;
+import com.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
+import com.ververica.cdc.debezium.internal.Handover;
+import com.ververica.cdc.debezium.internal.SchemaRecord;
+import com.ververica.cdc.debezium.utils.DatabaseHistoryUtil;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.SnapshotRecord;
 import io.debezium.data.Envelope;
@@ -75,18 +85,8 @@ import org.apache.inlong.sort.base.metric.MetricState;
 import org.apache.inlong.sort.base.metric.SourceMetricData;
 import org.apache.inlong.sort.base.metric.sub.SourceTableMetricData;
 import org.apache.inlong.sort.base.util.MetricStateUtils;
-import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
-import org.apache.inlong.sort.cdc.base.debezium.internal.DebeziumOffset;
-import org.apache.inlong.sort.cdc.base.debezium.internal.DebeziumOffsetSerializer;
-import org.apache.inlong.sort.cdc.base.debezium.internal.FlinkDatabaseHistory;
-import org.apache.inlong.sort.cdc.base.debezium.internal.FlinkOffsetBackingStore;
-import org.apache.inlong.sort.cdc.base.debezium.internal.Handover;
-import org.apache.inlong.sort.cdc.base.debezium.internal.SchemaRecord;
-import org.apache.inlong.sort.cdc.base.util.CallbackCollector;
-import org.apache.inlong.sort.cdc.base.util.DatabaseHistoryUtil;
 import org.apache.inlong.sort.cdc.oracle.debezium.internal.DebeziumChangeFetcher;
-import org.apache.inlong.sort.cdc.oracle.debezium.internal.DebeziumChangeConsumer;
-import org.apache.inlong.sort.cdc.oracle.debezium.internal.FlinkDatabaseSchemaHistory;
+import org.apache.inlong.sort.cdc.oracle.source.utils.CallbackCollector;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -235,11 +235,11 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
      */
     private transient Handover handover;
 
-    private String inlongMetric;
+    private final String inlongMetric;
 
-    private String inlongAudit;
+    private final String inlongAudit;
 
-    private boolean sourceMultipleEnable;
+    private final boolean sourceMultipleEnable;
 
     private SourceTableMetricData sourceMetricData;
 
@@ -371,8 +371,11 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     public void snapshotState(FunctionSnapshotContext functionSnapshotContext) throws Exception {
         if (handover.hasError()) {
             LOG.debug("snapshotState() called on closed source");
-            throw new FlinkRuntimeException(
-                    "Call snapshotState() on closed source, checkpoint failed.");
+            if (!isGentlyClosedException(handover.getError())) {
+                throw new FlinkRuntimeException(
+                        "Call snapshotState() on failed source, checkpoint failed.",
+                        handover.getError());
+            }
         } else {
             snapshotOffsetState(functionSnapshotContext.getCheckpointId());
             snapshotHistoryRecordsState();
@@ -565,7 +568,24 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         debeziumStarted = true;
 
         // start the real debezium consumer
-        debeziumChangeFetcher.runFetchLoop();
+        try {
+            debeziumChangeFetcher.runFetchLoop();
+        } catch (Throwable t) {
+            if (t.getMessage() != null
+                    && t.getMessage()
+                    .contains(
+                            "A slave with the same server_uuid/server_id as this slave has connected to the master")) {
+                throw new RuntimeException(
+                        "The 'server-id' in the mysql cdc connector should be globally unique, but conflicts happen now.\n"
+                                + "The server id conflict may happen in the following situations: \n"
+                                + "1. The server id has been used by other mysql cdc table in the current job.\n"
+                                + "2. The server id has been used by the mysql cdc table in other jobs.\n"
+                                + "3. The server id has been used by other sync tools like canal, debezium and so on.\n",
+                        t);
+            } else {
+                throw t;
+            }
+        }
     }
 
     @Override

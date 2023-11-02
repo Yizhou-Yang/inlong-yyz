@@ -23,17 +23,12 @@ import com.ververica.cdc.connectors.base.options.StartupOptions;
 import java.time.Duration;
 import java.util.Properties;
 import javax.annotation.Nullable;
+
+import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffsetFactory;
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.inlong.sort.cdc.base.config.SourceConfig;
-import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
-import org.apache.inlong.sort.cdc.base.source.jdbc.JdbcIncrementalSource;
-import org.apache.inlong.sort.cdc.base.source.meta.split.SourceRecords;
-import org.apache.inlong.sort.cdc.base.source.meta.split.SourceSplitState;
-import org.apache.inlong.sort.cdc.base.source.metrics.SourceReaderMetrics;
+import org.apache.inlong.sort.cdc.oracle.debezium.DebeziumDeserializationSchema;
 import org.apache.inlong.sort.cdc.oracle.source.config.OracleSourceConfigFactory;
-import org.apache.inlong.sort.cdc.oracle.source.meta.offset.RedoLogOffsetFactory;
-import org.apache.inlong.sort.cdc.oracle.source.reader.OracleRecordEmitter;
+import org.apache.inlong.sort.cdc.oracle.source.jdbc.JdbcIncrementalSource;
 
 /**
  * The builder class for {@link OracleIncrementalSource} to make it easier for the users to
@@ -41,7 +36,7 @@ import org.apache.inlong.sort.cdc.oracle.source.reader.OracleRecordEmitter;
  *
  * <p>Check the Java docs of each individual method to learn more about the settings to build a
  * {@link OracleIncrementalSource}.
- * Copy from com.ververica:flink-connector-oracle-cdc:2.3.0
+ * Copy from com.ververica:flink-connector-oracle-cdc:2.4.1
  */
 @Internal
 public class OracleSourceBuilder<T> {
@@ -219,6 +214,11 @@ public class OracleSourceBuilder<T> {
         return this;
     }
 
+    public OracleSourceBuilder<T> closeIdleReaders(boolean closeIdleReaders) {
+        this.configFactory.closeIdleReaders(closeIdleReaders);
+        return this;
+    }
+
     /**
      * The deserializer used to convert from consumed {@link
      * org.apache.kafka.connect.source.SourceRecord}.
@@ -253,16 +253,6 @@ public class OracleSourceBuilder<T> {
 
         public static <T> OracleSourceBuilder<T> builder() {
             return new OracleSourceBuilder<>();
-        }
-
-        @Override
-        protected RecordEmitter<SourceRecords, T, SourceSplitState> createRecordEmitter(
-                SourceConfig sourceConfig, SourceReaderMetrics sourceReaderMetrics) {
-            return new OracleRecordEmitter<>(
-                    deserializationSchema,
-                    sourceReaderMetrics,
-                    sourceConfig.isIncludeSchemaChanges(),
-                    offsetFactory);
         }
     }
 }

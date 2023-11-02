@@ -22,10 +22,10 @@ import com.ververica.cdc.connectors.oracle.OracleValidator;
 import io.debezium.connector.oracle.OracleConnector;
 
 import java.util.Properties;
-import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
-import org.apache.inlong.sort.cdc.base.debezium.internal.DebeziumOffset;
+import org.apache.inlong.sort.cdc.oracle.debezium.DebeziumDeserializationSchema;
 import org.apache.inlong.sort.cdc.oracle.debezium.DebeziumSourceFunction;
 
+import javax.annotation.Nullable;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
@@ -42,11 +42,12 @@ public class OracleSource {
     /** Builder class of {@link OracleSource}. */
     public static class Builder<T> {
 
-        private int port = 1521; // default 1521 port
+        private Integer port = 1521; // default 1521 port
         private String hostname;
         private String database;
         private String username;
         private String password;
+        private String url;
         private String[] tableList;
         private String[] schemaList;
         private Properties dbzProperties;
@@ -64,6 +65,12 @@ public class OracleSource {
         /** Integer port number of the Oracle database server. */
         public Builder<T> port(int port) {
             this.port = port;
+            return this;
+        }
+
+        /** Url to use when connecting to the Oracle database server. */
+        public Builder<T> url(@Nullable String url) {
+            this.url = url;
             return this;
         }
 
@@ -157,10 +164,18 @@ public class OracleSource {
             // and
             // underscores should be used.
             props.setProperty("database.server.name", DATABASE_SERVER_NAME);
-            props.setProperty("database.hostname", checkNotNull(hostname));
             props.setProperty("database.user", checkNotNull(username));
             props.setProperty("database.password", checkNotNull(password));
-            props.setProperty("database.port", String.valueOf(port));
+
+            if (url != null) {
+                props.setProperty("database.url", url);
+            }
+            if (hostname != null) {
+                props.setProperty("database.hostname", hostname);
+            }
+            if (port != null) {
+                props.setProperty("database.port", String.valueOf(port));
+            }
             props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
             props.setProperty("database.dbname", checkNotNull(database));
             if (schemaList != null) {
@@ -169,8 +184,8 @@ public class OracleSource {
             if (tableList != null) {
                 props.setProperty("table.include.list", String.join(",", tableList));
             }
-
-            DebeziumOffset specificOffset = null;
+            // we need this in order not to lose any transaction during snapshot to streaming switch
+            props.setProperty("internal.log.mining.transaction.snapshot.boundary.mode", "all");
             switch (startupOptions.startupMode) {
                 case INITIAL:
                     props.setProperty("snapshot.mode", "initial");
@@ -188,8 +203,15 @@ public class OracleSource {
                 props.putAll(dbzProperties);
             }
 
+            if (url == null) {
+                checkNotNull(hostname, "hostname is required when url is not configured");
+                props.setProperty("database.hostname", hostname);
+                checkNotNull(port, "port is required when url is not configured");
+                props.setProperty("database.port", String.valueOf(port));
+            }
+
             return new DebeziumSourceFunction<>(
-                    deserializer, props, specificOffset, new OracleValidator(props),
+                    deserializer, props, null, new OracleValidator(props),
                     inlongMetric, inlongAudit, sourceMultipleEnable);
         }
     }

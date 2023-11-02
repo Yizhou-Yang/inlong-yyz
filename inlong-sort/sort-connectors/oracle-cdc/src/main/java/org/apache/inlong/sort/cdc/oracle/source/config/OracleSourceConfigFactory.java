@@ -17,8 +17,10 @@
 
 package org.apache.inlong.sort.cdc.oracle.source.config;
 
+import static com.ververica.cdc.connectors.base.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
+import com.ververica.cdc.connectors.base.config.JdbcSourceConfigFactory;
 import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnector;
@@ -27,10 +29,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import javax.annotation.Nullable;
-import org.apache.inlong.sort.cdc.base.config.JdbcSourceConfigFactory;
 
 /** A factory to initialize {@link OracleSourceConfig}.
- *  Copy from com.ververica:flink-connector-oracle-cdc:2.3.0
+ *  Copy from com.ververica:flink-connector-oracle-cdc:2.4.1
  */
 public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
 
@@ -72,6 +73,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
 
     /** Creates a new {@link OracleSourceConfig} for the given subtask {@code subtaskId}. */
     public OracleSourceConfig create(int subtaskId) {
+        checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
         Properties props = new Properties();
         props.setProperty("connector.class", OracleConnector.class.getCanonicalName());
         // Logical name that identifies and provides a namespace for the particular Oracle
@@ -129,6 +131,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,
+                closeIdleReaders,
                 props,
                 dbzConfiguration,
                 DRIVER_ClASS_NAME,

@@ -30,13 +30,13 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
-import org.apache.inlong.sort.cdc.base.debezium.DebeziumDeserializationSchema;
-import org.apache.inlong.sort.cdc.base.debezium.table.MetadataConverter;
-import org.apache.inlong.sort.cdc.base.source.jdbc.JdbcIncrementalSource;
 import org.apache.inlong.sort.cdc.oracle.OracleSource;
+import org.apache.inlong.sort.cdc.oracle.debezium.DebeziumDeserializationSchema;
 import org.apache.inlong.sort.cdc.oracle.debezium.DebeziumSourceFunction;
+import org.apache.inlong.sort.cdc.oracle.debezium.table.MetadataConverter;
 import org.apache.inlong.sort.cdc.oracle.debezium.table.RowDataDebeziumDeserializeSchema;
 import org.apache.inlong.sort.cdc.oracle.source.OracleSourceBuilder;
+import org.apache.inlong.sort.cdc.oracle.source.jdbc.JdbcIncrementalSource;
 
 import javax.annotation.Nullable;
 import java.time.Duration;
@@ -56,6 +56,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class OracleTableSource implements ScanTableSource, SupportsReadingMetadata {
 
     private final ResolvedSchema physicalSchema;
+    @Nullable private final String url;
     private final int port;
     private final String hostname;
     private final String database;
@@ -78,6 +79,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
     private final String chunkKeyColumn;
+    private final boolean closeIdleReaders;
     private final boolean isAppend;
     private final boolean includeSchemaChange;
 
@@ -93,6 +95,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
 
     public OracleTableSource(
             ResolvedSchema physicalSchema,
+            @Nullable String url,
             int port,
             String hostname,
             String database,
@@ -115,9 +118,11 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             double distributionFactorUpper,
             double distributionFactorLower,
             @Nullable String chunkKeyColumn,
+            boolean closeIdleReaders,
             boolean isAppend,
             boolean includeSchemaChange) {
         this.physicalSchema = physicalSchema;
+        this.url = url;
         this.port = port;
         this.hostname = checkNotNull(hostname);
         this.database = checkNotNull(database);
@@ -142,6 +147,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.chunkKeyColumn = chunkKeyColumn;
+        this.closeIdleReaders = closeIdleReaders;
         this.isAppend = isAppend;
         this.includeSchemaChange = includeSchemaChange;
     }
@@ -179,6 +185,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             JdbcIncrementalSource<RowData> oracleChangeEventSource =
                     OracleSourceBuilder.OracleIncrementalSource.<RowData>builder()
                             .hostname(hostname)
+                            .url(url)
                             .port(port)
                             .databaseList(database)
                             .schemaList(schemaName)
@@ -199,12 +206,14 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .inlongMetric(inlongMetric)
                             .inlongAudit(inlongAudit)
                             .includeSchemaChanges(includeSchemaChange)
+                            .closeIdleReaders(closeIdleReaders)
                             .build();
             return SourceProvider.of(oracleChangeEventSource);
         } else {
             OracleSource.Builder<RowData> builder =
                     OracleSource.<RowData>builder()
                             .hostname(hostname)
+                            .url(url)
                             .port(port)
                             .database(database)
                             .tableList(tableName)
@@ -243,6 +252,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         OracleTableSource source =
                 new OracleTableSource(
                         physicalSchema,
+                        url,
                         port,
                         hostname,
                         database,
@@ -265,6 +275,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         distributionFactorUpper,
                         distributionFactorLower,
                         chunkKeyColumn,
+                        closeIdleReaders,
                         isAppend,
                         includeSchemaChange);
         source.metadataKeys = metadataKeys;
@@ -305,6 +316,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(distributionFactorUpper, that.distributionFactorUpper)
                 && Objects.equals(distributionFactorLower, that.distributionFactorLower)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
+                && Objects.equals(closeIdleReaders, that.closeIdleReaders)
                 && Objects.equals(isAppend, that.isAppend);
     }
 

@@ -20,6 +20,8 @@ package org.apache.inlong.sort.cdc.oracle.source.splitter;
 import static com.ververica.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static java.math.BigDecimal.ROUND_CEILING;
 
+import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
+import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkRange;
 import com.ververica.cdc.connectors.base.utils.ObjectUtils;
 import com.ververica.cdc.connectors.oracle.source.utils.OracleTypeUtils;
 import com.ververica.cdc.connectors.oracle.source.utils.OracleUtils;
@@ -42,17 +44,15 @@ import oracle.sql.ROWID;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
-import org.apache.inlong.sort.cdc.base.config.JdbcSourceConfig;
-import org.apache.inlong.sort.cdc.base.dialect.JdbcDataSourceDialect;
-import org.apache.inlong.sort.cdc.base.source.assigner.splitter.ChunkRange;
-import org.apache.inlong.sort.cdc.base.source.assigner.splitter.JdbcSourceChunkSplitter;
-import org.apache.inlong.sort.cdc.base.source.meta.split.SnapshotSplit;
+import org.apache.inlong.sort.cdc.oracle.dialect.JdbcDataSourceDialect;
+import org.apache.inlong.sort.cdc.oracle.source.assigner.splitter.JdbcSourceChunkSplitter;
+import org.apache.inlong.sort.cdc.oracle.source.meta.split.SnapshotSplit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * The {@code ChunkSplitter} used to split Oracle table into a set of chunks for JDBC data source.
- *  Copy from com.ververica:flink-connector-oracle-cdc:2.3.0
+ *  Copy from com.ververica:flink-connector-oracle-cdc:2.4.1
  */
 public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
 
