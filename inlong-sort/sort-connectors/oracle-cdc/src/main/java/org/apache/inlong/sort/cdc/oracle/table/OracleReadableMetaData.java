@@ -44,6 +44,8 @@ import org.apache.inlong.sort.cdc.oracle.source.utils.RecordUtils;
 import org.apache.inlong.sort.formats.json.canal.CanalJson;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.inlong.sort.base.Constants.DDL_FIELD_NAME;
 import static org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat.OBJECT_MAPPER;
@@ -378,8 +380,7 @@ public enum OracleReadableMetaData {
         // opTs
         long opTs = (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY);
         // actual data
-        GenericRowData data = rowData;
-        Map<String, Object> field = (Map<String, Object>) data.getField(0);
+        Map<String, Object> field = (Map<String, Object>) rowData.getField(0);
         List<Map<String, Object>> dataList = new ArrayList<>();
         dataList.add(field);
         CanalJson canalJson = CanalJson.builder()
@@ -401,7 +402,9 @@ public enum OracleReadableMetaData {
             canalJson.setData(dataList);
         }
         try {
-            return StringData.fromString(OBJECT_MAPPER.writeValueAsString(canalJson));
+            String jsonStr = OBJECT_MAPPER.writeValueAsString(canalJson);
+            LOGGER.debug("The data of source is: {}", jsonStr);
+            return StringData.fromString(jsonStr);
         } catch (Exception e) {
             throw new IllegalStateException("exception occurs when get meta data", e);
         }
@@ -489,5 +492,7 @@ public enum OracleReadableMetaData {
     public MetadataConverter getConverter() {
         return converter;
     }
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(OracleReadableMetaData.class);
 
 }
