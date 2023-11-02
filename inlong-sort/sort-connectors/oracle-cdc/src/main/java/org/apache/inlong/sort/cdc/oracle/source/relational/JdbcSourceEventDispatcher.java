@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import static org.apache.inlong.sort.cdc.oracle.source.utils.RecordUtils.isMysqlConnector;
 
 /**
  * A subclass implementation of {@link EventDispatcher}.
@@ -192,12 +193,14 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
         private Struct schemaChangeRecordValue(SchemaChangeEvent event) throws IOException {
             Struct sourceInfo = event.getSource();
             Map<String, Object> source = new HashMap<>();
-            String fileName = sourceInfo.getString(BINLOG_FILENAME_OFFSET_KEY);
-            Long pos = sourceInfo.getInt64(BINLOG_POSITION_OFFSET_KEY);
-            Long serverId = sourceInfo.getInt64(SERVER_ID_KEY);
-            source.put(SERVER_ID_KEY, serverId);
-            source.put(BINLOG_FILENAME_OFFSET_KEY, fileName);
-            source.put(BINLOG_POSITION_OFFSET_KEY, pos);
+            if (isMysqlConnector(event.getSource())) {
+                String fileName = sourceInfo.getString(BINLOG_FILENAME_OFFSET_KEY);
+                Long pos = sourceInfo.getInt64(BINLOG_POSITION_OFFSET_KEY);
+                Long serverId = sourceInfo.getInt64(SERVER_ID_KEY);
+                source.put(SERVER_ID_KEY, serverId);
+                source.put(BINLOG_FILENAME_OFFSET_KEY, fileName);
+                source.put(BINLOG_POSITION_OFFSET_KEY, pos);
+            }
             HistoryRecord historyRecord =
                     new HistoryRecord(
                             source,

@@ -148,7 +148,7 @@ public abstract class SourceSplitSerializer
         int splitKind = in.readInt();
         if (splitKind == SNAPSHOT_SPLIT_FLAG) {
             boolean useCatalogBeforeSchema = true;
-            if (version >= 3) {
+            if (version >= 4) {
                 useCatalogBeforeSchema = in.readBoolean();
             }
             TableId tableId = TableId.parse(in.readUTF(), useCatalogBeforeSchema);
@@ -268,15 +268,18 @@ public abstract class SourceSplitSerializer
         List<FinishedSnapshotSplitInfo> finishedSplitsInfo = new ArrayList<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
-            boolean useCatalogBeforeSchema = in.readBoolean();
-            TableId tableId = TableId.parse(in.readUTF(), useCatalogBeforeSchema);
+            String tableIdStr = in.readUTF();
             String splitId = in.readUTF();
             Object[] splitStart = SerializerUtils.serializedStringToRow(in.readUTF());
             Object[] splitEnd = SerializerUtils.serializedStringToRow(in.readUTF());
             OffsetFactory offsetFactory =
                     (OffsetFactory) SerializerUtils.serializedStringToObject(in.readUTF());
             Offset highWatermark = readOffsetPosition(version, in);
-
+            boolean useCatalogBeforeSchema = true;
+            if (version >= 4) {
+                useCatalogBeforeSchema = in.readBoolean();
+            }
+            TableId tableId = TableId.parse(tableIdStr, useCatalogBeforeSchema);
             finishedSplitsInfo.add(
                     new FinishedSnapshotSplitInfo(
                             tableId, splitId, splitStart, splitEnd, highWatermark, offsetFactory));
