@@ -64,10 +64,10 @@ public class OracleSchemaChangeEventEmitter implements SchemaChangeEventEmitter 
     private final TruncateReceiver truncateReceiver;
 
     public OracleSchemaChangeEventEmitter(OracleConnectorConfig connectorConfig, OraclePartition partition,
-                                          OracleOffsetContext offsetContext, TableId tableId, String sourceDatabaseName,
-                                          String objectOwner, String ddlText, OracleDatabaseSchema schema,
-                                          Instant changeTime, OracleStreamingChangeEventSourceMetrics streamingMetrics,
-                                          TruncateReceiver truncateReceiver) {
+            OracleOffsetContext offsetContext, TableId tableId, String sourceDatabaseName,
+            String objectOwner, String ddlText, OracleDatabaseSchema schema,
+            Instant changeTime, OracleStreamingChangeEventSourceMetrics streamingMetrics,
+            TruncateReceiver truncateReceiver) {
         this.partition = partition;
         this.offsetContext = offsetContext;
         this.tableId = tableId;
@@ -94,14 +94,12 @@ public class OracleSchemaChangeEventEmitter implements SchemaChangeEventEmitter 
             parser.setCurrentDatabase(sourceDatabaseName);
             parser.setCurrentSchema(objectOwner);
             parser.parse(ddlText, schema.getTables());
-        }
-        catch (ParsingException | MultipleParsingExceptions e) {
+        } catch (ParsingException | MultipleParsingExceptions e) {
             if (schema.skipUnparseableDdlStatements()) {
                 LOGGER.warn("Ignoring unparsable DDL statement '{}': {}", ddlText, e);
                 streamingMetrics.incrementWarningCount();
                 streamingMetrics.incrementUnparsableDdlCount();
-            }
-            else {
+            } else {
                 throw e;
             }
         }
@@ -162,8 +160,7 @@ public class OracleSchemaChangeEventEmitter implements SchemaChangeEventEmitter 
                     null,
                     event.statement(),
                     schema.tableFor(event.tableId()));
-        }
-        else {
+        } else {
             return SchemaChangeEvent.ofRename(
                     partition,
                     offsetContext,
@@ -186,7 +183,8 @@ public class OracleSchemaChangeEventEmitter implements SchemaChangeEventEmitter 
                 false);
     }
 
-    private SchemaChangeEvent dropTableEvent(OraclePartition partition, Table tableSchemaBeforeDrop, TableDroppedEvent event) {
+    private SchemaChangeEvent dropTableEvent(OraclePartition partition, Table tableSchemaBeforeDrop,
+            TableDroppedEvent event) {
         offsetContext.tableEvent(tableId, changeTime);
         return SchemaChangeEvent.ofDrop(
                 partition,
