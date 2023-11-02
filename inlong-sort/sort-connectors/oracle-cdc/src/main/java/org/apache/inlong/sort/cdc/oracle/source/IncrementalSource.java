@@ -69,7 +69,9 @@ import java.util.function.Supplier;
  */
 @Experimental
 public class IncrementalSource<T, C extends SourceConfig>
-        implements Source<T, SourceSplitBase, PendingSplitsState>, ResultTypeQueryable<T> {
+        implements
+            Source<T, SourceSplitBase, PendingSplitsState>,
+            ResultTypeQueryable<T> {
 
     private static final long serialVersionUID = 1L;
 

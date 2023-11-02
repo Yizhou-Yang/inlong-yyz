@@ -132,7 +132,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                         ? ZoneId.systemDefault()
                         : ZoneId.of(zoneId);
 
-        //LOG.info("timezone is" + localTimeZone + zoneId);
+        // LOG.info("timezone is" + localTimeZone + zoneId);
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
 

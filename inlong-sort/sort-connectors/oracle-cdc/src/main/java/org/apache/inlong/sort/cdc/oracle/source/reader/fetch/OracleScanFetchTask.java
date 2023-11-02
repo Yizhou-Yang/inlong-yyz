@@ -26,7 +26,6 @@ import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleOffsetContext;
 import io.debezium.connector.oracle.OraclePartition;
-import io.debezium.connector.oracle.OracleValueConverters;
 import io.debezium.connector.oracle.logminer.LogMinerOracleOffsetContextLoader;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
@@ -34,14 +33,11 @@ import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
-import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.SnapshotResult;
-import io.debezium.relational.Column;
 import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
-import io.debezium.relational.ValueConverter;
 import io.debezium.util.Clock;
 import io.debezium.util.ColumnUtils;
 import io.debezium.util.Strings;
@@ -59,9 +55,6 @@ import org.apache.inlong.sort.cdc.oracle.source.meta.split.StreamSplit;
 import org.apache.inlong.sort.cdc.oracle.source.reader.external.FetchTask;
 import org.apache.inlong.sort.cdc.oracle.source.reader.fetch.OracleStreamFetchTask.RedoLogSplitReadTask;
 import org.apache.inlong.sort.cdc.oracle.source.relational.JdbcSourceEventDispatcher;
-import org.apache.kafka.connect.data.Field;
-import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -207,7 +200,8 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
 
     /** A wrapped task to fetch snapshot split of table. */
     public static class OracleSnapshotSplitReadTask
-            extends AbstractSnapshotChangeEventSource<OraclePartition, OracleOffsetContext> {
+            extends
+                AbstractSnapshotChangeEventSource<OraclePartition, OracleOffsetContext> {
 
         private static final Logger LOG =
                 LoggerFactory.getLogger(OracleSnapshotSplitReadTask.class);
@@ -415,8 +409,8 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     private static class OracleSnapshotContext
-            extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
-            OraclePartition, OracleOffsetContext> {
+            extends
+                RelationalSnapshotChangeEventSource.RelationalSnapshotContext<OraclePartition, OracleOffsetContext> {
 
         public OracleSnapshotContext(OraclePartition partition) throws SQLException {
             super(partition, "");
@@ -428,7 +422,8 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
      * watermark for each {@link SnapshotSplit}.
      */
     public static class SnapshotSplitChangeEventSourceContext
-            implements ChangeEventSource.ChangeEventSourceContext {
+            implements
+                ChangeEventSource.ChangeEventSourceContext {
 
         private RedoLogOffset lowWatermark;
         private RedoLogOffset highWatermark;
@@ -455,21 +450,22 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
         }
     }
 
-        /**
-         * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for bounded binlog task
-         * of a snapshot split task.
-         */
-        public class SnapshotBinlogSplitChangeEventSourceContext
-                implements ChangeEventSource.ChangeEventSourceContext {
+    /**
+     * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for bounded binlog task
+     * of a snapshot split task.
+     */
+    public class SnapshotBinlogSplitChangeEventSourceContext
+            implements
+                ChangeEventSource.ChangeEventSourceContext {
 
-            public void finished() {
-                taskRunning = false;
-            }
-
-            @Override
-            public boolean isRunning() {
-                return taskRunning;
-            }
+        public void finished() {
+            taskRunning = false;
         }
+
+        @Override
+        public boolean isRunning() {
+            return taskRunning;
+        }
+    }
 
 }

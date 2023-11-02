@@ -228,7 +228,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 readAssignedSnapshotSplits(splitVersion, in);
         Map<String, Offset> finishedOffsets = readFinishedOffsets(splitVersion, in);
         boolean isAssignerFinished = in.readBoolean();
-        List<TableId> remainingTableIds = readTableIds(version,in);
+        List<TableId> remainingTableIds = readTableIds(version, in);
         boolean isTableIdCaseSensitive = in.readBoolean();
         final List<SchemalessSnapshotSplit> remainingSchemalessSplits = new ArrayList<>();
         final Map<String, SchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =

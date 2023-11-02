@@ -76,7 +76,8 @@ import static org.apache.inlong.sort.cdc.oracle.source.relational.JdbcSourceEven
  * RowData}.
  */
 public final class RowDataDebeziumDeserializeSchema
-        implements DebeziumDeserializationSchema<RowData> {
+        implements
+            DebeziumDeserializationSchema<RowData> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RowDataDebeziumDeserializeSchema.class);
 

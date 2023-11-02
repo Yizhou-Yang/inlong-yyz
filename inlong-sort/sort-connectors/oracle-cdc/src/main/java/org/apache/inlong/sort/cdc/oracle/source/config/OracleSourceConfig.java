@@ -38,8 +38,7 @@ public class OracleSourceConfig extends JdbcSourceConfig implements MetricConfig
 
     private static final long serialVersionUID = 1L;
 
-
-    private  @Nullable final String url;
+    private @Nullable final String url;
     private final String inlongMetric;
     private final String inlongAudit;
 

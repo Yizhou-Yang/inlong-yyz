@@ -71,7 +71,6 @@ import org.slf4j.LoggerFactory;
 import static com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils.createOracleConnection;
 import static com.ververica.cdc.connectors.oracle.util.ChunkUtils.getChunkKeyColumn;
 
-
 /** The context for fetch task that fetching data of snapshot split from Oracle data source.
  *  Copy from com.ververica:flink-connector-oracle-cdc:2.4.1
  */
@@ -217,7 +216,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
             } catch (SQLException e) {
                 LOG.error("{} can not convert to RowId", record);
             }
-            Object[] rowIds = new ROWID[] {rowId};
+            Object[] rowIds = new ROWID[]{rowId};
             return SourceRecordUtils.splitKeyRangeContains(rowIds, splitStart, splitEnd);
         } else {
             // config chunk key column compare

@@ -61,7 +61,8 @@ import static org.apache.inlong.sort.cdc.oracle.source.utils.RecordUtils.isSchem
  * Copy from com.ververica:flink-cdc-base:2.4.1.
  */
 public class IncrementalSourceRecordEmitter<T>
-        implements RecordEmitter<SourceRecords, T, SourceSplitState> {
+        implements
+            RecordEmitter<SourceRecords, T, SourceSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceRecordEmitter.class);
     private static final FlinkJsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =

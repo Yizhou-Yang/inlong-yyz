@@ -17,7 +17,6 @@
 
 package org.apache.inlong.sort.cdc.oracle.source.reader.fetch;
 
-
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import io.debezium.DebeziumException;
@@ -137,7 +136,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
         }
 
         @Override
-        public void afterHandleScn(OraclePartition partition,OracleOffsetContext offsetContext) {
+        public void afterHandleScn(OraclePartition partition, OracleOffsetContext offsetContext) {
             super.afterHandleScn(partition, offsetContext);
             // check do we need to stop for fetch binlog for snapshot split.
             if (isBoundedRead()) {

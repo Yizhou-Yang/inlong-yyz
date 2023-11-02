@@ -573,8 +573,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         } catch (Throwable t) {
             if (t.getMessage() != null
                     && t.getMessage()
-                    .contains(
-                            "A slave with the same server_uuid/server_id as this slave has connected to the master")) {
+                            .contains(
+                                    "A slave with the same server_uuid/server_id as this slave has connected to the master")) {
                 throw new RuntimeException(
                         "The 'server-id' in the mysql cdc connector should be globally unique, but conflicts happen now.\n"
                                 + "The server id conflict may happen in the following situations: \n"

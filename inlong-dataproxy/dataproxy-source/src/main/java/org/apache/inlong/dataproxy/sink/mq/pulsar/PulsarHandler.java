@@ -373,7 +373,7 @@ public class PulsarHandler implements MessageQueueHandler {
                 event.ack();
             }
         });
-//        }).get(1000, TimeUnit.MILLISECONDS);
+        // }).get(1000, TimeUnit.MILLISECONDS);
     }
 
     /**

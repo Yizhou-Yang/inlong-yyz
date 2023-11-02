@@ -120,8 +120,8 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
             List<SourceRecords> sourceRecordsSet = new ArrayList<>();
             sourceRecordsSet.add(new SourceRecords(sourceRecords));
             return sourceRecordsSet.iterator();
-        }else{
-           return Collections.emptyIterator();
+        } else {
+            return Collections.emptyIterator();
         }
     }
 

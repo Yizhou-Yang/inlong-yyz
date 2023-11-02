@@ -47,7 +47,8 @@ import java.util.Queue;
  * */
 @Experimental
 public class IncrementalSourceSplitReader<C extends SourceConfig>
-        implements SplitReader<SourceRecords, SourceSplitBase> {
+        implements
+            SplitReader<SourceRecords, SourceSplitBase> {
 
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceSplitReader.class);
     private final Queue<SourceSplitBase> splits;

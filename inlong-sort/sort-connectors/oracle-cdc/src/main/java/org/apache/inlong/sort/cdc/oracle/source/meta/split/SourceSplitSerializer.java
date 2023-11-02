@@ -46,7 +46,9 @@ import java.util.Map;
  * Copy from com.ververica:flink-cdc-base:2.4.1.
  * */
 public abstract class SourceSplitSerializer
-        implements SimpleVersionedSerializer<SourceSplitBase>, OffsetDeserializerSerializer {
+        implements
+            SimpleVersionedSerializer<SourceSplitBase>,
+            OffsetDeserializerSerializer {
 
     private static final int VERSION = 4;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =

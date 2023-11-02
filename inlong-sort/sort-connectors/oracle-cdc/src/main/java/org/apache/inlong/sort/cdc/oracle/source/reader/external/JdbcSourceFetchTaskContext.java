@@ -31,7 +31,6 @@ import io.debezium.relational.TableId;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.inlong.sort.cdc.oracle.dialect.JdbcDataSourceDialect;
-import org.apache.inlong.sort.cdc.oracle.source.reader.external.FetchTask;
 import org.apache.inlong.sort.cdc.oracle.source.relational.JdbcSourceEventDispatcher;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;

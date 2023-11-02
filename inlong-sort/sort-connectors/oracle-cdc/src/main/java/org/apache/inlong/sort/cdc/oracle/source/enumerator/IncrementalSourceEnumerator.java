@@ -53,7 +53,8 @@ import java.util.stream.Collectors;
  */
 @Experimental
 public class IncrementalSourceEnumerator
-        implements SplitEnumerator<SourceSplitBase, PendingSplitsState> {
+        implements
+            SplitEnumerator<SourceSplitBase, PendingSplitsState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceEnumerator.class);
     private static final long CHECK_EVENT_INTERVAL = 30_000L;

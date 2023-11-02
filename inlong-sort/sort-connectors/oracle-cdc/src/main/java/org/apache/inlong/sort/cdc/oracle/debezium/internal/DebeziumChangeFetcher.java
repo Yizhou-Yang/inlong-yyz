@@ -174,7 +174,7 @@ public class DebeziumChangeFetcher<T> {
             }
         } catch (Handover.ClosedException e) {
             // ignore
-        }catch (RetriableException e) {
+        } catch (RetriableException e) {
             // Retriable exception should be ignored by DebeziumChangeFetcher,
             // refer https://issues.redhat.com/browse/DBZ-2531 for more information.
             // Because Retriable exception is ignored by the DebeziumEngine and

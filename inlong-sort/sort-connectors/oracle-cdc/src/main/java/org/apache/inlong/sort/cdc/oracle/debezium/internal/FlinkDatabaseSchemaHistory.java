@@ -22,7 +22,6 @@ import com.ververica.cdc.debezium.internal.FlinkDatabaseHistory;
 import com.ververica.cdc.debezium.internal.SchemaRecord;
 import com.ververica.cdc.debezium.utils.DatabaseHistoryUtil;
 import io.debezium.config.Configuration;
-import io.debezium.pipeline.spi.Offsets;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.ddl.DdlParser;
@@ -176,7 +175,6 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
         }
         listener.recoveryStopped();
     }
-
 
     @Override
     public void stop() {

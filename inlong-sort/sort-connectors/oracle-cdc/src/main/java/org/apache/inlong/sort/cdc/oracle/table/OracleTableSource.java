@@ -56,7 +56,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class OracleTableSource implements ScanTableSource, SupportsReadingMetadata {
 
     private final ResolvedSchema physicalSchema;
-    @Nullable private final String url;
+    @Nullable
+    private final String url;
     private final int port;
     private final String hostname;
     private final String database;

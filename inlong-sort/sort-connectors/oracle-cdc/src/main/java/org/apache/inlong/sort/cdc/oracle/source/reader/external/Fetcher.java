@@ -24,7 +24,6 @@ import java.util.Iterator;
 import org.apache.inlong.sort.cdc.oracle.source.meta.split.SnapshotSplit;
 import org.apache.inlong.sort.cdc.oracle.source.meta.split.StreamSplit;
 
-
 /**
  * Fetcher to fetch data of a table split, the split is either snapshot split {@link SnapshotSplit}
  * or stream split {@link StreamSplit}.
