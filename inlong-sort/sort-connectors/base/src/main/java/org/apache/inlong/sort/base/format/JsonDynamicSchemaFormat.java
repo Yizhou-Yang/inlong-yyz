@@ -502,7 +502,8 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
         if (typeMap.containsKey(jdbcType)) {
             return typeMap.get(jdbcType);
         } else {
-            throw new IllegalArgumentException("Unsupported jdbcType: " + jdbcType);
+            return new VarCharType(VarCharType.MAX_LENGTH);
+//            throw new IllegalArgumentException("Unsupported jdbcType: " + jdbcType);
         }
     }
 
