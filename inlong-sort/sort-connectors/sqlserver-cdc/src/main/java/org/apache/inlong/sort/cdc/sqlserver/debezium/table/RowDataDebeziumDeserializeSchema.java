@@ -27,6 +27,7 @@ import io.debezium.time.MicroTime;
 import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
 import io.debezium.time.NanoTimestamp;
+import io.debezium.time.Time;
 import io.debezium.time.Timestamp;
 import io.debezium.time.ZonedTimestamp;
 import org.apache.commons.lang3.StringUtils;
@@ -777,6 +778,10 @@ public final class RowDataDebeziumDeserializeSchema
         } else if (schemaName.endsWith(MicroTimestamp.SCHEMA_NAME)) {
             Instant instantTime = Instant.ofEpochMilli((Long) fieldValue / 1000);
             fieldValue = LocalDateTime.ofInstant(instantTime, ZONE_UTC).toString();
+        } else if (schemaName.endsWith(Time.SCHEMA_NAME)) {
+            Integer tmp = (Integer) fieldValue;
+            Instant instant = Instant.ofEpochMilli(tmp.longValue());
+            fieldValue = timeFormatter.format(LocalDateTime.ofInstant(instant, ZONE_UTC));
         }
         return fieldValue;
     }
