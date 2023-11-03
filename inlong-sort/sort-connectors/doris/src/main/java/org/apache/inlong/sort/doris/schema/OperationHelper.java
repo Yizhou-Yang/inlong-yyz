@@ -53,7 +53,7 @@ public class OperationHelper {
     private static final String APOSTROPHE = "'";
     private static final String DOUBLE_QUOTES = "\"";
     private final int VARCHAR_MAX_LENGTH = 16383; // The max value is 65533/4;
-    private final int CHAR_MAX_LENGTH = 255;
+    private final int CHAR_MAX_LENGTH = 63;
     private final boolean supportDecimalV3;
 
     private OperationHelper(boolean supportDecimalV3) {
@@ -72,8 +72,21 @@ public class OperationHelper {
         if (length > VARCHAR_MAX_LENGTH) {
             return "STRING";
         }
-        length = varcharType.getLength() * 4;
+        length = length * 4;
         return String.format("VARCHAR(%s)", length);
+    }
+
+    private String handleCharType(CharType charType) {
+        // Because the precision definition of char by Doris is different from that of MySQL.
+        // The precision in MySQL is the number of characters, while Doris is the number of bytes,
+        // and Chinese characters occupy 4 bytes, so the precision multiplys by 4 here.
+        int length = charType.getLength();
+        String type = "CHAR";
+        if (length > CHAR_MAX_LENGTH) {
+            type = "VARCHAR";
+        }
+        length = length * 4;
+        return String.format("%s(%s)", type, length);
     }
 
     private String quote(String value) {
@@ -198,12 +211,7 @@ public class OperationHelper {
         if (type instanceof VarCharType) {
             dorisType = handleVarcharType((VarCharType) type);
         } else if (type instanceof CharType) {
-            CharType charType = (CharType) type;
-            int length = Math.min(charType.getLength(), CHAR_MAX_LENGTH);
-            if (length != charType.getLength()) {
-                charType = new CharType(length);
-            }
-            dorisType = charType.asSummaryString();
+            dorisType = handleCharType((CharType) type);
         } else if (type instanceof TimestampType || type instanceof LocalZonedTimestampType
                 || type instanceof ZonedTimestampType) {
             dorisType = "DATETIME";
@@ -237,14 +245,14 @@ public class OperationHelper {
     }
 
     private String handleDecimalType(DecimalType decimalType) {
-        if (decimalType.getPrecision() > 38 || decimalType.getScale() > 38) {
+        if (decimalType.getPrecision() > 38 || decimalType.getScale() > decimalType.getPrecision()) {
             return "STRING";
         }
         int precision = decimalType.getPrecision();
         int scale = decimalType.getScale();
         String type = "DECIMALV3";
         if (!supportDecimalV3) {
-            if (precision > 27 || scale > 27) {
+            if (precision > 27 || scale > precision) {
                 return "STRING";
             }
             type = "DECIMAL";

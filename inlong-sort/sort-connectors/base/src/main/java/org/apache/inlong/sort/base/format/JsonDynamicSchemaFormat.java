@@ -429,15 +429,23 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
         }
         String[] items = matcher.group(2).split(",");
         if (type instanceof DecimalType) {
-            int precision;
+            int precision = DEFAULT_DECIMAL_PRECISION;
             int scale = DEFAULT_DECIMAL_SCALE;
-            precision = Integer.parseInt(items[0].trim());
-            if (precision < DecimalType.MIN_PRECISION || precision > DecimalType.MAX_PRECISION) {
+            try {
+                precision = Integer.parseInt(items[0].trim());
+            } catch (NumberFormatException e) {
+                LOGGER.warn("The precision is unvalid of dialect type: {}", dialectType, e);
+            }
+            if (precision < DecimalType.MIN_PRECISION) {
                 precision = DEFAULT_DECIMAL_PRECISION;
             }
             if (items.length == 2) {
-                scale = Integer.parseInt(items[1].trim());
-                if (scale < DecimalType.MIN_SCALE || scale > precision) {
+                try {
+                    scale = Integer.parseInt(items[1].trim());
+                } catch (NumberFormatException e) {
+                    LOGGER.warn("The scale is unvalid of dialect type: {}", dialectType, e);
+                }
+                if (scale < DecimalType.MIN_SCALE) {
                     scale = DEFAULT_DECIMAL_SCALE;
                 }
             }

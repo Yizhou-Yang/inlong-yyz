@@ -190,7 +190,11 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
             Set<SchemaChangeType> types = null;
             try {
                 types = SchemaChangeUtils.extractSchemaChangeType(alterColumn);
-                Preconditions.checkState(!types.isEmpty(), "Schema change types is empty");
+                if (types.isEmpty()) {
+                    LOGGER.warn("Ignore the unsupportted schema change, origin schema: {}", originSchema);
+                    continue;
+                }
+                // Preconditions.checkState(!types.isEmpty(), "Schema change types is empty");
             } catch (Exception e) {
                 if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
                     throw new SchemaChangeHandleException(
@@ -216,7 +220,6 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
                 }
             }
         }
-
         if (!typeMap.isEmpty()) {
             doAlterOperation(database, schema, table, originData, originSchema, data, typeMap);
         }
