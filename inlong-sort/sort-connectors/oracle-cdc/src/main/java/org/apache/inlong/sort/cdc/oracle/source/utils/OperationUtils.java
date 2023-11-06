@@ -28,6 +28,7 @@ import net.sf.jsqlparser.statement.create.table.ColumnDefinition;
 import net.sf.jsqlparser.statement.create.table.CreateTable;
 import net.sf.jsqlparser.statement.drop.Drop;
 import net.sf.jsqlparser.statement.truncate.Truncate;
+import oracle.jdbc.OracleTypes;
 import org.apache.inlong.sort.protocol.ddl.Column;
 import org.apache.inlong.sort.protocol.ddl.enums.AlterType;
 import org.apache.inlong.sort.protocol.ddl.enums.IndexType;
@@ -277,13 +278,15 @@ public class OperationUtils {
                                     && tableSchema.getTable().isPrimaryKeyColumn(column.name())
                                     && column.scale().orElse(0) == 0) {
                                 // Convert number(0) to bigint for Oracle when the column is a primary key
-                                sqlType.put(
-                                        column.name(),
-                                        Types.BIGINT);
+                                sqlType.put(column.name(), Types.BIGINT);
+                            } else if (column.jdbcType() == OracleTypes.BINARY_FLOAT) {
+                                sqlType.put(column.name(), Types.FLOAT);
+                            } else if (column.jdbcType() == OracleTypes.BINARY_DOUBLE) {
+                                sqlType.put(column.name(), Types.DOUBLE);
+                            } else if (column.jdbcType() == OracleTypes.BFILE) {
+                                sqlType.put(column.name(), Types.VARBINARY);
                             } else {
-                                sqlType.put(
-                                        column.name(),
-                                        column.jdbcType());
+                                sqlType.put(column.name(), column.jdbcType());
                             }
                         });
         return sqlType;
