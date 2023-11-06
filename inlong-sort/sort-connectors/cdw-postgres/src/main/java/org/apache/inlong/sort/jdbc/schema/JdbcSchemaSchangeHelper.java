@@ -145,120 +145,136 @@ public class JdbcSchemaSchangeHelper extends SchemaChangeHelper {
 
     public boolean handleResourceNotExists(String tableIdentifier, SQLException e) {
         LOGGER.warn("handleResourceNotExists due to", e);
-        doSchemaChangeBase(SchemaChangeType.CREATE_TABLE,
-                policyMap.get(SchemaChangeType.CREATE_TABLE), null);
-        if (checkSchemaChangeTypeEnable(SchemaChangeType.CREATE_TABLE)) {
-            String stmt;
-            String database = JdbcMultipleUtils.getDatabaseFromIdentifier(tableIdentifier,
-                    dialect.getDefaultDatabase());
-            String schema = JdbcMultipleUtils.getSchemaFromIdentifier(tableIdentifier);
-            long length = 0;
-            StringBuilder sb = new StringBuilder();
-            String comment = Constants.CREATE_TABLE_COMMENT;
-            try {
-                List<String> primaryKeys =
-                        dynamicSchemaFormat.extractPrimaryKeyNames(firstDataMap.get(tableIdentifier));
-                if (dialect.parseUnknownDatabase(e)) {
+        String stmt;
+        String database = JdbcMultipleUtils.getDatabaseFromIdentifier(tableIdentifier,
+                dialect.getDefaultDatabase());
+        String schema = JdbcMultipleUtils.getSchemaFromIdentifier(tableIdentifier);
+        long length = 0;
+        StringBuilder sb = new StringBuilder();
+        String comment = Constants.CREATE_TABLE_COMMENT;
+        try {
+            List<String> primaryKeys =
+                    dynamicSchemaFormat.extractPrimaryKeyNames(firstDataMap.get(tableIdentifier));
+            if (dialect.parseUnknownDatabase(e)) {
+                doSchemaChangeBase(SchemaChangeType.CREATE_TABLE,
+                        policyMap.get(SchemaChangeType.CREATE_TABLE), null);
+                if (!checkSchemaChangeTypeEnable(SchemaChangeType.CREATE_TABLE)) {
+                    return false;
+                }
+                stmt = dialect.buildCreateDatabaseStatement(database);
+                if (stmt != null) {
+                    sb.append(stmt);
+                    length += stmt.getBytes(StandardCharsets.UTF_8).length;
+                }
+                executeStatement(stmt, dialect.getDefaultDatabase());
+                stmt = dialect.buildCreateSchemaStatement(schema);
+                if (stmt != null) {
+                    sb.append(stmt);
+                    length += stmt.getBytes(StandardCharsets.UTF_8).length;
+                }
+                executeStatement(stmt, database);
+                stmt = dialect.buildCreateTableStatement(tableIdentifier, primaryKeys,
+                        rowTypeMap.get(tableIdentifier), comment);
+                if (stmt != null) {
+                    sb.append(stmt);
+                    length += stmt.getBytes(StandardCharsets.UTF_8).length;
+                }
+                executeStatement(stmt, database);
+            } else if (dialect.parseUnkownSchema(e)) {
+                doSchemaChangeBase(SchemaChangeType.CREATE_TABLE,
+                        policyMap.get(SchemaChangeType.CREATE_TABLE), null);
+                if (!checkSchemaChangeTypeEnable(SchemaChangeType.CREATE_TABLE)) {
+                    return false;
+                }
+                schema = JdbcMultipleUtils.getSchemaFromIdentifier(tableIdentifier);
+                stmt = dialect.buildCreateSchemaStatement(schema);
+                if (stmt != null) {
+                    sb.append(stmt);
+                    length += stmt.getBytes(StandardCharsets.UTF_8).length;
+                }
+                executeStatement(stmt, database);
+                stmt = dialect.buildCreateTableStatement(tableIdentifier, primaryKeys,
+                        rowTypeMap.get(tableIdentifier), comment);
+                if (stmt != null) {
+                    sb.append(stmt);
+                    length += stmt.getBytes(StandardCharsets.UTF_8).length;
+                }
+                executeStatement(stmt, database);
+            } else if (dialect.parseUnkownTable(e)) {
+                doSchemaChangeBase(SchemaChangeType.CREATE_TABLE,
+                        policyMap.get(SchemaChangeType.CREATE_TABLE), null);
+                if (!checkSchemaChangeTypeEnable(SchemaChangeType.CREATE_TABLE)) {
+                    return false;
+                }
+                if (StringUtils.isNotBlank(database)) {
                     stmt = dialect.buildCreateDatabaseStatement(database);
-                    if (stmt != null) {
+                    if (StringUtils.isNotBlank(stmt)) {
                         sb.append(stmt);
                         length += stmt.getBytes(StandardCharsets.UTF_8).length;
+                        executeStatement(stmt, dialect.getDefaultDatabase());
                     }
-                    executeStatement(stmt, dialect.getDefaultDatabase());
+                }
+                if (StringUtils.isNotBlank(schema)) {
                     stmt = dialect.buildCreateSchemaStatement(schema);
-                    if (stmt != null) {
-                        sb.append(stmt);
-                        length += stmt.getBytes(StandardCharsets.UTF_8).length;
-                    }
-                    executeStatement(stmt, database);
-                    stmt = dialect.buildCreateTableStatement(tableIdentifier, primaryKeys,
-                            rowTypeMap.get(tableIdentifier), comment);
-                    if (stmt != null) {
-                        sb.append(stmt);
-                        length += stmt.getBytes(StandardCharsets.UTF_8).length;
-                    }
-                    executeStatement(stmt, database);
-                } else if (dialect.parseUnkownSchema(e)) {
-                    schema = JdbcMultipleUtils.getSchemaFromIdentifier(tableIdentifier);
-                    stmt = dialect.buildCreateSchemaStatement(schema);
-                    if (stmt != null) {
-                        sb.append(stmt);
-                        length += stmt.getBytes(StandardCharsets.UTF_8).length;
-                    }
-                    executeStatement(stmt, database);
-                    stmt = dialect.buildCreateTableStatement(tableIdentifier, primaryKeys,
-                            rowTypeMap.get(tableIdentifier), comment);
-                    if (stmt != null) {
-                        sb.append(stmt);
-                        length += stmt.getBytes(StandardCharsets.UTF_8).length;
-                    }
-                    executeStatement(stmt, database);
-                } else if (dialect.parseUnkownTable(e)) {
-                    if (StringUtils.isNotBlank(database)) {
-                        stmt = dialect.buildCreateDatabaseStatement(database);
-                        if (StringUtils.isNotBlank(stmt)) {
-                            sb.append(stmt);
-                            length += stmt.getBytes(StandardCharsets.UTF_8).length;
-                            executeStatement(stmt, dialect.getDefaultDatabase());
-                        }
-                    }
-                    if (StringUtils.isNotBlank(schema)) {
-                        stmt = dialect.buildCreateSchemaStatement(schema);
-                        if (StringUtils.isNotBlank(stmt)) {
-                            sb.append(stmt);
-                            length += stmt.getBytes(StandardCharsets.UTF_8).length;
-                            executeStatement(stmt, database);
-                        }
-                    }
-                    stmt = dialect.buildCreateTableStatement(tableIdentifier, primaryKeys,
-                            rowTypeMap.get(tableIdentifier), comment);
-                    if (stmt != null) {
-                        sb.append(stmt);
-                        length += stmt.getBytes(StandardCharsets.UTF_8).length;
-                    }
-                    executeStatement(stmt, database);
-                } else if (dialect.parseUnkownColumn(e)) {
-                    String unknownColumn = dialect.extractUnkownColumn(e);
-                    if (unknownColumn != null) {
-                        RowType rowType = rowTypeMap.get(tableIdentifier);
-                        if (rowType == null) {
-                            LOGGER.warn("Ignore the unknown column handle because the rowtype is null for {}",
-                                    tableIdentifier);
-                            return false;
-                        }
-                        int columnIndex = rowType.getFieldIndex(unknownColumn);
-                        if (columnIndex == -1) {
-                            LOGGER.warn(
-                                    "Ignore the unknown column handle because the unknown column is not found in schema for {}",
-                                    tableIdentifier);
-                            return false;
-                        }
-                        stmt = dialect.buildAlterTableStatement(tableIdentifier) + " "
-                                + dialect.buildAddColumnStatement(tableIdentifier,
-                                        Collections.singletonList(rowType.getFields().get(columnIndex)));
+                    if (StringUtils.isNotBlank(stmt)) {
                         sb.append(stmt);
                         length += stmt.getBytes(StandardCharsets.UTF_8).length;
                         executeStatement(stmt, database);
-                        return true;
                     }
-                    LOGGER.warn("Ignore the unknown column handle because the unknown column is null for {}",
-                            tableIdentifier);
+                }
+                stmt = dialect.buildCreateTableStatement(tableIdentifier, primaryKeys,
+                        rowTypeMap.get(tableIdentifier), comment);
+                if (stmt != null) {
+                    sb.append(stmt);
+                    length += stmt.getBytes(StandardCharsets.UTF_8).length;
+                }
+                executeStatement(stmt, database);
+            } else if (dialect.parseUnkownColumn(e)) {
+                doSchemaChangeBase(SchemaChangeType.ADD_COLUMN,
+                        policyMap.get(SchemaChangeType.ADD_COLUMN), null);
+                if (!checkSchemaChangeTypeEnable(SchemaChangeType.ADD_COLUMN)) {
                     return false;
-                } else {
-                    throw new SchemaChangeHandleException("Unsupported operation", e);
                 }
-                outputFormat.outputMetrics(tableIdentifier, 1, length, false);
-                return true;
-            } catch (Exception ex) {
-                if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
-                    throw new SchemaChangeHandleException("handle resource not exists failed", ex);
+                String unknownColumn = dialect.extractUnkownColumn(e);
+                if (unknownColumn != null) {
+                    RowType rowType = rowTypeMap.get(tableIdentifier);
+                    if (rowType == null) {
+                        LOGGER.warn("Ignore the unknown column handle because the rowtype is null for {}",
+                                tableIdentifier);
+                        return false;
+                    }
+                    int columnIndex = rowType.getFieldIndex(unknownColumn);
+                    if (columnIndex == -1) {
+                        LOGGER.warn(
+                                "Ignore the unknown column handle because the unknown column is not found in schema for {}",
+                                tableIdentifier);
+                        return false;
+                    }
+                    stmt = dialect.buildAlterTableStatement(tableIdentifier) + " "
+                            + dialect.buildAddColumnStatement(tableIdentifier,
+                                    Collections.singletonList(rowType.getFields().get(columnIndex)));
+                    sb.append(stmt);
+                    length += stmt.getBytes(StandardCharsets.UTF_8).length;
+                    executeStatement(stmt, database);
+                    return true;
                 }
-                LOGGER.warn("handle resource not exists failed", ex);
-                if (exceptionPolicy == SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE) {
-                    outputFormat.outputMetrics(tableIdentifier, 1, length, true);
-                    outputFormat.handleDirtyData(sb.toString(), tableIdentifier, DirtyType.APPLY_SCHEMA_CHANGE_ERROR,
-                            ex);
-                }
+                LOGGER.warn("Ignore the unknown column handle because the unknown column is null for {}",
+                        tableIdentifier);
+                return false;
+            } else {
+                throw new SchemaChangeHandleException("Unsupported operation", e);
+            }
+            outputFormat.outputMetrics(tableIdentifier, 1, length, false);
+            return true;
+        } catch (Exception ex) {
+            if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
+                throw new SchemaChangeHandleException("handle resource not exists failed", ex);
+            }
+            LOGGER.warn("handle resource not exists failed", ex);
+            if (exceptionPolicy == SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE) {
+                outputFormat.outputMetrics(tableIdentifier, 1, length, true);
+                outputFormat.handleDirtyData(sb.toString(), tableIdentifier, DirtyType.APPLY_SCHEMA_CHANGE_ERROR,
+                        ex);
             }
         }
         return false;

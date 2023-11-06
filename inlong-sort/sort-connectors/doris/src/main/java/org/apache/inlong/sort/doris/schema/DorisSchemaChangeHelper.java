@@ -463,48 +463,49 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
             List<String> pkNames = dynamicSchemaFormat.extractPrimaryKeyNames(data);
             RowType rowType = dynamicSchemaFormat.extractSchema(data, pkNames);
             if (tableSchema == null) {
-                if (checkSchemaChangeTypeEnable(SchemaChangeType.CREATE_TABLE)) {
-                    String stmt = operationHelper.buildCreateTableStatement(database, table, pkNames,
-                            rowType, Constants.CREATE_TABLE_COMMENT, null);
-                    try {
-                        result = executeStatement(database, stmt);
-                    } catch (IOException e) {
-                        throw new IllegalArgumentException("Create table auto failed", e);
-                    }
-                    if (result) {
-                        return true;
-                    }
-                    LOGGER.warn("Create table auto failed maybe it is already created,statement: {}", stmt);
-                    tableSchema = getSchema(database, table);
-                } else {
+                doSchemaChangeBase(SchemaChangeType.CREATE_TABLE,
+                        policyMap.get(SchemaChangeType.CREATE_TABLE), null);
+                if (!checkSchemaChangeTypeEnable(SchemaChangeType.CREATE_TABLE)) {
                     return false;
                 }
-            }
-            if (tableSchema != null) {
-                if (!checkSchemaChangeTypeEnable(SchemaChangeType.ADD_COLUMN)) {
-                    return false;
+                String stmt = operationHelper.buildCreateTableStatement(database, table, pkNames,
+                        rowType, Constants.CREATE_TABLE_COMMENT, null);
+                try {
+                    result = executeStatement(database, stmt);
+                } catch (IOException e) {
+                    throw new IllegalArgumentException("Create table auto failed", e);
                 }
-                List<RowField> addFiels = operationHelper.extractAddFields(tableSchema, rowType);
-                if (addFiels.isEmpty()) {
+                if (result) {
                     return true;
                 }
-                String stmt = operationHelper.buildAddColumnStatement(addFiels, new HashMap<>(), null);
-                if (stmt != null) {
-                    stmt = operationHelper.buildAlterStatementCommon(database, table) + stmt;
-                    try {
-                        result = executeStatement(database, stmt);
-                    } catch (IOException e) {
-                        throw new IllegalArgumentException(
-                                String.format("Add column auto failed, statement: %s", stmt), e);
-                    }
-                    if (!result) {
-                        throw new SchemaChangeHandleException(
-                                String.format("Add column auto failed, statement: %s", stmt));
-                    }
-                } else {
-                    LOGGER.warn("The schema of {}.{} maybe has already same as the schema of data", database, table);
-                }
+                LOGGER.warn("Create table auto failed maybe it is already created,statement: {}", stmt);
+                return result;
             }
+            List<RowField> addFiels = operationHelper.extractAddFields(tableSchema, rowType);
+            if (addFiels.isEmpty()) {
+                return true;
+            }
+            doSchemaChangeBase(SchemaChangeType.ADD_COLUMN, policyMap.get(SchemaChangeType.ADD_COLUMN), null);
+            if (!checkSchemaChangeTypeEnable(SchemaChangeType.ADD_COLUMN)) {
+                return false;
+            }
+            String stmt = operationHelper.buildAddColumnStatement(addFiels, new HashMap<>(), null);
+            if (stmt != null) {
+                stmt = operationHelper.buildAlterStatementCommon(database, table) + stmt;
+                try {
+                    result = executeStatement(database, stmt);
+                } catch (IOException e) {
+                    throw new IllegalArgumentException(
+                            String.format("Add column auto failed, statement: %s", stmt), e);
+                }
+                if (!result) {
+                    throw new SchemaChangeHandleException(
+                            String.format("Add column auto failed, statement: %s", stmt));
+                }
+            } else {
+                LOGGER.warn("The schema of {}.{} maybe has already same as the schema of data", database, table);
+            }
+
         } catch (Throwable e) {
             if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
                 throw new SchemaChangeHandleException(
