@@ -69,6 +69,9 @@ import static com.ververica.cdc.connectors.oracle.source.utils.OracleUtils.readT
  */
 public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
 
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(OracleScanFetchTask.class);
+
     private final SnapshotSplit split;
     private volatile boolean taskRunning = false;
 
@@ -116,6 +119,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
 
         final StreamSplit backfillBinlogSplit =
                 createBackfillRedoLogSplit(changeEventSourceContext);
+        LOGGER.info("Create binlog back fill split: {} for {}", backfillBinlogSplit, split);
         // optimization that skip the binlog read when the low watermark equals high
         // watermark
         final boolean binlogBackfillRequired =
@@ -139,6 +143,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
                             ((OracleSourceFetchTaskContext) context).getDbzConnectorConfig());
             final OracleOffsetContext oracleOffsetContext =
                     loader.load(backfillBinlogSplit.getStartingOffset().getOffset());
+            LOGGER.info("Execute binlog back fill for {}, the back fill split: {}", split, backfillBinlogSplit);
             backfillBinlogReadTask.execute(
                     new SnapshotBinlogSplitChangeEventSourceContext(),
                     sourceFetchContext.getPartition(),
@@ -293,7 +298,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
                     highWatermark,
                     snapshotSplit);
             jdbcConnection.close();
-            ((SnapshotSplitChangeEventSourceContext) (context)).setHighWatermark(lowWatermark);
+            ((SnapshotSplitChangeEventSourceContext) (context)).setHighWatermark(highWatermark);
             dispatcher.dispatchWatermarkEvent(
                     snapshotContext.partition.getSourcePartition(),
                     snapshotSplit,
