@@ -55,6 +55,14 @@ public class OracleDialect implements JdbcDataSourceDialect {
     private final OracleSourceConfig sourceConfig;
     private transient OracleSchema oracleSchema;
 
+    static {
+        try {
+            Class.forName("oracle.jdbc.OracleDriver");
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("load oracle class exception", e);
+        }
+    }
+
     public OracleDialect(OracleSourceConfigFactory configFactory) {
         this.configFactory = configFactory;
         this.sourceConfig = configFactory.create(0);
