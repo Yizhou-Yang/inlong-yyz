@@ -141,7 +141,6 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     private final JdbcDmlOptions dmlOptions;
     private final JdbcOptions jdbcOptions;
     private final boolean appendMode;
-    private long totalDataSize = 0L;
     private transient int batchCount = 0;
     private transient volatile boolean closed = false;
     private transient ScheduledExecutorService scheduler;
@@ -763,7 +762,10 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 continue;
             }
             final FutureTask<Void> futureTask = new FutureTask<>(() -> {
+                long start = System.currentTimeMillis();
                 flushTable(tableIdentifier, tableIdRecordList);
+                long end = System.currentTimeMillis();
+                LOG.info("Flush for {} spend {} ms", tableIdRecordList, end - start);
                 return null;
             });
             flushExecutorService.submit(futureTask);
@@ -812,7 +814,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             jdbcStatementExecutor.executeBatch();
             flushFlag = true;
             if (!schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE)) {
-                outputMetrics(tableIdentifier, (long) tableIdRecordList.size(),
+                outputMetrics(tableIdentifier, tableIdRecordList.size(),
                         totalDataSize, false);
             } else {
                 try {
@@ -824,99 +826,95 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 }
             }
         } catch (SQLException e) {
-            synchronized (this) {
-                LOG.warn("execute batch error", e);
-                if (hasExecuteBatch && helper.handleResourceNotExists(tableIdentifier, e)) {
+            tableException = e;
+            LOG.warn("execute batch error", e);
+            if (hasExecuteBatch && helper.handleResourceNotExists(tableIdentifier, e)) {
+                try {
+                    jdbcStatementExecutor.executeBatch();
+                    tableIdRecordList.clear();
+                    return;
+                } catch (SQLException ex) {
+                    tableException = ex;
+                    LOG.warn("Flush all data for tableIdentifier:{} get err:", tableIdentifier, ex);
+                    if (dirtySinkHelper.getDirtySink() == null) {
+                        getAndSetPkFromErrMsg(tableIdentifier, e.getMessage());
+                        updateOneExecutor(true, tableIdentifier);
+                    }
                     try {
-                        jdbcStatementExecutor.executeBatch();
-                        tableIdRecordList.clear();
-                        return;
-                    } catch (SQLException ex) {
-                        tableException = ex;
-                        LOG.warn("Flush all data for tableIdentifier:{} get err:", tableIdentifier, ex);
-                        if (dirtySinkHelper.getDirtySink() == null) {
-                            getAndSetPkFromErrMsg(tableIdentifier, e.getMessage());
-                            updateOneExecutor(true, tableIdentifier);
-                        }
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException interruptedException) {
-                            Thread.currentThread().interrupt();
-                            throw new IOException(
-                                    "unable to flush; interrupted while doing another attempt", interruptedException);
-                        }
+                        Thread.sleep(1000);
+                    } catch (InterruptedException interruptedException) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException(
+                                "unable to flush; interrupted while doing another attempt", interruptedException);
                     }
                 }
             }
         } catch (Exception e) {
-            synchronized (this) {
-                tableException = e;
-                LOG.warn("Flush all data for tableIdentifier:{} get err:", tableIdentifier, e);
-                if (dirtySinkHelper.getDirtySink() == null) {
-                    getAndSetPkFromErrMsg(tableIdentifier, e.getMessage());
-                    updateOneExecutor(true, tableIdentifier);
-                }
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                    throw new IOException(
-                            "unable to flush; interrupted while doing another attempt", e);
-                }
+            tableException = e;
+            LOG.warn("Flush all data for tableIdentifier:{} get err:", tableIdentifier, e);
+            if (dirtySinkHelper.getDirtySink() == null) {
+                getAndSetPkFromErrMsg(tableIdentifier, e.getMessage());
+                updateOneExecutor(true, tableIdentifier);
+            }
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IOException(
+                        "unable to flush; interrupted while doing another attempt", e);
             }
         }
 
         if (!flushFlag) {
-            synchronized (this) {
-                if (schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.STOP_PARTIAL)) {
-                    LOG.error("exception detected, skipping table " + tableIdentifier);
-                    tableExceptionMap.put(tableIdentifier, tableException);
-                    tableIdRecordList.clear();
-                    return;
-                }
+            if (schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.STOP_PARTIAL)) {
+                LOG.error("exception detected, skipping table " + tableIdentifier);
+                tableExceptionMap.put(tableIdentifier, tableException);
+                tableIdRecordList.clear();
+                return;
+            }
 
-                if (schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.THROW_WITH_STOP)) {
-                    LOG.error("exception detected, restarting entire task");
-                    throw new RuntimeException(tableException);
-                }
-
-                for (GenericRowData record : tableIdRecordList) {
-                    long totalDataSize = 0;
-                    for (int retryTimes = 1; retryTimes <= executionOptions.getMaxRetries(); retryTimes++) {
+            if (schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.THROW_WITH_STOP)) {
+                LOG.error("exception detected, restarting entire task");
+                throw new RuntimeException(tableException);
+            }
+            tableException = null;
+            for (GenericRowData record : tableIdRecordList) {
+                long totalDataSize = 0;
+                for (int retryTimes = 1; retryTimes <= executionOptions.getMaxRetries(); retryTimes++) {
+                    try {
+                        jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);
+                        jdbcStatementExecutor.addToBatch((JdbcIn) record);
+                        jdbcStatementExecutor.executeBatch();
+                        totalDataSize = record.toString().getBytes(StandardCharsets.UTF_8).length;
+                        outputMetrics(tableIdentifier, 1L, totalDataSize, false);
+                        flushFlag = true;
+                        break;
+                    } catch (Exception e) {
+                        tableException = e;
+                        LOG.warn("Flush one record tableIdentifier:{} ,retryTimes:{} get err:",
+                                tableIdentifier, retryTimes, e);
+                        getAndSetPkFromErrMsg(e.getMessage(), tableIdentifier);
+                        updateOneExecutor(true, tableIdentifier);
                         try {
-                            jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);
-                            jdbcStatementExecutor.addToBatch((JdbcIn) record);
-                            jdbcStatementExecutor.executeBatch();
-                            totalDataSize = record.toString().getBytes(StandardCharsets.UTF_8).length;
-                            outputMetrics(tableIdentifier, 1L, totalDataSize, false);
-                            flushFlag = true;
-                            break;
-                        } catch (Exception e) {
-                            LOG.warn("Flush one record tableIdentifier:{} ,retryTimes:{} get err:",
-                                    tableIdentifier, retryTimes, e);
-                            getAndSetPkFromErrMsg(e.getMessage(), tableIdentifier);
-                            updateOneExecutor(true, tableIdentifier);
-                            try {
-                                Thread.sleep(1000 * retryTimes);
-                            } catch (InterruptedException ex) {
-                                Thread.currentThread().interrupt();
-                                throw new IOException(
-                                        "unable to flush; interrupted while doing another attempt", e);
-                            }
+                            Thread.sleep(1000 * retryTimes);
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                            throw new IOException(
+                                    "unable to flush; interrupted while doing another attempt", e);
                         }
                     }
-                    if (!flushFlag && null != tableException) {
-                        LOG.info("Put tableIdentifier:{} exception:{}",
-                                tableIdentifier, tableException.getMessage());
-                        tableExceptionMap.put(tableIdentifier, tableException);
-                        if (stopWritingWhenTableException) {
-                            LOG.info("Stop write table:{} because occur exception",
-                                    tableIdentifier);
-                            break;
-                        }
-                    }
-                    outputMetrics(tableIdentifier, 1, totalDataSize, !flushFlag);
                 }
+                if (!flushFlag && null != tableException) {
+                    LOG.info("Put tableIdentifier:{} exception:{}",
+                            tableIdentifier, tableException.getMessage());
+                    tableExceptionMap.put(tableIdentifier, tableException);
+                    if (stopWritingWhenTableException) {
+                        LOG.info("Stop write table:{} because occur exception",
+                                tableIdentifier);
+                        break;
+                    }
+                }
+                outputMetrics(tableIdentifier, 1, totalDataSize, !flushFlag);
             }
         }
         tableIdRecordList.clear();

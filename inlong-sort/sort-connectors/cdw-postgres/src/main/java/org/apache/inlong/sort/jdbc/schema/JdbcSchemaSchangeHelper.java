@@ -144,6 +144,10 @@ public class JdbcSchemaSchangeHelper extends SchemaChangeHelper {
     }
 
     public boolean handleResourceNotExists(String tableIdentifier, SQLException e) {
+        if (!dialect.isResourceNotExists(e)) {
+            LOGGER.warn("Can't handle the error", e);
+            return false;
+        }
         LOGGER.warn("handleResourceNotExists due to", e);
         String stmt;
         String database = JdbcMultipleUtils.getDatabaseFromIdentifier(tableIdentifier,

@@ -493,6 +493,11 @@ public class PostgresDialect extends AbstractJdbcDialect {
     }
 
     @Override
+    public boolean isResourceNotExists(SQLException e) {
+        return parseUnknownDatabase(e) || parseUnkownSchema(e) || parseUnkownTable(e) || parseUnkownColumn(e);
+    }
+
+    @Override
     public String buildCreateTableStatement(String tableIdentifier, List<String> primaryKeys, RowType rowType,
             String comment) {
         StringBuilder sb = new StringBuilder();

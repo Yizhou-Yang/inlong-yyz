@@ -280,4 +280,6 @@ public abstract class AbstractJdbcDialect implements JdbcDialect {
         }
         return value;
     }
+
+    public abstract boolean isResourceNotExists(SQLException e);
 }
