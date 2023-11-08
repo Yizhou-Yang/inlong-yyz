@@ -281,8 +281,9 @@ public class SourceTableMetricData extends SourceMetricData implements SourceSub
         // source metric and sub source metric output metrics
         long rowCountSize = 1L;
         long rowDataSize = CalculateObjectSizeUtils.getDataSize(data);
+        // only node level need emitDelay
         this.outputMetrics(rowCountSize, rowDataSize, fetchDelay, emitDelay);
-        subSourceMetricData.outputMetrics(rowCountSize, rowDataSize, fetchDelay, emitDelay);
+        subSourceMetricData.outputMetrics(rowCountSize, rowDataSize);
 
         // output read phase metric
         outputReadPhaseMetrics((isSnapshotRecord) ? ReadPhase.SNAPSHOT_PHASE : ReadPhase.INCREASE_PHASE);
@@ -343,6 +344,7 @@ public class SourceTableMetricData extends SourceMetricData implements SourceSub
                 + ", numBytesInPerSecond=" + getNumBytesInPerSecond().getRate()
                 + ", currentFetchEventTimeLag=" + getFetchDelay()
                 + ", currentEmitEventTimeLag=" + getEmitDelay()
+                + ", logPosition=" + getLogPositionValue()
                 + ", readPhaseMetricDataMap=" + readPhaseMetricDataMap
                 + ", subSourceMetricMap=" + subSourceMetricMap
                 + '}';

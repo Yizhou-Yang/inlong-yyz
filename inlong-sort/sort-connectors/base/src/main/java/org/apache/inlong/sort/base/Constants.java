@@ -63,6 +63,8 @@ public final class Constants {
     public static final String CURRENT_FETCH_EVENT_TIME_LAG = "currentFetchEventTimeLag";
 
     public static final String CURRENT_EMIT_EVENT_TIME_LAG = "currentEmitEventTimeLag";
+
+    public static final String LOG_POSITION = "logPosition";
     /**
      * Timestamp when the read phase changed
      */

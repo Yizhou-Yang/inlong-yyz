@@ -263,12 +263,13 @@ public final class MySqlRecordEmitter<T>
 
     private void updateStartingOffsetForSplit(MySqlSplitState splitState, SourceRecord element) {
         if (splitState.isBinlogSplitState()) {
+            BinlogOffset position = getBinlogPosition(element);
+            splitState.asBinlogSplitState().setStartingOffset(position);
             // record the time metric to enter the incremental phase
             if (sourceReaderMetrics != null) {
                 sourceReaderMetrics.outputReadPhaseMetrics(ReadPhase.INCREASE_PHASE);
+                sourceReaderMetrics.recordLogPosition(position.getPosition());
             }
-            BinlogOffset position = getBinlogPosition(element);
-            splitState.asBinlogSplitState().setStartingOffset(position);
         }
     }
 
@@ -293,6 +294,9 @@ public final class MySqlRecordEmitter<T>
         try {
             binlogPos = position.getPosition();
             binlogFileNum = Long.parseLong(position.getFilename().replaceAll("\\D", ""));
+            if (sourceReaderMetrics != null) {
+                sourceReaderMetrics.recordLogPosition(position.getPosition());
+            }
         } catch (NumberFormatException e) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Can not translate binlog pos or flile name.");
