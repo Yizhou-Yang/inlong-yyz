@@ -443,7 +443,7 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
             }
         } catch (Exception e) {
             LOGGER.error("send request error", e);
-            throw new SchemaChangeHandleException("send request error", e);
+            throw new RuntimeException("send request error", e);
         }
         return responseHandler.apply(null);
     }
@@ -473,7 +473,7 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
                 try {
                     result = executeStatement(database, stmt);
                 } catch (IOException e) {
-                    throw new IllegalArgumentException("Create table auto failed", e);
+                    throw new RuntimeException("Create table auto failed", e);
                 }
                 if (result) {
                     return true;
@@ -495,17 +495,17 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
                 try {
                     result = executeStatement(database, stmt);
                 } catch (IOException e) {
-                    throw new IllegalArgumentException(
-                            String.format("Add column auto failed, statement: %s", stmt), e);
+                    throw new RuntimeException(String.format("Add column auto failed, statement: %s", stmt), e);
                 }
                 if (!result) {
-                    throw new SchemaChangeHandleException(
-                            String.format("Add column auto failed, statement: %s", stmt));
+                    throw new RuntimeException(String.format("Add column auto failed, statement: %s", stmt));
                 }
             } else {
                 LOGGER.warn("The schema of {}.{} maybe has already same as the schema of data", database, table);
             }
 
+        } catch (SchemaChangeHandleException e) {
+            throw e;
         } catch (Throwable e) {
             if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
                 throw new SchemaChangeHandleException(
