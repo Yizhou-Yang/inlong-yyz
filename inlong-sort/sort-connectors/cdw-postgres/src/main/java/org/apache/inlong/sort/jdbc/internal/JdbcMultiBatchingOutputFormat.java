@@ -327,7 +327,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                     .withTableName(JdbcMultiBatchingComm.getTableNameFromIdentifier(tableIdentifier))
                     .withDialect(jdbcOptions.getDialect())
                     .withFieldNames(filedNames)
-                    .withKeyFields(pkNameList.toArray(new String[pkNameList.size()]))
+                    .withKeyFields(pkNameList.toArray(new String[0]))
                     .build();
             statementExecutorFactory = ctx -> (JdbcExec) JdbcMultiBatchingComm.createBufferReduceExecutor(
                     createDmlOptions, ctx, rowDataTypeInfo, logicalTypes, executionOptions);
@@ -765,7 +765,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 long start = System.currentTimeMillis();
                 flushTable(tableIdentifier, tableIdRecordList);
                 long end = System.currentTimeMillis();
-                LOG.info("Flush for {} spend {} ms", tableIdRecordList, end - start);
+                LOG.info("Flush for {} cost {} ms", tableIdentifier, end - start);
                 return null;
             });
             flushExecutorService.submit(futureTask);
@@ -891,9 +891,13 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                         break;
                     } catch (Exception e) {
                         tableException = e;
+                        if (appendMode && e.getMessage().contains("duplicate key value violates unique constraint")) {
+                            LOG.warn("Ignore the duplicate key value error in append mode", e);
+                            getAndSetPkFromErrMsg(e.getMessage(), tableIdentifier);
+                            break;
+                        }
                         LOG.warn("Flush one record tableIdentifier:{} ,retryTimes:{} get err:",
                                 tableIdentifier, retryTimes, e);
-                        getAndSetPkFromErrMsg(e.getMessage(), tableIdentifier);
                         updateOneExecutor(true, tableIdentifier);
                         try {
                             Thread.sleep(1000 * retryTimes);

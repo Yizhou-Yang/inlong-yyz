@@ -58,7 +58,7 @@ import java.util.concurrent.FutureTask;
  */
 public final class TableCopyStatementExecutor implements JdbcBatchStatementExecutor<RowData> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TableSimpleStatementExecutor.class);
+    private static final Logger LOG = LoggerFactory.getLogger(TableCopyStatementExecutor.class);
     private static final char QUOTE = '"';
     private static final char ESCAPE = '\\';
     private static final char NEWLINE = '\n';
