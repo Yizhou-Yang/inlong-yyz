@@ -25,6 +25,7 @@ import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
+import org.apache.inlong.sort.base.schema.SchemaChangeHandleException;
 import org.apache.inlong.sort.jdbc.dialect.PostgresDialect;
 import org.apache.inlong.sort.jdbc.options.JdbcExecutionOptions;
 import org.apache.flink.connector.jdbc.internal.connection.JdbcConnectionProvider;
@@ -800,9 +801,9 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         Boolean flushFlag = false;
         Exception tableException = null;
         boolean hasExecuteBatch = false;
+        long totalDataSize = 0L;
         try {
             jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);
-            long totalDataSize = 0L;
             for (GenericRowData record : tableIdRecordList) {
                 totalDataSize = totalDataSize + record.toString().getBytes(StandardCharsets.UTF_8).length;
                 jdbcStatementExecutor.addToBatch((JdbcIn) record);
@@ -849,6 +850,8 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                     }
                 }
             }
+        } catch (SchemaChangeHandleException e) {
+            throw e;
         } catch (Exception e) {
             tableException = e;
             LOG.warn("Flush all data for tableIdentifier:{} get err:", tableIdentifier, e);
@@ -872,14 +875,19 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 tableIdRecordList.clear();
                 return;
             }
-
             if (schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.THROW_WITH_STOP)) {
                 LOG.error("exception detected, restarting entire task");
                 throw new RuntimeException(tableException);
             }
+            AbstractJdbcDialect jdbcDialect = (AbstractJdbcDialect) jdbcOptions.getDialect();
+            if (tableException instanceof SQLException
+                    && jdbcDialect.isResourceNotExists((SQLException) tableException)) {
+                outputMetrics(tableIdentifier, tableIdRecordList.size(), totalDataSize, true);
+                return;
+            }
             tableException = null;
             for (GenericRowData record : tableIdRecordList) {
-                long totalDataSize = 0;
+                totalDataSize = 0;
                 for (int retryTimes = 1; retryTimes <= executionOptions.getMaxRetries(); retryTimes++) {
                     try {
                         jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);

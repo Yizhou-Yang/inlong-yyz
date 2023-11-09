@@ -153,7 +153,7 @@ public final class TableCopyStatementExecutor implements JdbcBatchStatementExecu
                     if (!e.getMessage().contains("duplicate key value violates unique")) {
                         LOG.error("### SQLException {}", e.getMessage());
                     }
-                    throw new SQLException(e.getMessage());
+                    throw e;
                 } finally {
                     try {
                         pipeIn.close();
@@ -174,7 +174,7 @@ public final class TableCopyStatementExecutor implements JdbcBatchStatementExecu
                     LOG.error("record: {}", record);
                     LOG.error(Arrays.toString(e.getStackTrace()));
                     LOG.error("serializeRecord error", e);
-                    throw new SQLException(e.getMessage());
+                    throw new SQLException(e);
                 }
                 pipeOut.write(data);
             }
@@ -183,7 +183,7 @@ public final class TableCopyStatementExecutor implements JdbcBatchStatementExecu
         } catch (Exception e) {
             LOG.error(Arrays.toString(e.getStackTrace()));
             LOG.error("init copy write error", e);
-            throw new SQLException(e.getMessage());
+            throw new SQLException(e);
         } finally {
             try {
                 pipeOut.close();
@@ -199,7 +199,7 @@ public final class TableCopyStatementExecutor implements JdbcBatchStatementExecu
             if (data != null && !e.getMessage().contains("duplicate key value violates unique")) {
                 LOG.error("exception data({}):\n[{}]\n[{}]", data.length, new String(data), data);
             }
-            throw new SQLException(e.getMessage());
+            throw new SQLException(e);
         }
     }
 

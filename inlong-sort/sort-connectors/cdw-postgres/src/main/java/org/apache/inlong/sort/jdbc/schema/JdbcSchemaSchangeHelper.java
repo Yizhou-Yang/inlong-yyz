@@ -270,6 +270,8 @@ public class JdbcSchemaSchangeHelper extends SchemaChangeHelper {
             }
             outputFormat.outputMetrics(tableIdentifier, 1, length, false);
             return true;
+        } catch (SchemaChangeHandleException ex) {
+            throw ex;
         } catch (Exception ex) {
             if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
                 throw new SchemaChangeHandleException("handle resource not exists failed", ex);
