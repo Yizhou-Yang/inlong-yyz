@@ -619,7 +619,8 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         String dirtyIdentifier =
                 DirtySinkHelper.regexReplace(dirtyOptions.getIdentifier(), DirtyType.BATCH_LOAD_ERROR,
                         null, database, table, schema);
-        dirtySinkHelper.invoke(data, dirtyType, dirtyLabel, dirtyLogTag, dirtyIdentifier, e);
+        dirtySinkHelper.invoke(data, rowTypeMap.get(tableIdentifier),
+                dirtyType, dirtyLabel, dirtyLogTag, dirtyIdentifier, e);
     }
 
     /**
@@ -883,6 +884,9 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             if (tableException instanceof SQLException
                     && jdbcDialect.isResourceNotExists((SQLException) tableException)) {
                 outputMetrics(tableIdentifier, tableIdRecordList.size(), totalDataSize, true);
+                for (GenericRowData record : tableIdRecordList) {
+                    handleDirtyData(record, tableIdentifier, DirtyType.UNDEFINED, tableException);
+                }
                 return;
             }
             tableException = null;
@@ -920,11 +924,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                     LOG.info("Put tableIdentifier:{} exception:{}",
                             tableIdentifier, tableException.getMessage());
                     tableExceptionMap.put(tableIdentifier, tableException);
-                    if (stopWritingWhenTableException) {
-                        LOG.info("Stop write table:{} because occur exception",
-                                tableIdentifier);
-                        break;
-                    }
+                    handleDirtyData(record, tableIdentifier, DirtyType.UNDEFINED, tableException);
                 }
                 outputMetrics(tableIdentifier, 1, totalDataSize, !flushFlag);
             }

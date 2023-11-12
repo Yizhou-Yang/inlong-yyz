@@ -52,6 +52,7 @@ import org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat;
 import org.apache.inlong.sort.base.metric.MetricOption;
 import org.apache.inlong.sort.base.metric.MetricState;
 import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
+import org.apache.inlong.sort.base.schema.SchemaChangeHandleException;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.base.util.CalculateObjectSizeUtils;
 import org.apache.inlong.sort.base.util.MetricStateUtils;
@@ -756,6 +757,8 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             writeOutNum.addAndGet(values.size());
             // Clean the data that has been loaded.
             values.clear();
+        } catch (SchemaChangeHandleException e) {
+            throw e;
         } catch (Exception e) {
             LOG.error(String.format("Flush table: %s error", tableIdentifier), e);
             flushExceptionMap.put(tableIdentifier, e);

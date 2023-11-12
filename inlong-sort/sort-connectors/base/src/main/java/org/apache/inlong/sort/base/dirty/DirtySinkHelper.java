@@ -18,6 +18,7 @@
 package org.apache.inlong.sort.base.dirty;
 
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Preconditions;
 import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.slf4j.Logger;
@@ -91,6 +92,21 @@ public class DirtySinkHelper<T> implements Serializable {
      * @param e The cause of dirty data
      */
     public void invoke(T dirtyData, DirtyType dirtyType, String label, String logTag, String identifier, Throwable e) {
+        invoke(dirtyData, null, dirtyType, label, logTag, identifier, e);
+    }
+
+    /**
+     * Dirty data sink
+     *
+     * @param dirtyData The dirty data
+     * @param dirtyType The dirty type {@link DirtyType}
+     * @param label The dirty label
+     * @param logTag The dirty logTag
+     * @param identifier The dirty identifier
+     * @param e The cause of dirty data
+     */
+    public void invoke(T dirtyData, RowType rowType, DirtyType dirtyType,
+            String label, String logTag, String identifier, Throwable e) {
         if (!dirtyOptions.ignoreDirty()) {
             RuntimeException ex;
             if (e instanceof RuntimeException) {
@@ -106,6 +122,7 @@ public class DirtySinkHelper<T> implements Serializable {
                 builder.setData(dirtyData)
                         .setDirtyType(dirtyType)
                         .setLabels(label)
+                        .setRowType(rowType)
                         .setLogTag(logTag)
                         .setDirtyMessage(e.getMessage())
                         .setIdentifier(identifier);
