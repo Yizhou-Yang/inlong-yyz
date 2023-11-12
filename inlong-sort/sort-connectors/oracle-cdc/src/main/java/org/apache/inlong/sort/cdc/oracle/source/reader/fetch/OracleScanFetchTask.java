@@ -175,7 +175,8 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
                 context.getSourceConfig()
                         .getDbzConfiguration()
                         .edit()
-                        .with("table.include.list", split.getTableId().toString())
+                        .with("table.include.list", String.format("%s.%s",
+                                split.getTableId().schema(), split.getTableId().table()))
                         // Disable heartbeat event in snapshot split fetcher
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
