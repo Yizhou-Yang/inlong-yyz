@@ -92,7 +92,7 @@ public class PostgresDialect extends AbstractJdbcDialect {
     private static final Set<String> RESOURCE_EXISTS_ERROS =
             new HashSet<>(Arrays.asList("42P04", "42P06", "42P07", "42701"));
 
-    private static final Pattern UNKNOWN_COLUMN_PATTERN = Pattern.compile("java.sql.SQLException: ERROR"
+    private static final Pattern UNKNOWN_COLUMN_PATTERN = Pattern.compile(".*ERROR"
             + ": column \"?'?([a-zA-Z0-9_]+)\"?'? of relation .* does not exist.*", Pattern.DOTALL);
 
     public static final Logger LOG = LoggerFactory.getLogger(PostgresDialect.class);
@@ -494,6 +494,7 @@ public class PostgresDialect extends AbstractJdbcDialect {
 
     @Override
     public boolean isResourceNotExists(SQLException e) {
+        LOG.warn("Handle isResourceNotExists due to", e);
         return parseUnknownDatabase(e) || parseUnkownSchema(e) || parseUnkownTable(e) || parseUnkownColumn(e);
     }
 

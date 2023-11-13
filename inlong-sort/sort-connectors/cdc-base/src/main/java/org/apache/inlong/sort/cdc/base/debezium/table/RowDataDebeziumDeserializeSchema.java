@@ -607,10 +607,7 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
                         String fieldName = field.name();
                         Object fieldValue = struct.getWithoutDefault(fieldName);
                         Schema fieldSchema = schema.field(fieldName).schema();
-                        String schemaName = fieldSchema.name();
-                        if (schemaName != null) {
-                            fieldValue = getValueWithSchema(fieldValue, schemaName);
-                        }
+                        fieldValue = getValueWithSchema(fieldValue, fieldSchema);
                         if (fieldValue instanceof ByteBuffer) {
                             // binary data (blob or varbinary in mysql) are stored in bytebuffer
                             // use utf-8 to decode as a string by default
@@ -643,14 +640,14 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
      * extract the data with the format provided by debezium
      *
      * @param fieldValue
-     * @param schemaName
+     * @param fieldSchema
      * @return the extracted data with schema
      */
-    private Object getValueWithSchema(Object fieldValue, String schemaName) {
-        if (fieldValue == null) {
-            return null;
+    private Object getValueWithSchema(Object fieldValue, Schema fieldSchema) {
+        if (fieldSchema.name() == null || fieldValue == null) {
+            return fieldValue;
         }
-        switch (schemaName) {
+        switch (fieldSchema.name()) {
             case MicroTime.SCHEMA_NAME:
                 Instant instant = Instant.ofEpochMilli((Long) fieldValue / 1000);
                 fieldValue = timeFormatter.format(LocalDateTime.ofInstant(instant, ZONE_UTC));
@@ -672,10 +669,21 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
                 fieldValue = LocalDateTime.ofInstant(instantTime, ZONE_UTC).toString();
                 break;
             case Decimal.LOGICAL_NAME:
-                // no need to transfer decimal type since the value is already decimal
+                if(fieldSchema.parameters() != null){
+                    // Convert to string when the decimal precision is bigger than 38 or the scale is bigger than preciion
+                    int precision = Integer.parseInt(fieldSchema.parameters().getOrDefault("connect.decimal.precision", "0"));
+                    int scale = Integer.parseInt(fieldSchema.parameters().getOrDefault("scale", "0"));
+                    if(precision > DecimalType.MAX_PRECISION || scale > precision){
+                        if(fieldValue instanceof BigDecimal){
+                            fieldValue = ((BigDecimal)fieldValue).toPlainString();
+                        }else{
+                            fieldValue = fieldValue.toString();
+                        }
+                    }
+                }
                 break;
             default:
-                LOG.debug("schema {} is not being supported", schemaName);
+                LOG.debug("schema {} is not being supported", fieldSchema);
         }
         return fieldValue;
     }

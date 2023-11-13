@@ -422,6 +422,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         }
         if (row instanceof RowData) {
             RowData rowData = (RowData) row;
+            LOG.debug("sink receive raw data: {}", new String(rowData.getBinary(0)));
             JsonNode rootNode;
             try {
                 rootNode = jsonDynamicSchemaFormat.deserialize(rowData.getBinary(0));
@@ -511,6 +512,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                 if (enableBatchDelete()) {
                     physicalData.put(DORIS_DELETE_SIGN, DORIS_DELETE_FALSE);
                 }
+                LOG.debug("the {} data before write into doris: {}", rowKind, physicalData);
                 break;
             case DELETE:
                 handleColumnsChange(tableIdentifier, rootNode, physicalNode);
@@ -522,6 +524,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                 }
                 batchMap.computeIfAbsent(tableIdentifier, k -> new ArrayList<>())
                         .add(physicalData);
+                LOG.debug("the {} data before write into doris: {}", rowKind, physicalData);
                 break;
             case UPDATE_BEFORE:
                 if (updateBeforeData != null) {
@@ -535,6 +538,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                     }
                     batchMap.computeIfAbsent(tableIdentifier, k -> new ArrayList<>())
                             .add(updateBeforeData);
+                    LOG.debug("the {} data before write into doris: {}", rowKind, updateBeforeData);
                 }
                 break;
             default:
@@ -915,7 +919,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                 }
                 break;
             } catch (StreamLoadException e) {
-                if (multipleSink && autoCreateTableWhenSnapshot && DorisParseUtils
+                if (multipleSink && DorisParseUtils
                         .parseUnkownDatabaseError(e.getMessage())) {
                     if (helper.createDatabaseAuto(tableIdentifier, latestData.get(tableIdentifier))) {
                         continue;

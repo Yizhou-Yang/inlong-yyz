@@ -883,50 +883,30 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             AbstractJdbcDialect jdbcDialect = (AbstractJdbcDialect) jdbcOptions.getDialect();
             if (tableException instanceof SQLException
                     && jdbcDialect.isResourceNotExists((SQLException) tableException)) {
+                LOG.warn("Output metric for whole batch because the resource not exists", tableException);
                 outputMetrics(tableIdentifier, tableIdRecordList.size(), totalDataSize, true);
                 for (GenericRowData record : tableIdRecordList) {
                     handleDirtyData(record, tableIdentifier, DirtyType.UNDEFINED, tableException);
                 }
                 return;
             }
-            tableException = null;
             for (GenericRowData record : tableIdRecordList) {
-                totalDataSize = 0;
-                for (int retryTimes = 1; retryTimes <= executionOptions.getMaxRetries(); retryTimes++) {
-                    try {
-                        jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);
-                        jdbcStatementExecutor.addToBatch((JdbcIn) record);
-                        jdbcStatementExecutor.executeBatch();
-                        totalDataSize = record.toString().getBytes(StandardCharsets.UTF_8).length;
-                        outputMetrics(tableIdentifier, 1L, totalDataSize, false);
-                        flushFlag = true;
-                        break;
-                    } catch (Exception e) {
-                        tableException = e;
-                        if (appendMode && e.getMessage().contains("duplicate key value violates unique constraint")) {
-                            LOG.warn("Ignore the duplicate key value error in append mode", e);
-                            getAndSetPkFromErrMsg(e.getMessage(), tableIdentifier);
-                            break;
-                        }
-                        LOG.warn("Flush one record tableIdentifier:{} ,retryTimes:{} get err:",
-                                tableIdentifier, retryTimes, e);
-                        updateOneExecutor(true, tableIdentifier);
-                        try {
-                            Thread.sleep(1000 * retryTimes);
-                        } catch (InterruptedException ex) {
-                            Thread.currentThread().interrupt();
-                            throw new IOException(
-                                    "unable to flush; interrupted while doing another attempt", e);
-                        }
+                try {
+                    jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);
+                    jdbcStatementExecutor.addToBatch((JdbcIn) record);
+                    jdbcStatementExecutor.executeBatch();
+                    totalDataSize = record.toString().getBytes(StandardCharsets.UTF_8).length;
+                    outputMetrics(tableIdentifier, 1L, totalDataSize, false);
+                } catch (Exception e) {
+                    if (appendMode && e.getMessage().contains("duplicate key value violates unique constraint")) {
+                        LOG.warn("Ignore the duplicate key value error in append mode", e);
+                        getAndSetPkFromErrMsg(e.getMessage(), tableIdentifier);
                     }
-                }
-                if (!flushFlag && null != tableException) {
-                    LOG.info("Put tableIdentifier:{} exception:{}",
-                            tableIdentifier, tableException.getMessage());
-                    tableExceptionMap.put(tableIdentifier, tableException);
+                    LOG.warn("Flush one record tableIdentifier:{} ,get err:",
+                            tableIdentifier, e);
+                    outputMetrics(tableIdentifier, 1L, totalDataSize, true);
                     handleDirtyData(record, tableIdentifier, DirtyType.UNDEFINED, tableException);
                 }
-                outputMetrics(tableIdentifier, 1, totalDataSize, !flushFlag);
             }
         }
         tableIdRecordList.clear();
