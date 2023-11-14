@@ -32,6 +32,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.DeserializationFeature;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
@@ -52,6 +54,10 @@ public class MetaDataUtils {
 
     private static final String FORMAT_PRECISION = "%s(%d)";
     private static final String FORMAT_PRECISION_SCALE = "%s(%d, %d)";
+
+    static {
+        OBJECT_MAPPER.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
+    }
 
     /**
      * get sql type from table schema, represents the jdbc data type

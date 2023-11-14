@@ -26,6 +26,7 @@ import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.shaded.guava18.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.DeserializationFeature;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.table.api.ValidationException;
@@ -180,6 +181,10 @@ public abstract class JsonDynamicSchemaFormat extends AbstractDynamicSchemaForma
     public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     protected final JsonToRowDataConverters rowDataConverters;
     protected final boolean adaptSparkEngine;
+
+    static {
+        OBJECT_MAPPER.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
+    }
 
     public JsonDynamicSchemaFormat(Map<String, String> properties) {
         ReadableConfig config = Configuration.fromMap(properties);
