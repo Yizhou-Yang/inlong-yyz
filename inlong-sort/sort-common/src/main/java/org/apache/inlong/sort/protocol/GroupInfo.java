@@ -40,6 +40,10 @@ public class GroupInfo implements Serializable {
     private String groupId;
     @JsonProperty("streams")
     private List<StreamInfo> streams;
+    /**
+     * Whether align the type between source and sink, default is true.
+     */
+    private boolean typeAlign = true;
 
     private Map<String, String> properties;
 

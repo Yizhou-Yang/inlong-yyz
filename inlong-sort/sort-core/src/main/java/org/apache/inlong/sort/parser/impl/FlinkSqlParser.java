@@ -25,6 +25,7 @@ import org.apache.flink.table.api.TableEnvironment;
 import org.apache.inlong.sort.configuration.Constants;
 import org.apache.inlong.sort.formats.base.TableFormatUtils;
 import org.apache.inlong.sort.formats.common.ArrayFormatInfo;
+import org.apache.inlong.sort.formats.common.DecimalFormatInfo;
 import org.apache.inlong.sort.formats.common.FormatInfo;
 import org.apache.inlong.sort.formats.common.MapFormatInfo;
 import org.apache.inlong.sort.formats.common.RowFormatInfo;
@@ -262,7 +263,7 @@ public class FlinkSqlParser implements Parser {
         }
         if (node instanceof ExtractNode) {
             log.info("start parse node, node id:{}", node.getId());
-            String sql = genCreateSql(node);
+            String sql = genCreateSql(node, relation, nodeMap);
             log.info("node id:{}, create table sql:\n{}", node.getId(), maskSensitiveMessage(sql));
             registerTableSql(node, sql);
             hasParsedSet.add(node.getId());
@@ -278,13 +279,13 @@ public class FlinkSqlParser implements Parser {
             }
 
             if (node instanceof LoadNode) {
-                String createSql = genCreateSql(node);
-                log.info("node id:{}, create table sql:\n{}", node.getId(), maskSensitiveMessage(createSql));
-                registerTableSql(node, createSql);
                 LoadNode loadNode = (LoadNode) node;
                 String insertSql = genLoadNodeInsertSql(loadNode, relation, nodeMap);
                 log.info("node id:{}, insert sql:\n{}", node.getId(), insertSql);
                 insertSqls.add(insertSql);
+                String createSql = genCreateSql(node, relation, nodeMap);
+                log.info("node id:{}, create table sql:\n{}", node.getId(), maskSensitiveMessage(createSql));
+                registerTableSql(node, createSql);
                 hasParsedSet.add(node.getId());
             } else if (node instanceof TransformNode) {
                 TransformNode transformNode = (TransformNode) node;
@@ -292,7 +293,7 @@ public class FlinkSqlParser implements Parser {
                         "field relations is null");
                 Preconditions.checkState(!transformNode.getFieldRelations().isEmpty(),
                         "field relations is empty");
-                String createSql = genCreateSql(node);
+                String createSql = genCreateSql(node, relation, nodeMap);
                 log.info("node id:{}, create table sql:\n{}", node.getId(), maskSensitiveMessage(createSql));
                 String selectSql = genTransformSelectSql(transformNode, relation, nodeMap);
                 log.info("node id:{}, transform sql:\n{}", node.getId(), maskSensitiveMessage(selectSql));
@@ -744,18 +745,22 @@ public class FlinkSqlParser implements Parser {
      * @param node The abstract of extract, transform, load
      * @return The creation sql pf table
      */
-    private String genCreateSql(Node node) {
+    private String genCreateSql(Node node, NodeRelation relation, Map<String, Node> nodeMap) {
         if (node instanceof TransformNode) {
             return genCreateTransformSql(node);
         }
         if (node instanceof HbaseLoadNode) {
-            return genCreateHbaseLoadSql((HbaseLoadNode) node);
+            return genCreateHbaseLoadSql((HbaseLoadNode) node, relation, nodeMap);
         }
         StringBuilder sb = new StringBuilder("CREATE TABLE `");
         sb.append(node.genTableName()).append("`(\n");
         String filterPrimaryKey = getFilterPrimaryKey(node);
         sb.append(genPrimaryKey(node.getPrimaryKey(), filterPrimaryKey));
-        sb.append(parseFields(node.getFields(), node, filterPrimaryKey));
+        if(node instanceof LoadNode){
+            sb.append(parseFields(node.getFields(), (LoadNode) node, filterPrimaryKey, relation, nodeMap));
+        }else{
+            sb.append(parseFields(node.getFields(), node, filterPrimaryKey));
+        }
         if (node instanceof ExtractNode) {
             ExtractNode extractNode = (ExtractNode) node;
             if (extractNode.getWatermarkField() != null) {
@@ -787,20 +792,38 @@ public class FlinkSqlParser implements Parser {
     /**
      * Gen create table DDL for hbase load
      */
-    private String genCreateHbaseLoadSql(HbaseLoadNode node) {
+    private String genCreateHbaseLoadSql(HbaseLoadNode node, NodeRelation relation, Map<String, Node> nodeMap) {
         StringBuilder sb = new StringBuilder("CREATE TABLE `");
         sb.append(node.genTableName()).append("`(\n");
         sb.append("rowkey STRING,\n");
-
+        Map<String, FormatInfo> typeAlignMap = new HashMap<>();
+        for(String inputId: relation.getInputs()){
+            Node inputNode = nodeMap.get(inputId);
+            if(inputNode != null){
+                for(FieldInfo field: inputNode.getFields()){
+                    if(field.getFormatInfo() != null && field.getFormatInfo() instanceof DecimalFormatInfo){
+                        typeAlignMap.put(field.getName(),
+                                mergeType(field.getFormatInfo(), typeAlignMap.get(field.getName())));
+                    }
+                }
+            }
+        }
+        Map<String, FieldInfo> fieldMap = new HashMap<>();
+        node.getFields().forEach(s -> fieldMap.put(s.getName(), s));
         Map<String, List<FieldRelation>> columnFamilyMapFields = genColumnFamilyMapFieldRelations(
                 node.getFieldRelations());
         for (Map.Entry<String, List<FieldRelation>> entry : columnFamilyMapFields.entrySet()) {
             sb.append(entry.getKey());
             StringBuilder fieldsAppend = new StringBuilder(" Row<");
             for (FieldRelation fieldRelation : entry.getValue()) {
+                FormatInfo formatInfo = fieldRelation.getOutputField().getFormatInfo();
+                if(groupInfo.isTypeAlign() && formatInfo instanceof DecimalFormatInfo){
+                    formatInfo = mergeType(formatInfo, fieldMap.get(fieldRelation.getOutputField().getName()).getFormatInfo());
+                    String inputFieldName = fieldRelation.getInputField() == null?null:fieldRelation.getInputField().getName();
+                    formatInfo = mergeType(formatInfo, typeAlignMap.get(inputFieldName));
+                }
                 fieldsAppend.append(fieldRelation.getOutputField().getName().split(":")[1]).append(" ")
-                        .append(TableFormatUtils.deriveLogicalType(fieldRelation.getOutputField().getFormatInfo())
-                                .asSummaryString())
+                        .append(TableFormatUtils.deriveLogicalType(formatInfo).asSummaryString())
                         .append(",");
             }
             if (fieldsAppend.length() > 0) {
@@ -875,6 +898,64 @@ public class FlinkSqlParser implements Parser {
             sb.delete(sb.lastIndexOf(","), sb.length());
         }
         return sb.toString();
+    }
+
+    /**
+     * Parse fields
+     *
+     * @param fields The fields defined in node
+     * @param node The abstract of extract, transform, load
+     * @param filterPrimaryKey filter PrimaryKey, use for mongo
+     * @return Field formats in select sql
+     */
+    private String parseFields(List<FieldInfo> fields, LoadNode node, String filterPrimaryKey,
+            NodeRelation relation, Map<String, Node> nodeMap) {
+        if(!groupInfo.isTypeAlign()){
+            return parseFields(fields, node, filterPrimaryKey);
+        }
+        Map<String, FormatInfo> typeAlignMap = new HashMap<>();
+        for(String inputId: relation.getInputs()){
+            Node inputNode = nodeMap.get(inputId);
+            if(inputNode != null){
+                for(FieldInfo field: inputNode.getFields()){
+                    if(field.getFormatInfo() != null && field.getFormatInfo() instanceof DecimalFormatInfo){
+                        typeAlignMap.put(field.getName(),
+                                mergeType(field.getFormatInfo(), typeAlignMap.get(field.getName())));
+                    }
+                }
+            }
+        }
+        Map<String, String> inputFieldMap = new HashMap<>();
+        node.getFieldRelations().forEach(s -> inputFieldMap.put(s.getOutputField().getName(),
+                s.getInputField()==null?null:s.getInputField().getName()));
+        StringBuilder sb = new StringBuilder();
+        for (FieldInfo field : fields) {
+            if (StringUtils.isNotBlank(filterPrimaryKey) && field.getName().equals(filterPrimaryKey)) {
+                continue;
+            }
+            sb.append("    `").append(field.getName()).append("` ");
+            if(field.getFormatInfo() instanceof  DecimalFormatInfo){
+                sb.append(TableFormatUtils.deriveLogicalType(mergeType(field.getFormatInfo(),
+                        typeAlignMap.get(inputFieldMap.get(field.getName())))).asSummaryString());
+            }else{
+                sb.append(TableFormatUtils.deriveLogicalType(field.getFormatInfo()).asSummaryString());
+            }
+            sb.append(",\n");
+        }
+        if (sb.length() > 0) {
+            sb.delete(sb.lastIndexOf(","), sb.length());
+        }
+        return sb.toString();
+    }
+
+    private FormatInfo mergeType(FormatInfo t, FormatInfo o){
+        if(!(o instanceof DecimalFormatInfo)){
+            return t;
+        }
+        DecimalFormatInfo tt = (DecimalFormatInfo) t;
+        DecimalFormatInfo oo = (DecimalFormatInfo) o;
+        return new DecimalFormatInfo(Math.max(tt.getPrecision(), oo.getPrecision()),
+                Math.max(tt.getScale(),oo.getScale()));
     }
 
     /**
