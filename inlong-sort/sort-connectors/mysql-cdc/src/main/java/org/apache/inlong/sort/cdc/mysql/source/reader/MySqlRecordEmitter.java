@@ -118,7 +118,7 @@ public final class MySqlRecordEmitter<T>
     @Override
     public void emitRecord(SourceRecord element, SourceOutput<T> output, MySqlSplitState splitState)
             throws Exception {
-
+        LOG.debug("the source element: {}", element);
         if (isWatermarkEvent(element)) {
             BinlogOffset watermark = getWatermark(element);
             if (isHighWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
@@ -170,11 +170,8 @@ public final class MySqlRecordEmitter<T>
                     splitState.getMySQLSplit().getTableSchemas();
             final TableChange tableSchema =
                     tableSchemas.getOrDefault(RecordUtils.getTableId(element), null);
-
             updateSnapshotRecord(element, splitState);
-
             parseDataSourceName(element);
-
             outputElement(element, output, tableSchema);
         } else if (isHeartbeatEvent(element)) {
             updateStartingOffsetForSplit(splitState, element);

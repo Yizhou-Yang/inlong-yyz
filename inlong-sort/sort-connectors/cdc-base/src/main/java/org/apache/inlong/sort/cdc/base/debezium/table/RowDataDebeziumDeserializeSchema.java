@@ -394,8 +394,7 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 
             @Override
             public Object convert(Object dbzObj, Schema schema) {
-                BigDecimal bigDecimal;
-                if (dbzObj instanceof byte[]) {
+                BigDecimal bigDecimal;if (dbzObj instanceof byte[]) {
                     // decimal.handling.mode=precise
                     bigDecimal = Decimal.toLogical(schema, (byte[]) dbzObj);
                 } else if (dbzObj instanceof String) {
@@ -669,20 +668,20 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
                 fieldValue = LocalDateTime.ofInstant(instantTime, ZONE_UTC).toString();
                 break;
             case Decimal.LOGICAL_NAME:
-//                if (fieldSchema.parameters() != null) {
-//                    // Convert to string when the decimal precision is bigger than 38 or the scale is bigger than
-//                    // preciion
-//                    int precision =
-//                            Integer.parseInt(fieldSchema.parameters().getOrDefault("connect.decimal.precision", "0"));
-//                    int scale = Integer.parseInt(fieldSchema.parameters().getOrDefault("scale", "0"));
-//                    if (precision > DecimalType.MAX_PRECISION || scale > precision) {
-//                        if (fieldValue instanceof BigDecimal) {
-//                            fieldValue = ((BigDecimal) fieldValue).toPlainString();
-//                        } else {
-//                            fieldValue = fieldValue.toString();
-//                        }
-//                    }
-//                }
+                // if (fieldSchema.parameters() != null) {
+                // // Convert to string when the decimal precision is bigger than 38 or the scale is bigger than
+                // // preciion
+                // int precision =
+                // Integer.parseInt(fieldSchema.parameters().getOrDefault("connect.decimal.precision", "0"));
+                // int scale = Integer.parseInt(fieldSchema.parameters().getOrDefault("scale", "0"));
+                // if (precision > DecimalType.MAX_PRECISION || scale > precision) {
+                // if (fieldValue instanceof BigDecimal) {
+                // fieldValue = ((BigDecimal) fieldValue).toPlainString();
+                // } else {
+                // fieldValue = fieldValue.toString();
+                // }
+                // }
+                // }
                 break;
             default:
                 LOG.debug("schema {} is not being supported", fieldSchema);

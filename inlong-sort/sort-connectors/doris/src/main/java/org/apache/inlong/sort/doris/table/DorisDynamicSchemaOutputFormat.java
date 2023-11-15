@@ -390,6 +390,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
                     }
                 }
                 Object data = jsonFormat ? valueMap : value.toString();
+                LOG.debug("the data before write into doris: {}", data);
                 List mapData = batchMap.getOrDefault(tableIdentifier, new ArrayList<String>());
                 mapData.add(data);
                 batchMap.putIfAbsent(tableIdentifier, mapData);
@@ -403,6 +404,7 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             batchBytes += ((String) row).getBytes(StandardCharsets.UTF_8).length;
             List mapData = batchMap.getOrDefault(tableIdentifier, new ArrayList<String>());
             mapData.add(row);
+            LOG.debug("the data before write into doris: {}", row);
             batchMap.putIfAbsent(tableIdentifier, mapData);
         } else {
             LOG.error(String.format("The type of element should be 'RowData' or 'String' only., raw data: %s", row));
