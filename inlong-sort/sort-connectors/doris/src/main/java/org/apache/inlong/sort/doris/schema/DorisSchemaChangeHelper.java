@@ -19,6 +19,7 @@ package org.apache.inlong.sort.doris.schema;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.flink.cfg.DorisOptions;
+import org.apache.doris.flink.exception.IllegalArgumentException;
 import org.apache.doris.shaded.org.apache.commons.codec.binary.Base64;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
@@ -61,6 +62,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +70,8 @@ import java.util.Map.Entry;
 import java.util.StringJoiner;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static org.apache.doris.flink.util.ErrorMessages.ILLEGAL_ARGUMENT_MESSAGE;
 
 /**
  * Schema change helper
@@ -100,7 +104,12 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
     }
 
     private boolean checkSupportDecimalV3() {
-        DorisVersion dorisVersion = getDorisVersion();
+        DorisVersion dorisVersion = null;
+        try {
+            dorisVersion = getDorisVersion();
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException(e);
+        }
         if (dorisVersion == null) {
             return false;
         }
@@ -311,8 +320,9 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
         return false;
     }
 
-    private TableSchema getSchema(String database, String table) {
-        String url = String.format(GET_SCHEMA_API, options.getFenodes(), database, table);
+    private TableSchema getSchema(String database, String table) throws IllegalArgumentException {
+        String url = String.format(GET_SCHEMA_API, randomEndpoint(options.getFenodes()), database,
+                table);
         HttpGetEntity httpGet = new HttpGetEntity(url);
         httpGet.setHeader(HttpHeaders.AUTHORIZATION, authHeader());
         return sendRequest(httpGet, r -> {
@@ -345,8 +355,8 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
         });
     }
 
-    private DorisVersion getDorisVersion() {
-        String url = String.format(GET_VERSION_API, options.getFenodes());
+    private DorisVersion getDorisVersion() throws IllegalArgumentException {
+        String url = String.format(GET_VERSION_API, randomEndpoint(options.getFenodes()));
         HttpGetEntity httpGet = new HttpGetEntity(url);
         httpGet.setHeader(HttpHeaders.AUTHORIZATION, authHeader());
         return sendRequest(httpGet, r -> {
@@ -378,8 +388,9 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
     }
 
     private boolean checkLightSchemaChange(String database, String table, String column, boolean dropColumn)
-            throws IOException {
-        String url = String.format(CHECK_LIGHT_SCHEMA_CHANGE_API, options.getFenodes(), database, table);
+            throws IOException, IllegalArgumentException {
+        String url = String.format(CHECK_LIGHT_SCHEMA_CHANGE_API, randomEndpoint(options.getFenodes()), database,
+                table);
         Map<String, Object> param = buildRequestParam(column, dropColumn);
         HttpGetEntity httpGet = new HttpGetEntity(url);
         httpGet.setHeader(HttpHeaders.AUTHORIZATION, authHeader());
@@ -537,5 +548,16 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
             LOGGER.warn("Create database: {} auto failed", database, e);
         }
         return result;
+    }
+
+    public String randomEndpoint(String feNodes) throws IllegalArgumentException {
+        LOGGER.trace("Parse fenodes '{}'.", feNodes);
+        if (StringUtils.isEmpty(feNodes)) {
+            LOGGER.error(ILLEGAL_ARGUMENT_MESSAGE, "fenodes", feNodes);
+            throw new IllegalArgumentException("fenodes", feNodes);
+        }
+        List<String> nodes = Arrays.asList(feNodes.split(","));
+        Collections.shuffle(nodes);
+        return nodes.get(0).trim();
     }
 }
