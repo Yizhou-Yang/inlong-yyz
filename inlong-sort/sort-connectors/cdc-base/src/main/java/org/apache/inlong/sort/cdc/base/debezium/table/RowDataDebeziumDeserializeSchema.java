@@ -394,7 +394,8 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 
             @Override
             public Object convert(Object dbzObj, Schema schema) {
-                BigDecimal bigDecimal;if (dbzObj instanceof byte[]) {
+                BigDecimal bigDecimal;
+                if (dbzObj instanceof byte[]) {
                     // decimal.handling.mode=precise
                     bigDecimal = Decimal.toLogical(schema, (byte[]) dbzObj);
                 } else if (dbzObj instanceof String) {

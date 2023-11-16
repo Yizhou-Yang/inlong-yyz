@@ -756,9 +756,9 @@ public class FlinkSqlParser implements Parser {
         sb.append(node.genTableName()).append("`(\n");
         String filterPrimaryKey = getFilterPrimaryKey(node);
         sb.append(genPrimaryKey(node.getPrimaryKey(), filterPrimaryKey));
-        if(node instanceof LoadNode){
+        if (node instanceof LoadNode) {
             sb.append(parseFields(node.getFields(), (LoadNode) node, filterPrimaryKey, relation, nodeMap));
-        }else{
+        } else {
             sb.append(parseFields(node.getFields(), node, filterPrimaryKey));
         }
         if (node instanceof ExtractNode) {
@@ -797,11 +797,11 @@ public class FlinkSqlParser implements Parser {
         sb.append(node.genTableName()).append("`(\n");
         sb.append("rowkey STRING,\n");
         Map<String, FormatInfo> typeAlignMap = new HashMap<>();
-        for(String inputId: relation.getInputs()){
+        for (String inputId : relation.getInputs()) {
             Node inputNode = nodeMap.get(inputId);
-            if(inputNode != null){
-                for(FieldInfo field: inputNode.getFields()){
-                    if(field.getFormatInfo() != null && field.getFormatInfo() instanceof DecimalFormatInfo){
+            if (inputNode != null) {
+                for (FieldInfo field : inputNode.getFields()) {
+                    if (field.getFormatInfo() != null && field.getFormatInfo() instanceof DecimalFormatInfo) {
                         typeAlignMap.put(field.getName(),
                                 mergeType(field.getFormatInfo(), typeAlignMap.get(field.getName())));
                     }
@@ -817,9 +817,11 @@ public class FlinkSqlParser implements Parser {
             StringBuilder fieldsAppend = new StringBuilder(" Row<");
             for (FieldRelation fieldRelation : entry.getValue()) {
                 FormatInfo formatInfo = fieldRelation.getOutputField().getFormatInfo();
-                if(groupInfo.isTypeAlign() && formatInfo instanceof DecimalFormatInfo){
-                    formatInfo = mergeType(formatInfo, fieldMap.get(fieldRelation.getOutputField().getName()).getFormatInfo());
-                    String inputFieldName = fieldRelation.getInputField() == null?null:fieldRelation.getInputField().getName();
+                if (groupInfo.isTypeAlign() && formatInfo instanceof DecimalFormatInfo) {
+                    formatInfo = mergeType(formatInfo,
+                            fieldMap.get(fieldRelation.getOutputField().getName()).getFormatInfo());
+                    String inputFieldName =
+                            fieldRelation.getInputField() == null ? null : fieldRelation.getInputField().getName();
                     formatInfo = mergeType(formatInfo, typeAlignMap.get(inputFieldName));
                 }
                 fieldsAppend.append(fieldRelation.getOutputField().getName().split(":")[1]).append(" ")
@@ -910,15 +912,15 @@ public class FlinkSqlParser implements Parser {
      */
     private String parseFields(List<FieldInfo> fields, LoadNode node, String filterPrimaryKey,
             NodeRelation relation, Map<String, Node> nodeMap) {
-        if(!groupInfo.isTypeAlign()){
+        if (!groupInfo.isTypeAlign()) {
             return parseFields(fields, node, filterPrimaryKey);
         }
         Map<String, FormatInfo> typeAlignMap = new HashMap<>();
-        for(String inputId: relation.getInputs()){
+        for (String inputId : relation.getInputs()) {
             Node inputNode = nodeMap.get(inputId);
-            if(inputNode != null){
-                for(FieldInfo field: inputNode.getFields()){
-                    if(field.getFormatInfo() != null && field.getFormatInfo() instanceof DecimalFormatInfo){
+            if (inputNode != null) {
+                for (FieldInfo field : inputNode.getFields()) {
+                    if (field.getFormatInfo() != null && field.getFormatInfo() instanceof DecimalFormatInfo) {
                         typeAlignMap.put(field.getName(),
                                 mergeType(field.getFormatInfo(), typeAlignMap.get(field.getName())));
                     }
@@ -927,17 +929,17 @@ public class FlinkSqlParser implements Parser {
         }
         Map<String, String> inputFieldMap = new HashMap<>();
         node.getFieldRelations().forEach(s -> inputFieldMap.put(s.getOutputField().getName(),
-                s.getInputField()==null?null:s.getInputField().getName()));
+                s.getInputField() == null ? null : s.getInputField().getName()));
         StringBuilder sb = new StringBuilder();
         for (FieldInfo field : fields) {
             if (StringUtils.isNotBlank(filterPrimaryKey) && field.getName().equals(filterPrimaryKey)) {
                 continue;
             }
             sb.append("    `").append(field.getName()).append("` ");
-            if(field.getFormatInfo() instanceof  DecimalFormatInfo){
+            if (field.getFormatInfo() instanceof DecimalFormatInfo) {
                 sb.append(TableFormatUtils.deriveLogicalType(mergeType(field.getFormatInfo(),
                         typeAlignMap.get(inputFieldMap.get(field.getName())))).asSummaryString());
-            }else{
+            } else {
                 sb.append(TableFormatUtils.deriveLogicalType(field.getFormatInfo()).asSummaryString());
             }
             sb.append(",\n");
@@ -948,14 +950,14 @@ public class FlinkSqlParser implements Parser {
         return sb.toString();
     }
 
-    private FormatInfo mergeType(FormatInfo t, FormatInfo o){
-        if(!(o instanceof DecimalFormatInfo)){
+    private FormatInfo mergeType(FormatInfo t, FormatInfo o) {
+        if (!(o instanceof DecimalFormatInfo)) {
             return t;
         }
         DecimalFormatInfo tt = (DecimalFormatInfo) t;
         DecimalFormatInfo oo = (DecimalFormatInfo) o;
         return new DecimalFormatInfo(Math.max(tt.getPrecision(), oo.getPrecision()),
-                Math.max(tt.getScale(),oo.getScale()));
+                Math.max(tt.getScale(), oo.getScale()));
     }
 
     /**
