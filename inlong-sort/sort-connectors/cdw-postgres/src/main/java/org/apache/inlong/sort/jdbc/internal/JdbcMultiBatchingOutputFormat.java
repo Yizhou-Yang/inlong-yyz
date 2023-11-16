@@ -29,7 +29,6 @@ import org.apache.inlong.sort.base.schema.SchemaChangeHandleException;
 import org.apache.inlong.sort.jdbc.dialect.PostgresDialect;
 import org.apache.inlong.sort.jdbc.options.JdbcExecutionOptions;
 import org.apache.flink.connector.jdbc.internal.connection.JdbcConnectionProvider;
-import org.apache.flink.connector.jdbc.internal.connection.SimpleJdbcConnectionProvider;
 import org.apache.flink.connector.jdbc.internal.converter.JdbcRowConverter;
 import org.apache.flink.connector.jdbc.internal.executor.JdbcBatchStatementExecutor;
 import org.apache.flink.connector.jdbc.internal.executor.TableBufferReducedStatementExecutor;
@@ -149,7 +148,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
     private transient RuntimeContext runtimeContext;
     private transient JsonDynamicSchemaFormat jsonDynamicSchemaFormat;
     private transient Map<String, JdbcExec> jdbcExecMap = new ConcurrentHashMap<>();
-    private transient Map<String, SimpleJdbcConnectionProvider> connectionExecProviderMap = new ConcurrentHashMap<>();
+    private transient Map<String, Connection> connectionExecProviderMap = new ConcurrentHashMap<>();
     private transient Map<String, RowType> rowTypeMap = new ConcurrentHashMap<>();
     private transient Map<String, List<String>> pkNameMap = new ConcurrentHashMap<>();
     private transient Map<String, List<GenericRowData>> recordsMap = new HashMap<>();
@@ -351,11 +350,10 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         jdbcExec = statementExecutorFactory.apply(getRuntimeContext());
         try {
             JdbcOptions jdbcExecOptions = JdbcMultiBatchingComm.getExecJdbcOptions(jdbcOptions, tableIdentifier);
-            SimpleJdbcConnectionProvider tableConnectionProvider = new SimpleJdbcConnectionProvider(jdbcExecOptions);
             Connection connection = null;
+            // initial jdbc url has bits, change it to boolean
+            String urlWithBoolean = jdbcExecOptions.getDbURL() + "?tinyInt1isBit=false";
             try {
-                // initial jdbc url has bits, change it to boolean
-                String urlWithBoolean = jdbcExecOptions.getDbURL() + "?tinyInt1isBit=false";
                 connection = DriverManager.getConnection(
                         urlWithBoolean,
                         jdbcExecOptions.getUsername().orElse(null),
@@ -363,12 +361,15 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             } catch (SQLException e) {
                 LOG.error("unable to open JDBC writer, tableIdentifier:{} err:", tableIdentifier, e);
                 if (helper.handleResourceNotExists(tableIdentifier, e)) {
-                    tableConnectionProvider.reestablishConnection();
+                    connection = DriverManager.getConnection(
+                            urlWithBoolean,
+                            jdbcExecOptions.getUsername().orElse(null),
+                            jdbcExecOptions.getPassword().orElse(null));
                 } else {
                     return null;
                 }
             }
-            connectionExecProviderMap.put(tableIdentifier, tableConnectionProvider);
+            connectionExecProviderMap.put(tableIdentifier, connection);
             if (schemaUpdateExceptionPolicy.equals(SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE)) {
                 try {
                     JdbcExec newExecutor = enhanceExecutor(jdbcExec, tableIdentifier);
@@ -381,6 +382,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             }
             jdbcExec.prepareStatements(connection);
         } catch (Exception e) {
+            LOG.error("Failed to create connection", e);
             return null;
         }
         jdbcExecMap.put(tableIdentifier, jdbcExec);
@@ -804,7 +806,16 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         boolean hasExecuteBatch = false;
         long totalDataSize = 0L;
         try {
+            // Force check if the connection is valid, and if not, it will recreate
+            // the connection.
+            boolean updated = recreateExecutorIfClose(tableIdentifier);
+            if (updated) {
+                LOG.warn("Recreate connection and executor when flushing table {}", tableIdentifier);
+            }
+
             jdbcStatementExecutor = getOrCreateStatementExecutor(tableIdentifier);
+            checkNotNull(jdbcStatementExecutor, "executor of " + tableIdentifier + "is null");
+
             for (GenericRowData record : tableIdRecordList) {
                 totalDataSize = totalDataSize + record.toString().getBytes(StandardCharsets.UTF_8).length;
                 jdbcStatementExecutor.addToBatch((JdbcIn) record);
@@ -822,7 +833,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
                 try {
                     outputMetrics(tableIdRecordList.size(), tableIdentifier);
                 } catch (Exception e) {
-                    LOG.error("dirty metric calculation exception:{}", e);
+                    LOG.error("dirty metric calculation exception", e);
                     outputMetrics(tableIdentifier, (long) tableIdRecordList.size(),
                             totalDataSize, false);
                 }
@@ -1011,7 +1022,7 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
             }
 
             if (flushExecutorService != null) {
-                flushExecutorService.shutdown();
+                flushExecutorService.shutdownNow();
                 flushExecutorService = null;
             }
         }
@@ -1035,11 +1046,39 @@ public class JdbcMultiBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatc
         return false;
     }
 
+    public boolean recreateExecutorIfClose(String tableIdentifier) {
+        try {
+            Connection connection = connectionExecProviderMap.get(tableIdentifier);
+            if (null == connection
+                    || !connection.isValid(jdbcOptions.getConnectionCheckTimeoutSeconds())) {
+                if (connection != null) {
+                    try {
+                        connection.close();
+                    } catch (Exception e) {
+                        LOG.warn("Exception thrown on closing stale connection", e);
+                    }
+                }
+
+                JdbcExec tableJdbcExec = jdbcExecMap.get(tableIdentifier);
+                if (null != tableJdbcExec) {
+                    tableJdbcExec.closeStatements();
+                    jdbcExecMap.remove(tableIdentifier);
+                    getOrCreateStatementExecutor(tableIdentifier);
+                    return true;
+                }
+            }
+        } catch (SQLException | IOException e) {
+            LOG.error("jdbcExec recreateExecutorIfClose get err", e);
+        }
+
+        return false;
+    }
+
     public void updateOneExecutor(boolean reconnect, String tableIdentifier) {
         try {
-            SimpleJdbcConnectionProvider tableConnectionProvider = connectionExecProviderMap.get(tableIdentifier);
-            if (reconnect || null == tableConnectionProvider
-                    || !tableConnectionProvider.isConnectionValid()) {
+            Connection connection = connectionExecProviderMap.get(tableIdentifier);
+            if (reconnect || null == connection
+                    || !connection.isValid(jdbcOptions.getConnectionCheckTimeoutSeconds())) {
                 JdbcExec tableJdbcExec = jdbcExecMap.get(tableIdentifier);
                 if (null != tableJdbcExec) {
                     tableJdbcExec.closeStatements();
