@@ -921,7 +921,8 @@ public class FlinkSqlParser implements Parser {
             Node inputNode = nodeMap.get(inputId);
             if (inputNode != null) {
                 for (FieldInfo field : inputNode.getFields()) {
-                    if (field.getFormatInfo() != null && field.getFormatInfo() instanceof DecimalFormatInfo) {
+                    if (field.getFormatInfo() != null && !(field instanceof MetaFieldInfo)
+                            && field.getFormatInfo() instanceof DecimalFormatInfo) {
                         typeAlignMap.put(field.getName(),
                                 mergeType(field.getFormatInfo(), typeAlignMap.get(field.getName())));
                     }
@@ -939,11 +940,25 @@ public class FlinkSqlParser implements Parser {
                 continue;
             }
             sb.append("    `").append(field.getName()).append("` ");
-            if (field.getFormatInfo() instanceof DecimalFormatInfo) {
-                sb.append(TableFormatUtils.deriveLogicalType(mergeType(field.getFormatInfo(),
-                        typeAlignMap.get(inputFieldMap.get(field.getName())))).asSummaryString());
+            if (field instanceof MetaFieldInfo) {
+                if (!(node instanceof Metadata)) {
+                    throw new IllegalArgumentException(String.format("Node: %s is not instance of Metadata",
+                            node.getClass().getSimpleName()));
+                }
+                MetaFieldInfo metaFieldInfo = (MetaFieldInfo) field;
+                Metadata metadataNode = (Metadata) node;
+                if (!metadataNode.supportedMetaFields().contains(metaFieldInfo.getMetaField())) {
+                    throw new UnsupportedOperationException(String.format("Unsupported meta field for %s: %s",
+                            metadataNode.getClass().getSimpleName(), metaFieldInfo.getMetaField()));
+                }
+                sb.append(metadataNode.format(metaFieldInfo.getMetaField()));
             } else {
-                sb.append(TableFormatUtils.deriveLogicalType(field.getFormatInfo()).asSummaryString());
+                FormatInfo formatInfo = field.getFormatInfo();
+                if (formatInfo instanceof DecimalFormatInfo) {
+                    formatInfo = mergeType(field.getFormatInfo(),
+                            typeAlignMap.get(inputFieldMap.get(field.getName())));
+                }
+                sb.append(TableFormatUtils.deriveLogicalType(formatInfo).asSummaryString());
             }
             sb.append(",\n");
         }
