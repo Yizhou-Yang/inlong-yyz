@@ -817,7 +817,8 @@ public class FlinkSqlParser implements Parser {
             StringBuilder fieldsAppend = new StringBuilder(" Row<");
             for (FieldRelation fieldRelation : entry.getValue()) {
                 FormatInfo formatInfo = fieldRelation.getOutputField().getFormatInfo();
-                if (groupInfo.isTypeAlign() && formatInfo instanceof DecimalFormatInfo) {
+                if (groupInfo.isTypeAlign() && formatInfo instanceof DecimalFormatInfo
+                        && fieldRelation.getInputField() instanceof FieldInfo) {
                     formatInfo = mergeType(formatInfo,
                             fieldMap.get(fieldRelation.getOutputField().getName()).getFormatInfo());
                     String inputFieldName =
@@ -929,7 +930,9 @@ public class FlinkSqlParser implements Parser {
         }
         Map<String, String> inputFieldMap = new HashMap<>();
         node.getFieldRelations().forEach(s -> inputFieldMap.put(s.getOutputField().getName(),
-                s.getInputField() == null ? null : s.getInputField().getName()));
+                s.getInputField() == null || !(s.getInputField() instanceof FieldInfo)
+                        ? null
+                        : s.getInputField().getName()));
         StringBuilder sb = new StringBuilder();
         for (FieldInfo field : fields) {
             if (StringUtils.isNotBlank(filterPrimaryKey) && field.getName().equals(filterPrimaryKey)) {
