@@ -385,7 +385,6 @@ public enum OracleReadableMetaData {
         Map<String, Object> field = (Map<String, Object>) rowData.getField(0);
         try {
             List<Map<String, Object>> dataList = new ArrayList<>();
-            dataList.add(field);
             CanalJson canalJson = CanalJson.builder()
                     .data(dataList).database(databaseName).schema(schemaName)
                     .es(opTs).pkNames(getPkNames(tableSchema))
@@ -473,7 +472,7 @@ public enum OracleReadableMetaData {
             } else {
                 if (column.jdbcType() == OracleTypes.INTERVALYM) {
                     oracleType.put(column.name(),
-                            String.format(FORMAT_PRECISION, column.typeName(),Integer.MAX_VALUE));
+                            String.format(FORMAT_PRECISION, column.typeName(), Integer.MAX_VALUE));
                 } else {
                     oracleType.put(
                             column.name(),
