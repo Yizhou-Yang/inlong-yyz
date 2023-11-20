@@ -274,6 +274,9 @@ public class OperationUtils {
         table.columns()
                 .forEach(
                         column -> {
+                            if (column.jdbcType() == 4 && column.typeName() == null) {
+                                sqlType.put(column.name(), Types.BLOB);
+                            }
                             if (column.jdbcType() == Types.NUMERIC
                                     && tableSchema.getTable().isPrimaryKeyColumn(column.name())
                                     && column.scale().orElse(0) == 0) {
@@ -285,6 +288,10 @@ public class OperationUtils {
                                 sqlType.put(column.name(), Types.DOUBLE);
                             } else if (column.jdbcType() == OracleTypes.BFILE) {
                                 sqlType.put(column.name(), Types.VARBINARY);
+                            } else if (column.jdbcType() == OracleTypes.INTERVALYM) {
+                                sqlType.put(column.name(), Types.BLOB);
+                            } else if (column.jdbcType() == OracleTypes.TIMESTAMPLTZ) {
+                                sqlType.put(column.name(), Types.TIMESTAMP);
                             } else {
                                 sqlType.put(column.name(), column.jdbcType());
                             }

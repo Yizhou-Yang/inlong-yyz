@@ -31,6 +31,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+
+import oracle.jdbc.OracleTypes;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.GenericMapData;
@@ -457,8 +459,8 @@ public enum OracleReadableMetaData {
         final Table table = tableSchema.getTable();
         for (Column column : table.columns()) {
             // The typeName contains precision and does not need to be formatted.
-            if (column.typeName().matches(REGEX_FORMATTED)) {
-                oracleType.put(column.name(), column.typeName());
+            if (column.typeName() == null || column.typeName().matches(REGEX_FORMATTED)) {
+                oracleType.put(column.name(), column.typeName() == null ? "" : column.typeName());
                 continue;
             }
             if (column.scale().isPresent()) {
@@ -467,9 +469,14 @@ public enum OracleReadableMetaData {
                         String.format(FORMAT_PRECISION_SCALE,
                                 column.typeName(), column.length(), column.scale().get()));
             } else {
-                oracleType.put(
-                        column.name(),
-                        String.format(FORMAT_PRECISION, column.typeName(), column.length()));
+                if (column.jdbcType() == OracleTypes.INTERVALYM) {
+                    oracleType.put(column.name(),
+                            String.format(FORMAT_PRECISION, column.typeName(),Integer.MAX_VALUE));
+                } else {
+                    oracleType.put(
+                            column.name(),
+                            String.format(FORMAT_PRECISION, column.typeName(), column.length()));
+                }
             }
         }
         return oracleType;
