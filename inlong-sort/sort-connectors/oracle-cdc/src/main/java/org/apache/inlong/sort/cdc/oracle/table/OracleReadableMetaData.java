@@ -383,32 +383,34 @@ public enum OracleReadableMetaData {
         long opTs = (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY);
         // actual data
         Map<String, Object> field = (Map<String, Object>) rowData.getField(0);
-        List<Map<String, Object>> dataList = new ArrayList<>();
-        dataList.add(field);
-        CanalJson canalJson = CanalJson.builder()
-                .data(dataList).database(databaseName).schema(schemaName)
-                .es(opTs).pkNames(getPkNames(tableSchema))
-                .oracleType(getOracleType(tableSchema))
-                .table(tableName)
-                .type(getOpType(record)).sqlType(getSqlType(tableSchema)).build();
-        if (RecordUtils.isDdlRecord(messageStruct)) {
-            String sql = (String) field.get(DDL_FIELD_NAME);
-            canalJson.setSql(sql);
-            canalJson.setOperation(generateOperation(sql, tableSchema));
-            canalJson.setDdl(true);
-            canalJson.setData(dataList);
-        } else {
-            canalJson.setDdl(false);
-            canalJson.setTs((Long) messageStruct.get(FieldName.TIMESTAMP));
-            dataList.add(field);
-            canalJson.setData(dataList);
-        }
         try {
+            List<Map<String, Object>> dataList = new ArrayList<>();
+            dataList.add(field);
+            CanalJson canalJson = CanalJson.builder()
+                    .data(dataList).database(databaseName).schema(schemaName)
+                    .es(opTs).pkNames(getPkNames(tableSchema))
+                    .oracleType(getOracleType(tableSchema))
+                    .table(tableName)
+                    .type(getOpType(record)).sqlType(getSqlType(tableSchema)).build();
+            if (RecordUtils.isDdlRecord(messageStruct)) {
+                String sql = (String) field.get(DDL_FIELD_NAME);
+                canalJson.setSql(sql);
+                canalJson.setOperation(generateOperation(sql, tableSchema));
+                canalJson.setDdl(true);
+                canalJson.setData(dataList);
+            } else {
+                canalJson.setDdl(false);
+                canalJson.setTs((Long) messageStruct.get(FieldName.TIMESTAMP));
+                dataList.add(field);
+                canalJson.setData(dataList);
+            }
             String jsonStr = OBJECT_MAPPER.writeValueAsString(canalJson);
             LOGGER.debug("The data of source is: {}", jsonStr);
             return StringData.fromString(jsonStr);
         } catch (Exception e) {
-            throw new IllegalStateException("exception occurs when get meta data", e);
+            LOGGER.error("exception occurs when get canal json data, record: {}, table schema: {}, raw data: {}",
+                    record, tableName, field, e);
+            throw new RuntimeException("Get canal json failed", e);
         }
     }
 
