@@ -31,7 +31,7 @@
 
     <properties>
         <debezium.version>1.9.7.Final</debezium.version>
-        <flink.cdc.base.version>2.4.1</flink.cdc.base.version>
+        <flink.cdc.base.version>2.4.2</flink.cdc.base.version>
     </properties>
 
     <dependencies>
