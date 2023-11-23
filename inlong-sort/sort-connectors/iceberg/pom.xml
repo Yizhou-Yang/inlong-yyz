@@ -76,6 +76,11 @@
             <artifactId>sort-common</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.tencent.cloud.oceanus</groupId>
+            <artifactId>oceanus-flink-chdfs-hadoop</artifactId>
+            <version>0.1.4</version>
+        </dependency>
     </dependencies>
 
     <build>
