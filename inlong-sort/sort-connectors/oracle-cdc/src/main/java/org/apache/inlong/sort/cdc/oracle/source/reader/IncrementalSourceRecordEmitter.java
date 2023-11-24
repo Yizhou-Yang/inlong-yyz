@@ -52,6 +52,7 @@ import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getMessa
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isHeartbeatEvent;
 import static org.apache.inlong.sort.cdc.oracle.source.utils.RecordUtils.isSchemaChangeEvent;
+import static org.apache.inlong.sort.cdc.oracle.source.utils.RecordUtils.toSnapshotRecord;
 
 /**
  * The {@link RecordEmitter} implementation for {@link IncrementalSourceReader}.
@@ -128,6 +129,7 @@ public class IncrementalSourceRecordEmitter<T>
                     splitState.getSourceSplitBase().getTableSchemas();
             final TableChange tableSchema =
                     tableSchemas.getOrDefault(RecordUtils.getTableId(element), null);
+            updateSnapshotRecord(element, splitState);
             emitElement(element, splitState, output, tableSchema);
         } else if (isHeartbeatEvent(element)) {
             LOG.trace("Process Heartbeat: {}; splitState = {}", element, splitState);
@@ -136,6 +138,12 @@ public class IncrementalSourceRecordEmitter<T>
             // unknown element
             LOG.info(
                     "Meet unknown element {} for splitState = {}, just skip.", element, splitState);
+        }
+    }
+
+    private void updateSnapshotRecord(SourceRecord element, SourceSplitState splitState) {
+        if (splitState.isSnapshotSplitState()) {
+            toSnapshotRecord(element);
         }
     }
 

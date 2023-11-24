@@ -18,7 +18,9 @@
 package org.apache.inlong.sort.cdc.oracle.source.utils;
 
 import io.debezium.connector.AbstractSourceInfo;
+import io.debezium.connector.SnapshotRecord;
 import io.debezium.data.Envelope;
+import io.debezium.data.Envelope.FieldName;
 import io.debezium.relational.Column;
 import io.debezium.relational.TableId;
 import org.apache.flink.table.types.logical.BigIntType;
@@ -161,4 +163,14 @@ public class RecordUtils {
         return value.schema().field(HISTORY_RECORD_FIELD) != null;
     }
 
+    public static void toSnapshotRecord(SourceRecord element) {
+        Struct messageStruct = (Struct) element.value();
+        Struct sourceStruct = messageStruct.getStruct(FieldName.SOURCE);
+        SnapshotRecord.TRUE.toSource(sourceStruct);
+    }
+
+    public static boolean isSnapshotRecord(Struct sourceStruct) {
+        SnapshotRecord snapshotRecord = SnapshotRecord.fromSource(sourceStruct);
+        return (SnapshotRecord.TRUE == snapshotRecord);
+    }
 }

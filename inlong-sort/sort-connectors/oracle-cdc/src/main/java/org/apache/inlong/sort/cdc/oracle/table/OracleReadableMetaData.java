@@ -53,6 +53,7 @@ import static org.apache.inlong.sort.base.Constants.DDL_FIELD_NAME;
 import static org.apache.inlong.sort.base.format.JsonDynamicSchemaFormat.OBJECT_MAPPER;
 import static org.apache.inlong.sort.cdc.oracle.source.utils.OperationUtils.generateOperation;
 import static org.apache.inlong.sort.cdc.oracle.source.utils.OperationUtils.getSqlType;
+import static org.apache.inlong.sort.cdc.oracle.source.utils.RecordUtils.isSnapshotRecord;
 
 /** Defines the supported metadata columns for {@link OracleTableSource}. */
 public enum OracleReadableMetaData {
@@ -389,6 +390,7 @@ public enum OracleReadableMetaData {
                     .data(dataList).database(databaseName).schema(schemaName)
                     .es(opTs).pkNames(getPkNames(tableSchema))
                     .oracleType(getOracleType(tableSchema))
+                    .incremental(!isSnapshotRecord(sourceStruct))
                     .table(tableName)
                     .type(getOpType(record)).sqlType(getSqlType(tableSchema)).build();
             if (RecordUtils.isDdlRecord(messageStruct)) {

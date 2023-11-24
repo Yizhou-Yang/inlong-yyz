@@ -445,4 +445,11 @@ public final class Constants {
                     .defaultValue(false)
                     .withDescription("Whether include schema change in cdc connector");
 
+    public static final ConfigOption<Boolean> INCLUDE_INCREMENTAL =
+            ConfigOptions.key("include-incremental")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Whether include a incremental flag in data "
+                            + "when migrating all databases");
+
 }
