@@ -32,6 +32,7 @@ import java.util.Map;
 
 import static org.apache.inlong.sort.base.Constants.CURRENT_EMIT_EVENT_TIME_LAG;
 import static org.apache.inlong.sort.base.Constants.CURRENT_FETCH_EVENT_TIME_LAG;
+import static org.apache.inlong.sort.base.Constants.LOG_POSITION;
 import static org.apache.inlong.sort.base.Constants.NUM_BYTES_IN;
 import static org.apache.inlong.sort.base.Constants.NUM_BYTES_IN_FOR_METER;
 import static org.apache.inlong.sort.base.Constants.NUM_BYTES_IN_PER_SECOND;
@@ -66,6 +67,11 @@ public class SourceMetricData implements MetricData {
     private Gauge currentEmitEventTimeLag;
 
     /**
+     * log position only for incrementing data
+     */
+    private Gauge logPosition;
+
+    /**
      * fetchDelay = FetchTime - messageTimestamp, where the FetchTime is the time the
      * record fetched into the source operator.
      */
@@ -76,6 +82,8 @@ public class SourceMetricData implements MetricData {
      * source operator.
      */
     private volatile long emitDelay = 0L;
+
+    private volatile long logPositionValue = 0L;
 
     private AuditOperator auditOperator;
     private List<Integer> auditKeys;
@@ -98,6 +106,7 @@ public class SourceMetricData implements MetricData {
                 registerMetricsForNumRecordsInPerSecond();
                 registerMetricsForCurrentFetchEventTimeLag();
                 registerMetricsForCurrentEmitEventTimeLag();
+                registerMetricsForLogPosition();
                 break;
         }
 
@@ -196,6 +205,10 @@ public class SourceMetricData implements MetricData {
         currentEmitEventTimeLag = registerGauge(CURRENT_EMIT_EVENT_TIME_LAG, (Gauge<Long>) this::getEmitDelay);
     }
 
+    public void registerMetricsForLogPosition() {
+        logPosition = registerGauge(LOG_POSITION, (Gauge<Long>) this::getLogPositionValue);
+    }
+
     public Counter getNumRecordsIn() {
         return numRecordsIn;
     }
@@ -226,6 +239,10 @@ public class SourceMetricData implements MetricData {
 
     public long getEmitDelay() {
         return emitDelay;
+    }
+
+    public long getLogPositionValue() {
+        return logPositionValue;
     }
 
     @Override
@@ -302,6 +319,10 @@ public class SourceMetricData implements MetricData {
         }
     }
 
+    public void recordLogPosition(Long logPositionValue) {
+        this.logPositionValue = logPositionValue;
+    }
+
     private void outputDefaultMetrics(long rowCountSize, long rowDataSize) {
         if (numRecordsIn != null) {
             this.numRecordsIn.inc(rowCountSize);
@@ -339,6 +360,7 @@ public class SourceMetricData implements MetricData {
                 + ", numBytesInPerSecond=" + numBytesInPerSecond.getRate()
                 + ", currentFetchEventTimeLag=" + currentFetchEventTimeLag.getValue()
                 + ", currentEmitEventTimeLag=" + currentEmitEventTimeLag.getValue()
+                + ", logPosition=" + logPosition.getValue()
                 + ", auditOperator=" + auditOperator
                 + '}';
     }

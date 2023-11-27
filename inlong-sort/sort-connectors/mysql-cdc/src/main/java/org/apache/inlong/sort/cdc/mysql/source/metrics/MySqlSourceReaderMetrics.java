@@ -111,6 +111,12 @@ public class MySqlSourceReaderMetrics {
         }
     }
 
+    public void recordLogPosition(Long logPosition) {
+        if (sourceTableMetricData != null) {
+            sourceTableMetricData.recordLogPosition(logPosition);
+        }
+    }
+
     public void initMetrics(long rowCountSize, long rowDataSize, Map<String, Long> readPhaseMetricMap,
             Map<String, MySqlTableMetric> tableMetricMap) {
         if (sourceTableMetricData != null) {
