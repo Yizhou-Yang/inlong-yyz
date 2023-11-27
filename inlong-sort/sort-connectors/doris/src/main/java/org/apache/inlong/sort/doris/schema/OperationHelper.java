@@ -134,14 +134,21 @@ public class OperationHelper {
      * @param alterColumns The list of AlterColumn
      * @return A statement of AddColumn
      */
-    public String buildModifyColumnStatement(List<AlterColumn> alterColumns) {
+    public String buildModifyColumnStatement(List<AlterColumn> alterColumns, RowType rowType, List<RowField> rowFields) {
         LOGGER.info("starting to handle change column statements");
         Preconditions.checkState(alterColumns != null
                 && !alterColumns.isEmpty(), "Alter columns is empty");
-        Iterator<AlterColumn> iterator = alterColumns.iterator();
         StringBuilder sb = new StringBuilder();
-        while (iterator.hasNext()) {
-            AlterColumn expression = iterator.next();
+        //initalize data type map, get logical type from schema, and get data type.
+        Map<String, LogicalType> dataFields = new HashMap<>();
+        if (rowType != null) {
+            for (RowField field : rowType.getFields()) {
+                dataFields.put(field.getName(), field.getType());
+            }
+        }
+
+        for(int i = 0; i< alterColumns.size(); i++){
+            AlterColumn expression = alterColumns.get(i);
             Preconditions.checkNotNull(expression.getNewColumn(), "New column is null");
             Column newColumn = expression.getNewColumn();
             Preconditions.checkState(newColumn.getName() != null && !newColumn.getName().trim().isEmpty(),
@@ -150,15 +157,16 @@ public class OperationHelper {
             // note: can't support change column syntax by combining modify column with a rename, since
             // Alter operation RENAME conflicts with operation SCHEMA_CHANGE
 
+            RowField field = rowFields.get(i);
             // MODIFY COLUMN new_name type
             sb.append("MODIFY COLUMN `").append(newColumn.getName()).append("` ")
-                    .append(convert2DorisType(newColumn.getJdbcType(),
-                            newColumn.isNullable(), newColumn.getDefinition()));
+                    .append(convert2DorisType(field.getType(), dataFields.get(field.getName())));
 
             // TODO: support [KEY | agg_type]
 
             // [DEFAULT "default_value"]
-            if (validDefaultValue(newColumn.getDefaultValue())) {
+            if (newColumn.getDefaultValue() != null && !newColumn.getDefaultValue().trim().isEmpty() && !"NULL"
+                    .equalsIgnoreCase(newColumn.getDefaultValue())) {
                 sb.append(" DEFAULT ").append(quote(newColumn.getDefaultValue()));
             }
 
@@ -176,7 +184,7 @@ public class OperationHelper {
 
             // TODO: support [FROM rollup_index_name]
 
-            if (iterator.hasNext()) {
+            if (i < alterColumns.size() - 1) {
                 sb.append(",");
             }
         }
@@ -210,10 +218,6 @@ public class OperationHelper {
         return sb.toString();
     }
 
-    /**
-
-
-
      /**
      * Build common statement of alter
      *
@@ -225,7 +229,7 @@ public class OperationHelper {
         return "ALTER TABLE `" + database + "`.`" + table + "` ";
     }
 
-    private String builComment(String comment) {
+    private String buildComment(String comment) {
         return "'" + comment.replaceAll("'", "\"") + "'";
     }
 
@@ -246,7 +250,7 @@ public class OperationHelper {
             String columnComment = column.getDescription().orElse(Constants.ADD_COLUMN_COMMENT);
             sb.append("\t`").append(column.getName()).append("` ").append(convert2DorisType(column.getType(),
                     dataTypeMap.get(column.getName())));
-            sb.append(" COMMENT ").append(builComment(columnComment));
+            sb.append(" COMMENT ").append(buildComment(columnComment));
             if (i != fields.length - 1) {
                 sb.append(",\n");
             }
@@ -263,7 +267,7 @@ public class OperationHelper {
         }
         String keys = joiner.toString();
         sb.append(model).append(" KEY(").append(keys).append(")");
-        sb.append("\nCOMMENT ").append(builComment(comment));
+        sb.append("\nCOMMENT ").append(buildComment(comment));
         sb.append("\nDISTRIBUTED BY HASH(").append(keys).append(")");
         // Add light schema change support for it if the version of doris is greater than 1.2.0 or equals 1.2.0
         sb.append("\nPROPERTIES (\n\t\"light_schema_change\" = \"true\"\n)");
@@ -363,7 +367,7 @@ public class OperationHelper {
             sb.append("ADD COLUMN ")
                     .append("`").append(field.getName()).append("` ")
                     .append(convert2DorisType(field.getType(), dataFields.get(field.getName())))
-                    .append(" COMMENT ").append(builComment(comment));
+                    .append(" COMMENT ").append(buildComment(comment));
             if (positionMap.containsKey(field.getName())) {
                 String afterField = positionMap.get(field.getName());
                 if (afterField != null) {

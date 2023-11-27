@@ -154,7 +154,7 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
                             break;
                         case CHANGE_COLUMN_TYPE:
                             alterStatement =
-                                    doChangeColumnType(database, table, kv.getValue(), kv.getKey(), originSchema);
+                                    doChangeColumnType(database, table, kv.getValue(), kv.getKey(), originSchema, rowType);
                             break;
                         default:
                     }
@@ -197,6 +197,46 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
     public String doDropColumn(String database, String table, List<AlterColumn> alterColumns,
             SchemaChangeType type, String originSchema) {
         return operationHelper.buildDropColumnStatement(alterColumns);
+    }
+
+
+    @Override
+    public String doRenameColumn(String database, String table, List<AlterColumn> alterColumns,
+            SchemaChangeType type, String originSchema) {
+        return operationHelper.buildRenameColumnStatement(alterColumns);
+    }
+
+    @Override
+    public String doChangeColumnType(String database, String table, List<AlterColumn> alterColumns,
+            SchemaChangeType type, String originSchema) {
+        Preconditions.checkState(alterColumns != null
+                && !alterColumns.isEmpty(), "Alter columns is empty");
+        Map<String, String> positionMap = new HashMap<>();
+        List<RowField> fields = alterColumns.stream().map(s -> {
+            Column column = s.getNewColumn();
+            Preconditions.checkNotNull(column, "New column is null");
+            Preconditions.checkState(column.getName() != null && !column.getName().trim().isEmpty(),
+                    "The column name is blank");
+            parsePosition(column, positionMap);
+            return convert2RowField(column);
+        }).collect(Collectors.toList());
+        return operationHelper.buildModifyColumnStatement(alterColumns, null, fields);
+    }
+
+    public String doChangeColumnType(String database, String table, List<AlterColumn> alterColumns,
+            SchemaChangeType type, String originSchema, RowType rowType) {
+        Preconditions.checkState(alterColumns != null
+                && !alterColumns.isEmpty(), "Alter columns is empty");
+        Map<String, String> positionMap = new HashMap<>();
+        List<RowField> fields = alterColumns.stream().map(s -> {
+            Column column = s.getNewColumn();
+            Preconditions.checkNotNull(column, "New column is null");
+            Preconditions.checkState(column.getName() != null && !column.getName().trim().isEmpty(),
+                    "The column name is blank");
+            parsePosition(column, positionMap);
+            return convert2RowField(column);
+        }).collect(Collectors.toList());
+        return operationHelper.buildModifyColumnStatement(alterColumns, null, fields);
     }
 
     public String doAddColumn(String database, String table, List<AlterColumn> alterColumns,
