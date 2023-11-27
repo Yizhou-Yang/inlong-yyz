@@ -25,8 +25,12 @@ import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.reformatName
 
 import io.debezium.relational.history.TableChanges.TableChange;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.alter.Alter;
@@ -75,6 +79,7 @@ public class OperationUtils {
             if (endsWithFirst) {
                 sql = removeFirstFlag(sql);
             }
+            sql = clean(sql);
             Statement statement = CCJSqlParserUtil.parse(sql);
             if (statement instanceof Alter) {
                 return parseAlterOperation(
@@ -96,6 +101,26 @@ public class OperationUtils {
         }
         return new UnsupportedOperation();
     }
+
+    /**
+     * remove unparsable parts from the sql
+     * background: ALTER TABLE `id_name` CHANGE COLUMN `name` `name1` text CHARACTER SET `utf8` COLLATE `utf8_bin` NOT NULL
+     * has error since jsql parser can't parse "CHARACTER SET `utf8`".
+     * So, remove this, and possibly other unparsable parts in the future
+     */
+    private static String clean(String sql) {
+        HashSet<String> clausesToRemove = new HashSet<>();
+        clausesToRemove.add("CHARACTER SET");
+        String patternString = "((" + String.join("|", clausesToRemove) + ")\\s+`?[^`\\s]+`?\\s*)+";
+        Pattern pattern = Pattern.compile(patternString, Pattern.CASE_INSENSITIVE);
+
+        // Use the Matcher class to find and remove the clauses from the SQL statement
+        Matcher matcher = pattern.matcher(sql);
+        String cleanedSql = matcher.replaceAll("");
+
+        return cleanedSql;
+    }
+
 
     /**
      * parse alter operation from Alter from sqlParser.

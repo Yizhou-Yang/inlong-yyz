@@ -226,10 +226,10 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
                 Arrays.asList(SchemaChangePolicy.ENABLE, SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
                         SchemaChangePolicy.ERROR));
         SUPPORTS_POLICY_MAP.put(SchemaChangeType.RENAME_COLUMN,
-                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                Arrays.asList(SchemaChangePolicy.ENABLE,SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
                         SchemaChangePolicy.ERROR));
         SUPPORTS_POLICY_MAP.put(SchemaChangeType.CHANGE_COLUMN_TYPE,
-                Arrays.asList(SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
+                Arrays.asList(SchemaChangePolicy.ENABLE,SchemaChangePolicy.IGNORE, SchemaChangePolicy.LOG,
                         SchemaChangePolicy.ERROR));
     }
 

@@ -238,15 +238,13 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
     }
 
     @Override
-    public String doChangeColumnType(String database, String table,
-            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema) {
-        throw new SchemaChangeHandleException(String.format("Unsupported for %s: %s", type, originSchema));
+    private String doChangeColumnType(List<AlterColumn> alterColumns) {
+        return operationHelper.buildModifyColumnStatement(alterColumns);
     }
 
     @Override
-    public String doRenameColumn(String database, String table,
-            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema) {
-        throw new SchemaChangeHandleException(String.format("Unsupported for %s: %s", type, originSchema));
+    private String doRenameColumn(List<AlterColumn> alterColumns) {
+        return operationHelper.buildRenameColumnStatement(alterColumns);
     }
 
     @Override

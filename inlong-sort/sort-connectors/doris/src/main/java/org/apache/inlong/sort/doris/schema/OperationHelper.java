@@ -37,7 +37,10 @@ import org.apache.flink.util.Preconditions;
 import org.apache.inlong.sort.base.Constants;
 import org.apache.inlong.sort.doris.model.TableSchema;
 import org.apache.inlong.sort.protocol.ddl.Column;
+import org.apache.inlong.sort.protocol.ddl.enums.PositionType;
 import org.apache.inlong.sort.protocol.ddl.expressions.AlterColumn;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -50,6 +53,7 @@ import java.util.stream.Collectors;
 
 public class OperationHelper {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(OperationHelper.class);
     private static final String APOSTROPHE = "'";
     private static final String DOUBLE_QUOTES = "\"";
     private final int VARCHAR_MAX_LENGTH = 16383; // The max value is 65533/4;
@@ -124,7 +128,93 @@ public class OperationHelper {
         return sb.toString();
     }
 
+
     /**
+     * Build the statement of AddColumn
+     * @param alterColumns The list of AlterColumn
+     * @return A statement of AddColumn
+     */
+    public String buildModifyColumnStatement(List<AlterColumn> alterColumns) {
+        LOGGER.info("starting to handle change column statements");
+        Preconditions.checkState(alterColumns != null
+                && !alterColumns.isEmpty(), "Alter columns is empty");
+        Iterator<AlterColumn> iterator = alterColumns.iterator();
+        StringBuilder sb = new StringBuilder();
+        while (iterator.hasNext()) {
+            AlterColumn expression = iterator.next();
+            Preconditions.checkNotNull(expression.getNewColumn(), "New column is null");
+            Column newColumn = expression.getNewColumn();
+            Preconditions.checkState(newColumn.getName() != null && !newColumn.getName().trim().isEmpty(),
+                    "The column name is blank");
+            LOGGER.info("handling change column statements" + expression);
+            // note: can't support change column syntax by combining modify column with a rename, since
+            // Alter operation RENAME conflicts with operation SCHEMA_CHANGE
+
+            // MODIFY COLUMN new_name type
+            sb.append("MODIFY COLUMN `").append(newColumn.getName()).append("` ")
+                    .append(convert2DorisType(newColumn.getJdbcType(),
+                            newColumn.isNullable(), newColumn.getDefinition()));
+
+            // TODO: support [KEY | agg_type]
+
+            // [DEFAULT "default_value"]
+            if (validDefaultValue(newColumn.getDefaultValue())) {
+                sb.append(" DEFAULT ").append(quote(newColumn.getDefaultValue()));
+            }
+
+            // [AFTER column_name|FIRST]
+            if (newColumn.getPosition() != null && newColumn.getPosition().getPositionType() != null) {
+                if (newColumn.getPosition().getPositionType() == PositionType.FIRST) {
+                    sb.append(" FIRST");
+                } else if (newColumn.getPosition().getPositionType() == PositionType.AFTER) {
+                    Preconditions.checkState(newColumn.getPosition().getColumnName() != null
+                                    && !newColumn.getPosition().getColumnName().trim().isEmpty(),
+                            "The column name of Position is empty");
+                    sb.append(" AFTER `").append(newColumn.getPosition().getColumnName()).append("`");
+                }
+            }
+
+            // TODO: support [FROM rollup_index_name]
+
+            if (iterator.hasNext()) {
+                sb.append(",");
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Build the statement of RenameColumn
+     *
+     * @param alterColumns The list of AlterColumn
+     * @return A statement of DropColumn
+     */
+    public String buildRenameColumnStatement(List<AlterColumn> alterColumns) {
+        Preconditions.checkState(alterColumns != null
+                && !alterColumns.isEmpty(), "Alter columns is empty");
+        Iterator<AlterColumn> iterator = alterColumns.iterator();
+        StringBuilder sb = new StringBuilder();
+        while (iterator.hasNext()) {
+            AlterColumn expression = iterator.next();
+            Preconditions.checkNotNull(expression.getOldColumn(), "Old column is null");
+            Column oldColumn = expression.getOldColumn();
+            Column newColumn = expression.getNewColumn();
+            Preconditions.checkState(newColumn.getName() != null && !newColumn.getName().trim().isEmpty(),
+                    "The column name is blank");
+            sb.append("RENAME COLUMN `").append(oldColumn.getName()).append("` `").append(newColumn.getName())
+                    .append("`");
+            if (iterator.hasNext()) {
+                sb.append(",");
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+
+
+
+     /**
      * Build common statement of alter
      *
      * @param database The database of Doris
