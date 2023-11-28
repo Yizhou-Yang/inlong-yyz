@@ -154,7 +154,8 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
                             break;
                         case CHANGE_COLUMN_TYPE:
                             alterStatement =
-                                    doChangeColumnType(database, table, kv.getValue(), kv.getKey(), originSchema, rowType);
+                                    doChangeColumnType(database, table, kv.getValue(), kv.getKey(), originSchema,
+                                            rowType);
                             break;
                         default:
                     }
@@ -198,7 +199,6 @@ public class DorisSchemaChangeHelper extends SchemaChangeHelper {
             SchemaChangeType type, String originSchema) {
         return operationHelper.buildDropColumnStatement(alterColumns);
     }
-
 
     @Override
     public String doRenameColumn(String database, String table, List<AlterColumn> alterColumns,

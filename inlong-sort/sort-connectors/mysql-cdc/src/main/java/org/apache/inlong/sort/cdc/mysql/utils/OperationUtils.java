@@ -121,7 +121,6 @@ public class OperationUtils {
         return cleanedSql;
     }
 
-
     /**
      * parse alter operation from Alter from sqlParser.
      * @param statement alter statement

@@ -128,18 +128,18 @@ public class OperationHelper {
         return sb.toString();
     }
 
-
     /**
      * Build the statement of AddColumn
      * @param alterColumns The list of AlterColumn
      * @return A statement of AddColumn
      */
-    public String buildModifyColumnStatement(List<AlterColumn> alterColumns, RowType rowType, List<RowField> rowFields) {
+    public String buildModifyColumnStatement(List<AlterColumn> alterColumns, RowType rowType,
+            List<RowField> rowFields) {
         LOGGER.info("starting to handle change column statements");
         Preconditions.checkState(alterColumns != null
                 && !alterColumns.isEmpty(), "Alter columns is empty");
         StringBuilder sb = new StringBuilder();
-        //initalize data type map, get logical type from schema, and get data type.
+        // initalize data type map, get logical type from schema, and get data type.
         Map<String, LogicalType> dataFields = new HashMap<>();
         if (rowType != null) {
             for (RowField field : rowType.getFields()) {
@@ -147,7 +147,7 @@ public class OperationHelper {
             }
         }
 
-        for(int i = 0; i< alterColumns.size(); i++){
+        for (int i = 0; i < alterColumns.size(); i++) {
             AlterColumn expression = alterColumns.get(i);
             Preconditions.checkNotNull(expression.getNewColumn(), "New column is null");
             Column newColumn = expression.getNewColumn();
@@ -176,7 +176,7 @@ public class OperationHelper {
                     sb.append(" FIRST");
                 } else if (newColumn.getPosition().getPositionType() == PositionType.AFTER) {
                     Preconditions.checkState(newColumn.getPosition().getColumnName() != null
-                                    && !newColumn.getPosition().getColumnName().trim().isEmpty(),
+                            && !newColumn.getPosition().getColumnName().trim().isEmpty(),
                             "The column name of Position is empty");
                     sb.append(" AFTER `").append(newColumn.getPosition().getColumnName()).append("`");
                 }
@@ -218,13 +218,13 @@ public class OperationHelper {
         return sb.toString();
     }
 
-     /**
-     * Build common statement of alter
-     *
-     * @param database The database of Doris
-     * @param table The table of Doris
-     * @return A statement of Alter table
-     */
+    /**
+    * Build common statement of alter
+    *
+    * @param database The database of Doris
+    * @param table The table of Doris
+    * @return A statement of Alter table
+    */
     public String buildAlterStatementCommon(String database, String table) {
         return "ALTER TABLE `" + database + "`.`" + table + "` ";
     }
