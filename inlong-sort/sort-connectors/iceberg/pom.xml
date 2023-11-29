@@ -105,6 +105,7 @@
                                     <include>com.google.protobuf:*</include>
                                     <include>com.amazonaws:*</include>
                                     <include>com.fasterxml.jackson.core:jackson-databind</include>
+                                    <include>com.tencent.cloud.oceanus:oceanus-flink-chdfs-hadoop</include>
                                 </includes>
                             </artifactSet>
                             <filters>

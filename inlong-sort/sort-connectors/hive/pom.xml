@@ -257,6 +257,7 @@
                                     <includes>
                                         <include>org/apache/inlong/**</include>
                                         <include>META-INF/services/org.apache.flink.table.factories.Factory</include>
+                                        <include>com.tencent.cloud.oceanus:oceanus-flink-chdfs-hadoop</include>
                                     </includes>
                                 </filter>
                                 <filter>
