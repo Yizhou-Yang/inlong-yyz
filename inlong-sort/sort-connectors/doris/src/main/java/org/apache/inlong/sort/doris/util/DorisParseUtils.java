@@ -47,6 +47,8 @@ public class DorisParseUtils {
             Pattern.compile(".*errcode = 2, detailmessage = table .* already exists.*", Pattern.DOTALL),
             Pattern.compile(".*errcode = 2, detailmessage = can not add column which already exists in base table:.*",
                     Pattern.DOTALL),
+            Pattern.compile(".*errcode = 2, detailmessage = nothing is changed.*",
+                    Pattern.DOTALL),
             Pattern.compile(".*errcode = 2, detailmessage = can't create database .*; database exists.*",
                     Pattern.DOTALL));
 
