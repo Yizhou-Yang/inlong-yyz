@@ -104,10 +104,9 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
             }
         } catch (Exception e) {
             if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
-                throw new SchemaChangeHandleException(
-                        String.format("Parse database, table from origin data failed, origin data: %s",
-                                new String(originData)),
-                        e);
+                // ddl shouldn't force restart，since in doris，nothing is changed is an exception, and
+                // nothing is changed causing restart is very weird. runtime exception changed to log.error
+                LOGGER.error("sync ddl failed" + e);
             }
             LOGGER.warn("Parse database, table from origin data failed, origin data: {}", new String(originData), e);
             if (exceptionPolicy == SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE) {
