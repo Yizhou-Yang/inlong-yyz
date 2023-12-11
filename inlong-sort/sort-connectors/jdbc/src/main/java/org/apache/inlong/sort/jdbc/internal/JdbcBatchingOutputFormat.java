@@ -56,6 +56,7 @@ import org.apache.inlong.sort.base.metric.MetricState;
 import org.apache.inlong.sort.base.metric.SinkMetricData;
 import org.apache.inlong.sort.base.util.CalculateObjectSizeUtils;
 import org.apache.inlong.sort.base.util.MetricStateUtils;
+import org.apache.inlong.sort.jdbc.table.AbstractJdbcDialect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -594,6 +595,12 @@ public class JdbcBatchingOutputFormat<In, JdbcIn, JdbcExec extends JdbcBatchStat
                             .withKeyFields(keyFields)
                             .withFieldTypes(fieldTypes)
                             .build();
+            AbstractJdbcDialect jdbcDialect = (AbstractJdbcDialect) options.getDialect();
+            try {
+                jdbcDialect.open(options, dml.getTableName());
+            } catch (Exception e) {
+                throw new RuntimeException("Open for dialect failed", e);
+            }
             if (dml.getKeyFields().isPresent() && dml.getKeyFields().get().length > 0) {
                 return new TableJdbcUpsertOutputFormat(
                         new SimpleJdbcConnectionProvider(options),

@@ -19,7 +19,9 @@ package org.apache.inlong.sort.jdbc.dialect;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.flink.connector.jdbc.internal.connection.SimpleJdbcConnectionProvider;
 import org.apache.flink.connector.jdbc.internal.converter.JdbcRowConverter;
+import org.apache.flink.connector.jdbc.internal.options.JdbcOptions;
 import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
@@ -33,10 +35,12 @@ import org.apache.inlong.sort.jdbc.table.AbstractJdbcDialect;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -74,6 +78,8 @@ public class PostgresDialect extends AbstractJdbcDialect {
             new HashSet<>(Arrays.asList("42P04", "42P06", "42P07", "42701"));
     private static final long CHAR_MAX_LENGTH = 10485760;
     private static final long VACHAR_MAX_LENGTH = 10485760;
+    private final Map<String, Set<String>> jsonColumnMap = new HashMap<>();
+
     @Override
     public boolean canHandle(String url) {
         return url.startsWith("jdbc:postgresql:");
@@ -116,6 +122,32 @@ public class PostgresDialect extends AbstractJdbcDialect {
                     + updateClause;
         }
         return Optional.of(upsertCause);
+    }
+
+    @Override
+    public String getInsertIntoStatement(String tableName, String[] fieldNames) {
+        String columns =
+                Arrays.stream(fieldNames)
+                        .map(this::quoteIdentifier)
+                        .collect(Collectors.joining(", "));
+        String placeholders =
+                Arrays.stream(fieldNames).map(f -> {
+                    String field = ":" + f;
+                    Set<String> jsonColumns = jsonColumnMap.get(tableName);
+                    if (jsonColumns != null && jsonColumns.contains(f)) {
+                        // field += "::json";
+                        field = "CAST(" + field + " AS json)";
+                    }
+                    return field;
+                }).collect(Collectors.joining(", "));
+        return "INSERT INTO "
+                + quoteIdentifier(tableName)
+                + "("
+                + columns
+                + ")"
+                + " VALUES ("
+                + placeholders
+                + ")";
     }
 
     @Override
@@ -176,8 +208,42 @@ public class PostgresDialect extends AbstractJdbcDialect {
     public PreparedStatement setQueryPrimaryKeySql(Connection conn,
             String tableIdentifier) throws SQLException {
         PreparedStatement st = conn.prepareStatement(QUERY_PRIMARY_KEY_SQL);
-        st.setString(1, JdbcMultiBatchingComm.getTableNameFromIdentifier(tableIdentifier));
+        String tablename = JdbcMultiBatchingComm.getTableNameFromIdentifier(tableIdentifier);
+        st.setString(1, tablename);
+        getJsonColumns(conn, tablename);
         return st;
+    }
+
+    @Override
+    public void open(JdbcOptions jdbcOptions, String tableIdentifier) throws Exception {
+        SimpleJdbcConnectionProvider tableConnectionProvider = new SimpleJdbcConnectionProvider(jdbcOptions);
+        try (Connection conn = tableConnectionProvider.getOrEstablishConnection()) {
+            getJsonColumns(conn, tableIdentifier);
+        }
+    }
+
+    private void getJsonColumns(Connection conn, String tableIdentifier) throws SQLException {
+        String sql = "SELECT column_name " +
+                "FROM information_schema.columns " +
+                "WHERE table_name = ? and table_schema = ? AND data_type = 'json'";
+        String[] tableWithSchema = tableIdentifier.split("\\.");
+        String schema = "public";
+        String tablename = tableIdentifier;
+        if (tableWithSchema.length == 2) {
+            schema = tableWithSchema[0];
+            tablename = tableWithSchema[1];
+        }
+        PreparedStatement pstmt = conn.prepareStatement(sql);
+        pstmt.setString(1, tablename);
+        pstmt.setString(2, schema);
+        ResultSet resultSet = pstmt.executeQuery();
+        Set<String> jsonColumns = new HashSet<>();
+        while (resultSet.next()) {
+            jsonColumns.add(resultSet.getString("column_name"));
+        }
+        if (!jsonColumns.isEmpty()) {
+            jsonColumnMap.put(tableIdentifier, jsonColumns);
+        }
     }
 
     @Override

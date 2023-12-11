@@ -314,6 +314,12 @@ public class JdbcDynamicOutputFormatBuilder implements Serializable {
                 Arrays.stream(fieldDataTypes)
                         .map(DataType::getLogicalType)
                         .toArray(LogicalType[]::new);
+        AbstractJdbcDialect jdbcDialect = (AbstractJdbcDialect) dmlOptions.getDialect();
+        try {
+            jdbcDialect.open(jdbcOptions, dmlOptions.getTableName());
+        } catch (Exception e) {
+            throw new RuntimeException("Open for dialect failed", e);
+        }
         if (dmlOptions.getKeyFields().isPresent() && dmlOptions.getKeyFields().get().length > 0 && !appendMode) {
             // upsert query
             return new JdbcBatchingOutputFormat<>(

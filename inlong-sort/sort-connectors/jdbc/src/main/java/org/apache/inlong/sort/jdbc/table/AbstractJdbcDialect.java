@@ -124,6 +124,10 @@ public abstract class AbstractJdbcDialect implements JdbcDialect {
     public abstract PreparedStatement setQueryPrimaryKeySql(Connection conn,
             String tableIdentifier) throws SQLException;
 
+    public void open(JdbcOptions jdbcOptions, String tableIdentifier) throws Exception {
+
+    }
+
     /**
      * get getPkNames from query db.tb
      *
