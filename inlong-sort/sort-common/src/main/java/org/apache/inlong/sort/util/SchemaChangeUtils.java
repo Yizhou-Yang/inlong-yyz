@@ -190,6 +190,9 @@ public class SchemaChangeUtils {
             case CHANGE_COLUMN:
                 parseTypeOfChangeColumn(alterColumn, types);
                 break;
+            case ADD_CONSTRAINT:
+                types.add(SchemaChangeType.ADD_CONSTRAINT);
+                break;
             default:
         }
         return types;

@@ -41,6 +41,7 @@ import java.util.regex.Pattern;
 public abstract class AbstractDynamicSchemaFormat<T> {
 
     public static final Pattern PATTERN = Pattern.compile("\\$\\{\\s*([\\w.-]+)\\s*}", Pattern.CASE_INSENSITIVE);
+    private boolean upsertMode;
 
     /**
      * Extract values by key from the raw data
@@ -195,4 +196,12 @@ public abstract class AbstractDynamicSchemaFormat<T> {
      * @throws IOException The exception will throws
      */
     public abstract String parse(T data, String pattern) throws IOException;
+
+    public boolean isUpsertMode() {
+        return upsertMode;
+    }
+
+    public void setUpsertMode(boolean upsertMode) {
+        this.upsertMode = upsertMode;
+    }
 }

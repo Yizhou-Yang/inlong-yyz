@@ -17,6 +17,7 @@
 
 package org.apache.inlong.sort.iceberg.sink;
 
+import java.time.Duration;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.flink.api.common.functions.MapFunction;
@@ -179,12 +180,16 @@ public class FlinkSink {
         private MultipleSinkOption multipleSinkOption = null;
         private DirtyOptions dirtyOptions;
         private @Nullable DirtySink<Object> dirtySink;
+        private Integer commitConcurrency;
+        private Duration commitTimeout;
         private ReadableConfig tableOptions;
 
         private boolean enableSchemaChange;
         private String schemaChangePolicies;
         private boolean switchAppendUpsertEnable = false;
         private boolean autoCreateTableWhenSnapshot;
+        private static final int DEFAULT_COMMIT_PARALLELISM = 1;
+        private static final int DEFAULT_MAX_COMMIT_PARALLELISM = 1;
 
         private Builder() {
         }
@@ -334,6 +339,16 @@ public class FlinkSink {
             return this;
         }
 
+        public FlinkSink.Builder commitConcurrency(Integer commitConcurrency) {
+            this.commitConcurrency = commitConcurrency;
+            return this;
+        }
+
+        public FlinkSink.Builder commitTimeout(Duration commitTimeout) {
+            this.commitTimeout = commitTimeout;
+            return this;
+        }
+
         public FlinkSink.Builder tableOptions(ReadableConfig tableOptions) {
             this.tableOptions = tableOptions;
             return this;
@@ -385,7 +400,7 @@ public class FlinkSink {
          * @param newWriteParallelism the number of parallel iceberg stream writer.
          * @return {@link Builder} to connect the iceberg table.
          */
-        public Builder writeParallelism(int newWriteParallelism) {
+        public Builder writeParallelism(Integer newWriteParallelism) {
             this.writeParallelism = newWriteParallelism;
             return this;
         }
@@ -591,15 +606,30 @@ public class FlinkSink {
 
         private SingleOutputStreamOperator<Void> appendMultipleCommitter(
                 SingleOutputStreamOperator<MultipleWriteResult> writerStream) {
-            IcebergProcessOperator<MultipleWriteResult, Void> multipleFilesCommiter =
+            int parallelism = writeParallelism == null ? writerStream.getParallelism() : writeParallelism;
+            IcebergProcessOperator<MultipleWriteResult, Void> multipleFilesCommitter =
                     new IcebergProcessOperator<>(new IcebergMultipleFilesCommiter(catalogLoader, overwrite,
-                            actionProvider, tableOptions));
-            SingleOutputStreamOperator<Void> committerStream = writerStream
-                    .transform(operatorName(ICEBERG_MULTIPLE_FILES_COMMITTER_NAME), Types.VOID, multipleFilesCommiter)
-                    .setParallelism(1)
-                    .setMaxParallelism(1);
+                            actionProvider, commitConcurrency, commitTimeout, tableOptions));
+            SingleOutputStreamOperator<Void> committerStream;
+            if (writeParallelism == null) {
+                committerStream = writerStream
+                        .transform(operatorName(ICEBERG_MULTIPLE_FILES_COMMITTER_NAME), Types.VOID,
+                                multipleFilesCommitter)
+                        .setParallelism(DEFAULT_COMMIT_PARALLELISM)
+                        .setMaxParallelism(DEFAULT_MAX_COMMIT_PARALLELISM);
+            } else {
+                committerStream = writerStream
+                        .transform(operatorName(ICEBERG_MULTIPLE_FILES_COMMITTER_NAME), Types.VOID,
+                                multipleFilesCommitter)
+                        .setParallelism(parallelism);
+            }
+
             if (uidPrefix != null) {
-                committerStream = committerStream.uid(uidPrefix + "-committer");
+                if (writeParallelism == null) {
+                    committerStream = committerStream.uid(uidPrefix + "-committer");
+                } else {
+                    committerStream = committerStream.uid(uidPrefix + "-committer-p");
+                }
             }
             return committerStream;
         }
@@ -648,16 +678,27 @@ public class FlinkSink {
         private SingleOutputStreamOperator<MultipleWriteResult> appendMultipleWriter(DataStream<RowData> input) {
             // equality field will be initialized at runtime
             // upsert mode will be initialized at runtime
+            boolean upsertMode;
+            if (flinkWriteConf != null && table != null) {
+                upsertMode = flinkWriteConf.upsertMode() || PropertyUtil.propertyAsBoolean(table.properties(),
+                        UPSERT_ENABLED, UPSERT_ENABLED_DEFAULT);
+            } else if (flinkWriteConf != null) {
+                upsertMode = flinkWriteConf.upsertMode();
+            } else if (table != null) {
+                upsertMode = PropertyUtil.propertyAsBoolean(table.properties(), UPSERT_ENABLED, UPSERT_ENABLED_DEFAULT);
+            } else {
+                upsertMode = true;
+            }
+            upsertMode = upsertMode && !appendMode;
 
-            int parallelism = writeParallelism == null ? input.getParallelism() : writeParallelism;
             DynamicSchemaHandleOperator routeOperator = new DynamicSchemaHandleOperator(
                     catalogLoader, multipleSinkOption, dirtyOptions, dirtySink, inlongMetric, auditHostAndPorts,
-                    enableSchemaChange, schemaChangePolicies, autoCreateTableWhenSnapshot);
+                    enableSchemaChange, schemaChangePolicies, autoCreateTableWhenSnapshot, upsertMode);
             SingleOutputStreamOperator<RecordWithSchema> routeStream = input
                     .transform(operatorName(ICEBERG_WHOLE_DATABASE_MIGRATION_NAME),
                             TypeInformation.of(RecordWithSchema.class),
                             routeOperator)
-                    .setParallelism(parallelism);
+                    .setParallelism(input.getParallelism());
             RowType tableSchemaRowType = (RowType) tableSchema.toRowDataType().getLogicalType();
             int metaFieldIndex = getMetaFieldIndex(tableSchema);
             IcebergProcessOperator streamWriter =
@@ -665,11 +706,28 @@ public class FlinkSink {
                             appendMode, catalogLoader, inlongMetric, auditHostAndPorts,
                             multipleSinkOption, dirtyOptions, dirtySink, tableSchemaRowType, metaFieldIndex,
                             switchAppendUpsertEnable));
-            SingleOutputStreamOperator<MultipleWriteResult> writerStream = routeStream
-                    .transform(operatorName(ICEBERG_MULTIPLE_STREAM_WRITER_NAME),
-                            TypeInformation.of(IcebergProcessOperator.class),
-                            streamWriter)
-                    .setParallelism(parallelism);
+
+            int parallelism = writeParallelism == null ? input.getParallelism() : writeParallelism;
+            SingleOutputStreamOperator<MultipleWriteResult> writerStream;
+            if (parallelism != input.getParallelism()) {
+                writerStream =
+                        routeStream
+                                .keyBy(record -> record.getTableId())
+                                .transform(
+                                        operatorName(ICEBERG_MULTIPLE_STREAM_WRITER_NAME),
+                                        TypeInformation.of(IcebergProcessOperator.class),
+                                        streamWriter)
+                                .setParallelism(parallelism);
+            } else {
+                writerStream =
+                        routeStream
+                                .transform(
+                                        operatorName(ICEBERG_MULTIPLE_STREAM_WRITER_NAME),
+                                        TypeInformation.of(IcebergProcessOperator.class),
+                                        streamWriter)
+                                .setParallelism(parallelism);
+            }
+
             if (uidPrefix != null) {
                 writerStream = writerStream.uid(uidPrefix + "-writer");
             }

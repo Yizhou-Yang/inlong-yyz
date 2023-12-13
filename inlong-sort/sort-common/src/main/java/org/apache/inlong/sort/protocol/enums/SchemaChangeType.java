@@ -55,6 +55,10 @@ public enum SchemaChangeType {
      */
     CHANGE_COLUMN_TYPE(8),
     /**
+     * Add Index
+     */
+    ADD_CONSTRAINT(9),
+    /**
      * Alter table, it is a unified description of modified table, which may contain multiple operations, it is not
      * exposed to the outside world in most scenarios.
      */

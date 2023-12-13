@@ -18,7 +18,15 @@
 package org.apache.inlong.sort.iceberg.catalog.hybris;
 
 import com.qcloud.dlc.common.Constants;
+import com.qcloud.dlc.metastore.DLCClientFactory;
 import com.qcloud.dlc.metastore.DLCDataCatalogMetastoreClient;
+import com.tencentcloudapi.dlc.v20210125.DlcClient;
+import com.tencentcloudapi.dlc.v20210125.models.AssignMangedTablePropertiesRequest;
+import com.tencentcloudapi.dlc.v20210125.models.AssignMangedTablePropertiesResponse;
+import com.tencentcloudapi.dlc.v20210125.models.Property;
+import com.tencentcloudapi.dlc.v20210125.models.TableBaseInfo;
+import com.tencentcloudapi.dlc.v20210125.models.TColumn;
+import com.tencentcloudapi.dlc.v20210125.models.TPartition;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
@@ -40,6 +48,9 @@ import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.ClientPool;
+import org.apache.iceberg.PartitionField;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.TableOperations;
@@ -56,12 +67,15 @@ import org.apache.iceberg.relocated.com.google.common.annotations.VisibleForTest
 import org.apache.iceberg.relocated.com.google.common.base.MoreObjects;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableList;
+import org.apache.iceberg.relocated.com.google.common.collect.ImmutableMap;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
+import org.apache.iceberg.types.Types;
 import org.apache.inlong.sort.iceberg.utils.DLCUtils;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +91,11 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
 
     public static final String LIST_ALL_TABLES = "list-all-tables";
     public static final String LIST_ALL_TABLES_DEFAULT = "false";
+    private static final String DATASOURCE_CONNECTION_NAME = "DataLakeCatalog";
+    private static final String TABLE_TYPE = "table";
+    private static final String ICEBERG_FORMAT = "iceberg";
+    private static final String PRIMARY_KEYS = "primary.keys";
+    private static final String PRIMARY_SPLIT_QUOTA = ",";
     public static final Set<String> SUPPORTED_WAREHOUSE = new HashSet<String>() {
 
         {
@@ -601,6 +620,150 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
         database.setParameters(parameter);
 
         return database;
+    }
+
+    public org.apache.iceberg.Table createTable(TableIdentifier identifier, Schema schema, PartitionSpec spec,
+            String location, Map<String, String> properties) {
+        LOG.debug("DlcWrappedHybrisCatalog createTable: invoke dlc createTable api!");
+
+        DLCClientFactory dlcClientFactory = new DLCClientFactory(this.conf);
+        DlcClient client;
+        try {
+            client = dlcClientFactory.newClient();
+        } catch (Exception e) {
+            LOG.error("dlc client create error", e);
+            return null;
+        }
+
+        AssignMangedTablePropertiesRequest assignMangedTablePropertiesRequest =
+                new AssignMangedTablePropertiesRequest();
+        String databaseName = "", tableName = "";
+        if (identifier != null) {
+            tableName = identifier.name();
+            if (identifier.hasNamespace() && identifier.namespace().levels() != null
+                    && identifier.namespace().levels().length > 0) {
+                databaseName = identifier.namespace().levels()[0];
+            } else {
+                LOG.warn("createTable: no namespace or namespace has no levels!");
+            }
+            LOG.info("createTable databaseName:" + databaseName + ", tableName:" + tableName);
+
+            TableBaseInfo tableBaseInfo = new TableBaseInfo();
+            tableBaseInfo.setTableName(tableName);
+            tableBaseInfo.setDatabaseName(databaseName);
+            tableBaseInfo.setDatasourceConnectionName(DATASOURCE_CONNECTION_NAME);
+            tableBaseInfo.setType(TABLE_TYPE);
+            tableBaseInfo.setTableFormat(ICEBERG_FORMAT);
+            assignMangedTablePropertiesRequest.setTableBaseInfo(tableBaseInfo);
+
+            // generate create table column.
+            List<Types.NestedField> columns = schema.columns();
+            if (columns != null) {
+                int columnSize = columns.size();
+                TColumn[] tColumns = new TColumn[columnSize];
+                for (int i = 0; i < columnSize; i++) {
+                    Types.NestedField nestedField = columns.get(i);
+
+                    TColumn tColumn = new TColumn();
+                    tColumn.setName(nestedField.name());
+                    tColumn.setType(nestedField.type().typeId().name());
+                    tColumn.setComment(nestedField.doc());
+                    tColumn.setNotNull(nestedField.isRequired());
+
+                    tColumns[i] = tColumn;
+                }
+                assignMangedTablePropertiesRequest.setColumns(tColumns);
+            } else {
+                LOG.debug("no columns!");
+            }
+
+            // generate create table partition.
+            if (spec != null && !PartitionSpec.unpartitioned().equals(spec)) {
+                List<PartitionField> partitionFieldList = spec.fields();
+
+                int partitionSize = partitionFieldList.size();
+                TPartition[] tPartitions = new TPartition[partitionSize];
+                for (int i = 0; i < partitionSize; i++) {
+                    PartitionField partitionField = partitionFieldList.get(i);
+
+                    TPartition tPartition = new TPartition();
+                    tPartition.setName(partitionField.name());
+                    int sourceId = partitionField.sourceId();
+                    Types.NestedField nestedField = schema.columns().get(sourceId);
+                    tPartition.setType(nestedField.type().typeId().name());
+                    tPartition.setComment(nestedField.doc());
+                    tPartition.setTransform(partitionField.transform().dedupName());
+
+                    tPartitions[i] = tPartition;
+                }
+
+                assignMangedTablePropertiesRequest.setPartitions(tPartitions);
+            } else {
+                LOG.debug("no partitions!");
+            }
+
+            // generate create table properties.
+            List<Property> propertyList = new ArrayList<>();
+            String primaryKeys = "";
+            for (Map.Entry<String, String> entry : properties.entrySet()) {
+                if (PRIMARY_KEYS.equalsIgnoreCase(entry.getKey())) {
+                    primaryKeys = entry.getValue();
+                } else {
+                    Property property = new Property();
+
+                    property.setKey(entry.getKey());
+                    property.setValue(entry.getValue());
+                    propertyList.add(property);
+                }
+            }
+            Property[] propertiesForDlc = propertyList.toArray(new Property[0]);
+            assignMangedTablePropertiesRequest.setProperties(propertiesForDlc);
+
+            if (StringUtils.isNotBlank(primaryKeys)) {
+                String[] upsertKeys = primaryKeys.split(PRIMARY_SPLIT_QUOTA);
+                assignMangedTablePropertiesRequest.setUpsertKeys(upsertKeys);
+            } else {
+                LOG.debug("upsertKeys is blank!");
+            }
+            Map<String, String> propertiesNew = ImmutableMap.of();
+            ImmutableMap.Builder<String, String> propertiesBuilder = ImmutableMap.builder();
+            try {
+                AssignMangedTablePropertiesResponse response =
+                        client.AssignMangedTableProperties(assignMangedTablePropertiesRequest);
+                Property[] propertiesRes = response.getProperties();
+
+                for (Property property : propertiesRes) {
+                    String key = property.getKey();
+                    String value = property.getValue();
+                    LOG.debug("key:" + key + ", " + value);
+
+                    propertiesBuilder.put(key, value);
+                }
+
+                propertiesNew = propertiesBuilder.build();
+            } catch (Exception e) {
+                LOG.error("request error", e);
+            }
+
+            if (propertiesNew.size() == 0) {
+                LOG.debug("request super createTable for properties");
+                if (!this.tableExists(identifier)) {
+                    return super.createTable(identifier, schema, spec, null, properties);
+                } else {
+                    LOG.info("Table({}) in Database({}) is exists when createTable, ignore!", tableName, databaseName);
+                }
+            } else {
+                LOG.debug("request super createTable for propertiesNew");
+                if (!this.tableExists(identifier)) {
+                    return super.createTable(identifier, schema, spec, null, propertiesNew);
+                } else {
+                    LOG.info("Table({}) in Database({}) is exists when createTable, ignore!", tableName, databaseName);
+                }
+            }
+        } else {
+            LOG.warn("createTable: identifier is null!");
+        }
+        return null;
     }
 
     @Override

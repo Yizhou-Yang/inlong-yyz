@@ -17,6 +17,7 @@
 
 package org.apache.inlong.sort.iceberg;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -155,6 +156,24 @@ public class FlinkDynamicTableFactory implements DynamicTableSinkFactory, Dynami
                     .defaultValue(TableProperties.WRITE_DISTRIBUTION_MODE_NONE)
                     .withDescription("Distribute the records from input data stream based "
                             + "on the write.distribution-mode.");
+
+    public static final ConfigOption<Integer> COMMIT_CONCURRENCY =
+            ConfigOptions.key("commit.concurrency")
+                    .intType()
+                    .defaultValue(1)
+                    .withDescription("The number of thread in the commit operator");
+
+    public static final ConfigOption<Duration> COMMIT_TIMEOUT =
+            ConfigOptions.key("commit.timeout")
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(120))
+                    .withDescription("The timeout for committing tables.");
+
+    public static final ConfigOption<Integer> MULTI_PARALLELISM =
+            ConfigOptions.key("multi.parallelism")
+                    .intType()
+                    .noDefaultValue()
+                    .withDescription("The parallelism of the multiple operators");
 
     private final FlinkCatalog catalog;
 
@@ -357,6 +376,10 @@ public class FlinkDynamicTableFactory implements DynamicTableSinkFactory, Dynami
         options.add(WRITE_COMPACT_ENABLE);
         options.add(WRITE_COMPACT_INTERVAL);
         options.add(WRITE_DISTRIBUTION_MODE);
+
+        options.add(COMMIT_CONCURRENCY);
+        options.add(COMMIT_TIMEOUT);
+        options.add(MULTI_PARALLELISM);
         return options;
     }
 

@@ -20,6 +20,7 @@ package org.apache.inlong.sort.iceberg.sink.multiple;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.SupportsNamespaces;
@@ -45,7 +46,7 @@ public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
     private static final Joiner DOT = Joiner.on(".");
 
     public static void createTable(Catalog catalog, TableIdentifier tableId, SupportsNamespaces asNamespaceCatalog,
-            Schema schema) {
+            Schema schema, List<String> primaryKeyList, boolean upsertMode) {
         if (!catalog.tableExists(tableId)) {
             if (asNamespaceCatalog != null && !asNamespaceCatalog.namespaceExists(tableId.namespace())) {
                 try {
@@ -57,14 +58,33 @@ public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
             }
             ImmutableMap.Builder<String, String> properties = ImmutableMap.builder();
             properties.put("format-version", "2");
-            properties.put("write.upsert.enabled", "true");
+            if (upsertMode) {
+                properties.put("write.upsert.enabled", "true");
+
+                for (String primaryKey : primaryKeyList) {
+                    properties.put("write.parquet.bloom-filter-enabled.column." + primaryKey, "true");
+                }
+            } else {
+                LOGGER.debug("createTable upsertMode: false, no primaryKey!");
+            }
+            LOGGER.debug("createTable upsertMode:" + upsertMode + ", primaryKey:" + String.join(",", primaryKeyList));
+
             properties.put("write.metadata.metrics.default", "full");
             // for hive visible
             properties.put("engine.hive.enabled", "true");
+            // fake properties for primary key
+            properties.put("primary.keys", String.join(",", primaryKeyList));
             try {
-                catalog.createTable(tableId, schema, PartitionSpec.unpartitioned(), properties.build());
-                LOGGER.info("Auto create Table({}) in Database({}) in Catalog({})!",
-                        tableId.name(), tableId.namespace(), catalog.name());
+                Table table =
+                        catalog.createTable(tableId, schema, PartitionSpec.unpartitioned(), null, properties.build());
+                if (table == null) {
+                    LOGGER.warn(
+                            "Auto create Table({}) in Database({}) in Catalog({}) failed, maybe something wrong or table exists!",
+                            tableId.name(), tableId.namespace(), catalog.name());
+                } else {
+                    LOGGER.info("Auto create Table({}) in Database({}) in Catalog({}) success!",
+                            tableId.name(), tableId.namespace(), catalog.name());
+                }
             } catch (AlreadyExistsException e) {
                 LOGGER.warn("Table({}) already exist in Database({}) in Catalog({})!",
                         tableId.name(), tableId.namespace(), catalog.name());

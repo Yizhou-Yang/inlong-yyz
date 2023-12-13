@@ -128,6 +128,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
     private final String INCREMENTAL = "incremental";
     private transient Gson gson;
     private boolean autoCreateTableWhenSnapshot;
+    private boolean upsertMode;
 
     public DynamicSchemaHandleOperator(CatalogLoader catalogLoader,
             MultipleSinkOption multipleSinkOption,
@@ -137,7 +138,8 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             String auditHostAndPorts,
             boolean enableSchemaChange,
             String schemaChangePolicies,
-            boolean autoCreateTableWhenSnapshot) {
+            boolean autoCreateTableWhenSnapshot,
+            boolean upsertMode) {
         this.catalogLoader = catalogLoader;
         this.multipleSinkOption = multipleSinkOption;
         this.inlongMetric = inlongMetric;
@@ -146,6 +148,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         this.schemaChangePolicies = schemaChangePolicies;
         this.enableSchemaChange = enableSchemaChange;
         this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
+        this.upsertMode = upsertMode;
     }
 
     @SuppressWarnings("unchecked")
@@ -158,6 +161,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
 
         this.dynamicSchemaFormat = (JsonDynamicSchemaFormat) DynamicSchemaFormatFactory.getFormat(
                 multipleSinkOption.getFormat(), multipleSinkOption.getFormatOption());
+        this.dynamicSchemaFormat.setUpsertMode(this.upsertMode);
 
         this.processingTimeService = getRuntimeContext().getProcessingTimeService();
         processingTimeService.registerTimer(
@@ -358,7 +362,8 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         });
         if (schema == null) {
             try {
-                handleTableCreateEventFromOperator(record.getTableId(), dataSchema);
+                List<String> primaryKeyList = dynamicSchemaFormat.extractPrimaryKeyNames(jsonNode);
+                handleTableCreateEventFromOperator(record.getTableId(), dataSchema, primaryKeyList, upsertMode);
             } catch (Exception e) {
                 LOG.error("Table create error, tableId: {}, schema: {}", record.getTableId(), dataSchema);
                 if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE == multipleSinkOption
@@ -471,9 +476,11 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
     }
 
     // ================================ All coordinator handle method ==============================================
-    private void handleTableCreateEventFromOperator(TableIdentifier tableId, Schema schema) {
+    private void handleTableCreateEventFromOperator(TableIdentifier tableId, Schema schema,
+            List<String> primaryKeyList, boolean upsertMode) {
         if (this.autoCreateTableWhenSnapshot) {
-            IcebergSchemaChangeUtils.createTable(catalog, tableId, asNamespaceCatalog, schema);
+            IcebergSchemaChangeUtils.createTable(catalog, tableId, asNamespaceCatalog, schema, primaryKeyList,
+                    upsertMode);
         }
         handleSchemaInfoEvent(tableId, catalog.loadTable(tableId).schema());
     }

@@ -41,9 +41,14 @@ public class WedataDLCCredentialProvider extends AbstractDLCCredentialProvider i
     @Override
     public void initialize(Configuration conf) {
         String secretId = conf.get("qcloud.dlc.secret-id");
+        String executorSecretId = conf.get("executor.secret.id");
         String secretKey = conf.get("qcloud.dlc.secret-key");
+        String executorSecretKey = conf.get("executor.secret.key");
+
         Preconditions.checkArgument(secretId != null, "qcloud.dlc.secret-id must be set.");
+        Preconditions.checkArgument(executorSecretId != null, "executor.secret.id must be set.");
         Preconditions.checkArgument(secretKey != null, "qcloud.dlc.secret-key must be set.");
+        Preconditions.checkArgument(executorSecretKey != null, "executor.secret.key must be set.");
 
         Map<String, String> options = DLCUtils.getTmpTokenOptions(conf);
         this.options = options;

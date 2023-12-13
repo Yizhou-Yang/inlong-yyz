@@ -31,6 +31,11 @@
     <description>DLC is a data lake product. It's storage is based on iceberg.
         Here is the product: https://cloud.tencent.com/product/dlc</description>
 
+    <properties>
+        <java.sdk.version>3.1.878</java.sdk.version>
+        <dlc.sdk.version>3.1.893</dlc.sdk.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.inlong</groupId>
@@ -91,7 +96,7 @@
         <dependency>
             <groupId>com.tencentcloudapi</groupId>
             <artifactId>tencentcloud-sdk-java</artifactId>
-            <version>3.1.607-SNAPSHOT</version>
+            <version>${java.sdk.version}</version>
         </dependency>
         <dependency>
             <groupId>com.qcloud</groupId>
@@ -169,6 +174,23 @@
             <artifactId>httpclient</artifactId>
             <version>4.5.8</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+
+        <!--Add tencent dlc java sdk -->
+        <dependency>
+            <groupId>com.tencentcloudapi</groupId>
+            <artifactId>tencentcloud-sdk-java-dlc</artifactId>
+            <version>${dlc.sdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.inlong</groupId>
+            <artifactId>sort-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -199,6 +221,7 @@
                                     <include>commons-codec:commons-codec</include>
                                     <include>com.squareup.okio:okio</include>
                                     <include>com.squareup.okhttp:okhttp</include>
+                                    <include>com.squareup.okhttp3:okhttp</include>
                                     <include>com.squareup.okhttp:logging-interceptor</include>
                                     <include>org.ini4j:ini4j</include>
                                     <include>com.google.code.gson:gson</include>

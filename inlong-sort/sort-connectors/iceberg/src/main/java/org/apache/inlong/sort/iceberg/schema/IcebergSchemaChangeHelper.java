@@ -122,7 +122,8 @@ public class IcebergSchemaChangeHelper extends SchemaChangeHelper {
             List<String> pkListStr = dynamicSchemaFormat.extractPrimaryKeyNames(data);
             RowType rowType = dynamicSchemaFormat.extractSchema(data, pkListStr);
             Schema schema = FlinkSchemaUtil.convert(FlinkSchemaUtil.toSchema(rowType));
-            IcebergSchemaChangeUtils.createTable(catalog, tableId, asNamespaceCatalog, schema);
+            IcebergSchemaChangeUtils.createTable(catalog, tableId, asNamespaceCatalog, schema, pkListStr,
+                    dynamicSchemaFormat.isUpsertMode());
             isSuccessDDL.set(true);
         } catch (Exception e) {
             if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {

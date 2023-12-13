@@ -42,6 +42,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -59,6 +60,9 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TYPE_MAP_COMPA
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_POLICIES;
 import static org.apache.inlong.sort.base.Constants.SWITCH_APPEND_UPSERT_ENABLE;
+import static org.apache.inlong.sort.iceberg.FlinkDynamicTableFactory.COMMIT_CONCURRENCY;
+import static org.apache.inlong.sort.iceberg.FlinkDynamicTableFactory.COMMIT_TIMEOUT;
+import static org.apache.inlong.sort.iceberg.FlinkDynamicTableFactory.MULTI_PARALLELISM;
 import static org.apache.inlong.sort.iceberg.FlinkDynamicTableFactory.WRITE_DISTRIBUTION_MODE;
 
 /**
@@ -126,9 +130,18 @@ public class IcebergTableSink implements DynamicTableSink, SupportsPartitioning,
         boolean autoCreateTableWhenSnapshot = tableOptions.get(SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT);
         String schemaChangePolicies = tableOptions.getOptional(SINK_SCHEMA_CHANGE_POLICIES).orElse(null);
         LOG.info("policy {}", tableOptions.get(SINK_MULTIPLE_SCHEMA_UPDATE_POLICY));
+
+        // now comes the parallelism
+        Integer commitConcurrency = tableOptions.get(COMMIT_CONCURRENCY);
+        Duration commitTimeout = tableOptions.get(COMMIT_TIMEOUT);
+        Integer parallelism = tableOptions.get(MULTI_PARALLELISM);
+
         if (multipleSink) {
             return (DataStreamSinkProvider) dataStream -> FlinkSink.forRowData(dataStream)
                     .overwrite(overwrite)
+                    .commitConcurrency(commitConcurrency)
+                    .commitTimeout(commitTimeout)
+                    .writeParallelism(parallelism)
                     .appendMode(tableOptions.get(IGNORE_ALL_CHANGELOG))
                     .metric(tableOptions.get(INLONG_METRIC), tableOptions.get(INLONG_AUDIT))
                     .catalogLoader(catalogLoader)

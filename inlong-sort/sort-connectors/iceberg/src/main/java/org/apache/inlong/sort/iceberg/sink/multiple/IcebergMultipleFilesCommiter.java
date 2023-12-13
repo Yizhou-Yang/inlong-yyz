@@ -18,6 +18,7 @@
 package org.apache.inlong.sort.iceberg.sink.multiple;
 
 import org.apache.flink.api.common.state.CheckpointListener;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
@@ -28,10 +29,18 @@ import org.apache.iceberg.actions.ActionsProvider;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.flink.CatalogLoader;
 import org.apache.iceberg.flink.TableLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 public class IcebergMultipleFilesCommiter extends IcebergProcessFunction<MultipleWriteResult, Void>
         implements
@@ -39,19 +48,35 @@ public class IcebergMultipleFilesCommiter extends IcebergProcessFunction<Multipl
             CheckpointListener,
             BoundedOneInput {
 
-    private Map<TableIdentifier, IcebergSingleFileCommiter> multipleCommiters;
+    private static final Logger LOG = LoggerFactory.getLogger(IcebergMultipleFilesCommiter.class);
+
+    private ConcurrentHashMap<TableIdentifier, IcebergSingleFileCommiter> multipleCommiters;
     private final CatalogLoader catalogLoader;
     private final boolean overwrite;
     private final ActionsProvider actionsProvider;
+
+    private final int commitConcurrency;
+
+    private final Duration commitTimeout;
+
     private final ReadableConfig tableOptions;
 
     private transient FunctionInitializationContext functionInitializationContext;
 
-    public IcebergMultipleFilesCommiter(CatalogLoader catalogLoader, boolean overwrite, ActionsProvider actionProvider,
+    private transient ExecutorService commitExecutors;
+
+    public IcebergMultipleFilesCommiter(
+            CatalogLoader catalogLoader,
+            boolean overwrite,
+            ActionsProvider actionProvider,
+            int commitConcurrency,
+            Duration commitTimeout,
             ReadableConfig tableOptions) {
         this.catalogLoader = catalogLoader;
         this.overwrite = overwrite;
         this.actionsProvider = actionProvider;
+        this.commitConcurrency = commitConcurrency;
+        this.commitTimeout = commitTimeout;
         this.tableOptions = tableOptions;
     }
 
@@ -59,9 +84,13 @@ public class IcebergMultipleFilesCommiter extends IcebergProcessFunction<Multipl
     public void processElement(MultipleWriteResult value) throws Exception {
         TableIdentifier tableId = value.getTableId();
         if (multipleCommiters.get(tableId) == null) {
-            IcebergSingleFileCommiter commiter = new IcebergSingleFileCommiter(
-                    tableId, TableLoader.fromCatalog(catalogLoader, value.getTableId()), overwrite,
-                    actionsProvider, tableOptions);
+            IcebergSingleFileCommiter commiter =
+                    new IcebergSingleFileCommiter(
+                            tableId,
+                            TableLoader.fromCatalog(catalogLoader, value.getTableId()),
+                            overwrite,
+                            actionsProvider,
+                            tableOptions);
             commiter.setup(getRuntimeContext(), collector, context);
             commiter.initializeState(functionInitializationContext);
             commiter.open(new Configuration());
@@ -85,18 +114,55 @@ public class IcebergMultipleFilesCommiter extends IcebergProcessFunction<Multipl
 
     @Override
     public void notifyCheckpointComplete(long checkpointId) throws Exception {
+        List<Tuple2<TableIdentifier, Future<Exception>>> tables = new ArrayList<>();
+
         for (Entry<TableIdentifier, IcebergSingleFileCommiter> entry : multipleCommiters.entrySet()) {
-            entry.getValue().notifyCheckpointComplete(checkpointId);
+            Future<Exception> future =
+                    commitExecutors.submit(
+                            () -> {
+                                try {
+                                    LOG.info(
+                                            "Start committing {} for checkpoint {}",
+                                            entry.getKey(),
+                                            checkpointId);
+                                    entry.getValue().notifyCheckpointComplete(checkpointId);
+                                    LOG.info(
+                                            "Finish committing {} for checkpoint {}",
+                                            entry.getKey(),
+                                            checkpointId);
+                                    return null;
+                                } catch (Exception e) {
+                                    LOG.warn(
+                                            "committing {} for checkpoint {} failed",
+                                            entry.getKey(),
+                                            checkpointId,
+                                            e);
+                                    return e;
+                                }
+                            });
+            tables.add(new Tuple2<>(entry.getKey(), future));
+        }
+
+        for (Tuple2<TableIdentifier, Future<Exception>> t : tables) {
+            Exception e = t.f1.get(commitTimeout.toMillis(), TimeUnit.MILLISECONDS);
+            if (e != null) {
+                throw e;
+            }
         }
     }
 
     @Override
     public void open(Configuration parameters) throws Exception {
-        multipleCommiters = new HashMap<>();
+        multipleCommiters = new ConcurrentHashMap<>();
+        commitExecutors = Executors.newFixedThreadPool(commitConcurrency);
     }
 
     @Override
     public void close() throws Exception {
+        if (commitExecutors != null) {
+            commitExecutors.shutdownNow();
+        }
+
         if (multipleCommiters == null) {
             return;
         }
@@ -112,5 +178,4 @@ public class IcebergMultipleFilesCommiter extends IcebergProcessFunction<Multipl
             entry.getValue().endInput();
         }
     }
-
 }
