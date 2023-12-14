@@ -766,18 +766,19 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         } catch (SchemaChangeHandleException e) {
             throw e;
         } catch (Exception e) {
+            if (!multipleSink) {
+                throw new RuntimeException(String.format("Flush table: %s error", tableIdentifier), e);
+//                try {
+//                    handleSingleTable(e, values, loadValue);
+//                    return;
+//                } catch (Exception ex) {
+//                    throw new RuntimeException(e);
+//                }
+            }
             LOG.error(String.format("Flush table: %s error", tableIdentifier), e);
             flushExceptionMap.put(tableIdentifier, e);
             // may count repeatedly
             errorNum.getAndAdd(values.size());
-            if (!multipleSink) {
-                try {
-                    handleSingleTable(e, values, loadValue);
-                    return;
-                } catch (Exception ex) {
-                    throw new RuntimeException(e);
-                }
-            }
             if (SchemaUpdateExceptionPolicy.THROW_WITH_STOP == schemaUpdatePolicy) {
                 throw new RuntimeException(
                         String.format("Writing records to streamload of tableIdentifier:%s failed, the value: %s.",
