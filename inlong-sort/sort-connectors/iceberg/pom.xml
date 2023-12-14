@@ -117,6 +117,12 @@
                                         <include>META-INF/services/org.apache.flink.table.factories.Factory</include>
                                     </includes>
                                 </filter>
+                                <filter>
+                                    <artifact>com.tencent.cloud.oceanus:oceanus-flink-chdfs-hadoop</artifact>
+                                    <excludes>
+                                        <exclude>org/apache/commons/codec/**</exclude>
+                                    </excludes>
+                                </filter>
                             </filters>
                             <relocations>
                                 <relocation>
