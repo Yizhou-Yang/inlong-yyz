@@ -768,12 +768,12 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
         } catch (Exception e) {
             if (!multipleSink) {
                 throw new RuntimeException(String.format("Flush table: %s error", tableIdentifier), e);
-//                try {
-//                    handleSingleTable(e, values, loadValue);
-//                    return;
-//                } catch (Exception ex) {
-//                    throw new RuntimeException(e);
-//                }
+                // try {
+                // handleSingleTable(e, values, loadValue);
+                // return;
+                // } catch (Exception ex) {
+                // throw new RuntimeException(e);
+                // }
             }
             LOG.error(String.format("Flush table: %s error", tableIdentifier), e);
             flushExceptionMap.put(tableIdentifier, e);
