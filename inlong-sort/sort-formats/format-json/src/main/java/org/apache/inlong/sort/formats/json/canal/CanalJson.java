@@ -43,6 +43,8 @@ public class CanalJson {
     private String table;
     @JsonProperty("type")
     private String type;
+    @JsonProperty("otype")
+    private String otype;
     @JsonProperty("database")
     private String database;
     @JsonProperty("ts")
@@ -75,6 +77,7 @@ public class CanalJson {
             @JsonProperty("es") long es,
             @JsonProperty("table") String table,
             @JsonProperty("type") String type,
+            @JsonProperty("otype") String otype,
             @JsonProperty("database") String database,
             @JsonProperty("ts") long ts,
             @JsonProperty("sql") String sql,
@@ -92,6 +95,7 @@ public class CanalJson {
         this.es = es;
         this.table = table;
         this.type = type;
+        this.otype = otype;
         this.database = database;
         this.ts = ts;
         this.sql = sql;
