@@ -31,6 +31,7 @@ import org.apache.inlong.manager.pojo.source.kafka.KafkaOffset;
 import org.apache.inlong.manager.pojo.source.kafka.KafkaSource;
 import org.apache.inlong.manager.pojo.source.mongodb.MongoDBSource;
 import org.apache.inlong.manager.pojo.source.mysql.MySQLBinlogSource;
+import org.apache.inlong.manager.pojo.source.oceanBase.OceanBaseSource;
 import org.apache.inlong.manager.pojo.source.oracle.OracleSource;
 import org.apache.inlong.manager.pojo.source.postgresql.PostgreSQLSource;
 import org.apache.inlong.manager.pojo.source.pulsar.PulsarSource;
@@ -44,6 +45,7 @@ import org.apache.inlong.manager.pojo.source.tubemq.TubeMQSource;
 import org.apache.inlong.manager.pojo.stream.StreamField;
 import org.apache.inlong.sort.protocol.FieldInfo;
 import org.apache.inlong.sort.protocol.LookupOptions;
+import org.apache.inlong.sort.protocol.constant.OceanBaseConstant;
 import org.apache.inlong.sort.protocol.constant.DMConstant;
 import org.apache.inlong.sort.protocol.constant.OracleConstant.ScanStartUpMode;
 import org.apache.inlong.sort.protocol.enums.KafkaScanStartupMode;
@@ -55,6 +57,7 @@ import org.apache.inlong.sort.protocol.node.extract.DamengExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.KafkaExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.MongoExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.MySqlExtractNode;
+import org.apache.inlong.sort.protocol.node.extract.OceanBaseExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.OracleExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.PostgresExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.PulsarExtractNode;
@@ -126,6 +129,8 @@ public class ExtractNodeUtils {
                 return createExtractNode((TdsqlKafkaSource) sourceInfo);
             case SourceType.TIDB:
                 return createExtractNode((TidbSource) sourceInfo);
+            case SourceType.OCEANBASE:
+                return createExtractNode((OceanBaseSource) sourceInfo);
             case SourceType.DAMENG:
                 return createExtractNode((DamengSource) sourceInfo);
             default:
@@ -469,6 +474,36 @@ public class ExtractNodeUtils {
                 source.getSchemaName(),
                 source.getTableName(),
                 source.getPort(),
+                scanStartupMode);
+    }
+
+    /**
+     * Create OceanBase extract node
+     *
+     * @param source OceanBase source info
+     * @return oceanBase extract node info
+     */
+    public static OceanBaseExtractNode createExtractNode(OceanBaseSource source) {
+        List<FieldInfo> fieldInfos = parseFieldInfos(source.getFieldList(), source.getSourceName());
+        OceanBaseConstant.ScanStartUpMode scanStartupMode = StringUtils.isBlank(source.getScanStartupMode())
+                ? null
+                : OceanBaseConstant.ScanStartUpMode.forName(source.getScanStartupMode());
+        Map<String, String> properties = parseProperties(source.getProperties());
+        return new OceanBaseExtractNode(
+                source.getSourceName(),
+                source.getSourceName(),
+                fieldInfos,
+                null,
+                properties,
+                source.getPrimaryKey(),
+                source.getTenantName(),
+                source.getHostname(),
+                source.getPort(),
+                source.getUsername(),
+                source.getPassword(),
+                source.getDatabaseName(),
+                source.getTableName(),
+                source.getTableList(),
                 scanStartupMode);
     }
 

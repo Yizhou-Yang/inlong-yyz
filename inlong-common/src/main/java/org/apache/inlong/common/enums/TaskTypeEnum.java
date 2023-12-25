@@ -44,6 +44,7 @@ public enum TaskTypeEnum {
     MYSQL(213),
     TDSQL_KAFKA(101),
     TIDB(102),
+    OCEANBASE(14),
 
     ;
 
@@ -83,6 +84,8 @@ public enum TaskTypeEnum {
                 return MQTT;
             case 13:
                 return HUDI;
+            case 14:
+                return OCEANBASE;
             case 101:
                 return TDSQL_KAFKA;
             case 102:

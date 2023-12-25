@@ -33,6 +33,7 @@ import org.apache.inlong.sort.protocol.node.extract.HudiExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.KafkaExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.MongoExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.MySqlExtractNode;
+import org.apache.inlong.sort.protocol.node.extract.OceanBaseExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.OracleExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.PostgresExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.PulsarExtractNode;
@@ -67,7 +68,8 @@ import java.util.Map;
         @JsonSubTypes.Type(value = DorisExtractNode.class, name = "dorisExtract"),
         @JsonSubTypes.Type(value = TidbExtractNode.class, name = "tidbExtract"),
         @JsonSubTypes.Type(value = TdsqlKafkaExtractNode.class, name = "tdsqlKafkaExtract"),
-        @JsonSubTypes.Type(value = HudiExtractNode.class, name = "hudiExtract")
+        @JsonSubTypes.Type(value = HudiExtractNode.class, name = "hudiExtract"),
+        @JsonSubTypes.Type(value = OceanBaseExtractNode.class, name = "oceanBaseExtract")
 })
 @Data
 @NoArgsConstructor

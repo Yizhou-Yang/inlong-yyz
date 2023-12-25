@@ -171,7 +171,12 @@ public enum MetaField {
      * Determine if a data is from cdc snapshot phase or not
      * true for increment phase, false for snapshot phase
      */
-    INCREMENTAL;
+    INCREMENTAL,
+
+    /**
+     * oceanBase use this metadata
+     */
+    TENANT_NAME;
 
     public static MetaField forName(String name) {
         for (MetaField metaField : values()) {
