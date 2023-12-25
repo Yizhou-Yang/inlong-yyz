@@ -17,6 +17,7 @@
 
 package org.apache.inlong.sort.protocol.node.format;
 
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonSubTypes;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonTypeInfo;
 
@@ -35,7 +36,8 @@ import java.util.Map;
         @JsonSubTypes.Type(value = CanalJsonFormat.class, name = "canalJsonFormat"),
         @JsonSubTypes.Type(value = CsvFormat.class, name = "csvFormat"),
         @JsonSubTypes.Type(value = InLongMsgFormat.class, name = "inLongMsgFormat"),
-        @JsonSubTypes.Type(value = RawFormat.class, name = "rawFormat")
+        @JsonSubTypes.Type(value = RawFormat.class, name = "rawFormat"),
+        @JsonSubTypes.Type(value = OggJsonFormat.class, name = "oggJsonFormat")
 })
 public interface Format extends Serializable {
 
@@ -44,6 +46,7 @@ public interface Format extends Serializable {
      *
      * @return format
      */
+    @JsonIgnore
     String getFormat();
 
     /**

@@ -62,6 +62,7 @@ import org.apache.inlong.sort.protocol.node.format.DebeziumJsonFormat;
 import org.apache.inlong.sort.protocol.node.format.Format;
 import org.apache.inlong.sort.protocol.node.format.InLongMsgFormat;
 import org.apache.inlong.sort.protocol.node.format.JsonFormat;
+import org.apache.inlong.sort.protocol.node.format.OggJsonFormat;
 import org.apache.inlong.sort.protocol.node.format.RawFormat;
 import org.apache.inlong.sort.protocol.node.load.ClickHouseLoadNode;
 import org.apache.inlong.sort.protocol.node.load.DLCIcebergLoadNode;
@@ -829,7 +830,9 @@ public class LoadNodeUtils {
                 format = jsonFormat;
                 break;
             case CANAL:
-                format = new CanalJsonFormat();
+                CanalJsonFormat canalJsonFormat = new CanalJsonFormat();
+                canalJsonFormat.setIgnoreParseErrors(ignoreParseErrors);
+                format = canalJsonFormat;
                 break;
             case DEBEZIUM_JSON:
                 DebeziumJsonFormat debeziumJsonFormat = new DebeziumJsonFormat();
@@ -838,6 +841,11 @@ public class LoadNodeUtils {
                 break;
             case RAW:
                 format = new RawFormat();
+                break;
+            case OGG_JSON:
+                OggJsonFormat oggJsonFormat = new OggJsonFormat();
+                oggJsonFormat.setIgnoreParseErrors(ignoreParseErrors);
+                format = oggJsonFormat;
                 break;
             default:
                 throw new IllegalArgumentException(String.format("Unsupported dataType=%s", dataType));

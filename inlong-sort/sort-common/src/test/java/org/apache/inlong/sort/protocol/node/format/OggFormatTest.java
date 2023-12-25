@@ -15,40 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.common.enums;
+package org.apache.inlong.sort.protocol.node.format;
 
-import java.util.Locale;
+import org.apache.inlong.sort.SerializeBaseTest;
 
-/**
- * Enum of data type.
- */
-public enum DataTypeEnum {
+public class OggFormatTest extends SerializeBaseTest<OggJsonFormat> {
 
-    CSV("csv"),
-    AVRO("avro"),
-    JSON("json"),
-    CANAL("canal"),
-    DEBEZIUM_JSON("debezium_json"),
-    RAW("raw"),
-    PROTOBUF("protobuf"),
-    OGG_JSON("ogg-json");
-
-    private final String type;
-
-    DataTypeEnum(String type) {
-        this.type = type;
-    }
-
-    public static DataTypeEnum forType(String type) {
-        for (DataTypeEnum dataType : values()) {
-            if (dataType.getType().equals(type.toLowerCase(Locale.ROOT))) {
-                return dataType;
-            }
-        }
-        throw new IllegalArgumentException("Unsupported data type for " + type);
-    }
-
-    public String getType() {
-        return type;
+    /**
+     * Get test object
+     *
+     * @return The test object
+     */
+    @Override
+    public OggJsonFormat getTestObject() {
+        return new OggJsonFormat();
     }
 }

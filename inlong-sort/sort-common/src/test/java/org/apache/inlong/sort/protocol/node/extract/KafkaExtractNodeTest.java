@@ -27,6 +27,7 @@ import org.apache.inlong.sort.protocol.FieldInfo;
 import org.apache.inlong.sort.protocol.enums.KafkaScanStartupMode;
 import org.apache.inlong.sort.protocol.node.format.CsvFormat;
 import org.apache.inlong.sort.protocol.node.format.InLongMsgFormat;
+import org.apache.inlong.sort.protocol.node.format.OggJsonFormat;
 import org.apache.inlong.sort.protocol.node.format.RawFormat;
 import org.junit.Assert;
 import org.junit.Test;
@@ -143,5 +144,10 @@ public class KafkaExtractNodeTest extends SerializeBaseTest<KafkaExtractNode> {
         Map<String, String> csvOptions = kafkaNode.tableOptions();
         assertEquals("csv", csvOptions.get("format"));
         assertEquals("true", csvOptions.get("csv.ignore-parse-errors"));
+
+        kafkaNode.setFormat(new OggJsonFormat());
+        Map<String, String> oggOptions = kafkaNode.tableOptions();
+        assertEquals("ogg-json", oggOptions.get("format"));
+        assertEquals("false", oggOptions.get("ogg-json.ignore-parse-errors"));
     }
 }

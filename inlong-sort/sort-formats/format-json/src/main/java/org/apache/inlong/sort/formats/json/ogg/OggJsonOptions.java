@@ -15,40 +15,27 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.common.enums;
+package org.apache.inlong.sort.formats.json.ogg;
 
-import java.util.Locale;
+import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.formats.json.JsonOptions;
 
-/**
- * Enum of data type.
- */
-public enum DataTypeEnum {
+/** Option utils for ogg-json format. */
+@PublicEvolving
+public class OggJsonOptions {
 
-    CSV("csv"),
-    AVRO("avro"),
-    JSON("json"),
-    CANAL("canal"),
-    DEBEZIUM_JSON("debezium_json"),
-    RAW("raw"),
-    PROTOBUF("protobuf"),
-    OGG_JSON("ogg-json");
+    public static final ConfigOption<Boolean> IGNORE_PARSE_ERRORS =
+            JsonOptions.IGNORE_PARSE_ERRORS;
 
-    private final String type;
+    public static final ConfigOption<String> TIMESTAMP_FORMAT = JsonOptions.TIMESTAMP_FORMAT;
 
-    DataTypeEnum(String type) {
-        this.type = type;
-    }
+    public static final ConfigOption<String> JSON_MAP_NULL_KEY_MODE =
+            JsonOptions.MAP_NULL_KEY_MODE;
 
-    public static DataTypeEnum forType(String type) {
-        for (DataTypeEnum dataType : values()) {
-            if (dataType.getType().equals(type.toLowerCase(Locale.ROOT))) {
-                return dataType;
-            }
-        }
-        throw new IllegalArgumentException("Unsupported data type for " + type);
-    }
+    public static final ConfigOption<String> JSON_MAP_NULL_KEY_LITERAL =
+            JsonOptions.MAP_NULL_KEY_LITERAL;
 
-    public String getType() {
-        return type;
+    private OggJsonOptions() {
     }
 }

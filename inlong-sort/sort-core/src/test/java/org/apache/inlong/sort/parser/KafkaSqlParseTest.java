@@ -32,7 +32,9 @@ import org.apache.inlong.sort.protocol.StreamInfo;
 import org.apache.inlong.sort.protocol.enums.KafkaScanStartupMode;
 import org.apache.inlong.sort.protocol.node.Node;
 import org.apache.inlong.sort.protocol.node.extract.KafkaExtractNode;
+import org.apache.inlong.sort.protocol.node.format.Format;
 import org.apache.inlong.sort.protocol.node.format.JsonFormat;
+import org.apache.inlong.sort.protocol.node.format.OggJsonFormat;
 import org.apache.inlong.sort.protocol.node.format.RawFormat;
 import org.apache.inlong.sort.protocol.node.load.MySqlLoadNode;
 import org.apache.inlong.sort.protocol.transformation.FieldRelation;
@@ -67,7 +69,7 @@ public class KafkaSqlParseTest extends AbstractTestBase {
                 .inStreamingMode()
                 .build();
         StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env, settings);
-        Node inputNode = buildKafkaExtractSpecificOffset();
+        Node inputNode = buildKafkaExtractSpecificOffset(new JsonFormat());
         Node outputNode = buildMysqlLoadNode();
         StreamInfo streamInfo = new StreamInfo("1", Arrays.asList(inputNode, outputNode),
                 Collections.singletonList(buildNodeRelation(Collections.singletonList(inputNode),
@@ -78,13 +80,41 @@ public class KafkaSqlParseTest extends AbstractTestBase {
         Assert.assertTrue(result.tryExecute());
     }
 
-    private KafkaExtractNode buildKafkaExtractSpecificOffset() {
+    /**
+     * Test flink sql task for extract is kafka {@link KafkaExtractNode} and load is mysql {@link MySqlLoadNode}
+     *
+     * @throws Exception The exception may be thrown when executing
+     */
+    @Test
+    public void testKafkaSourceForOggJsonFormat() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        env.enableCheckpointing(10000);
+        env.disableOperatorChaining();
+        EnvironmentSettings settings = EnvironmentSettings
+                .newInstance()
+                .useBlinkPlanner()
+                .inStreamingMode()
+                .build();
+        StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env, settings);
+        Node inputNode = buildKafkaExtractSpecificOffset(new OggJsonFormat());
+        Node outputNode = buildMysqlLoadNode();
+        StreamInfo streamInfo = new StreamInfo("1", Arrays.asList(inputNode, outputNode),
+                Collections.singletonList(buildNodeRelation(Collections.singletonList(inputNode),
+                        Collections.singletonList(outputNode))));
+        GroupInfo groupInfo = new GroupInfo("1", Collections.singletonList(streamInfo));
+        FlinkSqlParser parser = FlinkSqlParser.getInstance(tableEnv, groupInfo);
+        ParseResult result = parser.parse();
+        Assert.assertTrue(result.tryExecute());
+    }
+
+    private KafkaExtractNode buildKafkaExtractSpecificOffset(Format format) {
         List<FieldInfo> fields = Arrays.asList(new FieldInfo("id", new LongFormatInfo()),
                 new FieldInfo("name", new StringFormatInfo()),
                 new FieldInfo("age", new IntFormatInfo()));
         return new KafkaExtractNode("1", "kafka_input", fields, null,
                 null, "topic_input", "localhost:9092",
-                new JsonFormat(), KafkaScanStartupMode.SPECIFIC_OFFSETS, null, "groupId",
+                format, KafkaScanStartupMode.SPECIFIC_OFFSETS, null, "groupId",
                 "partition:0,offset:42;partition:1,offset:300", null);
     }
 

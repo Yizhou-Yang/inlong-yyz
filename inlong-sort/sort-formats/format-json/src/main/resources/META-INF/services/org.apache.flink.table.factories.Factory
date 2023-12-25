@@ -14,3 +14,4 @@
 # limitations under the License.
 
 org.apache.inlong.sort.formats.json.canal.CanalJsonEnhancedFormatFactory
+org.apache.inlong.sort.formats.json.ogg.OggJsonFormatFactory
