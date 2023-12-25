@@ -32,7 +32,7 @@
         Here is the product: https://cloud.tencent.com/product/dlc</description>
 
     <properties>
-        <java.sdk.version>3.1.878</java.sdk.version>
+        <java.sdk.version>3.1.933-SNAPSHOT</java.sdk.version>
         <dlc.sdk.version>3.1.893</dlc.sdk.version>
     </properties>
 
