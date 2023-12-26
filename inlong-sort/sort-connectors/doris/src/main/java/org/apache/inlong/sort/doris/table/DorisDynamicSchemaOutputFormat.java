@@ -449,8 +449,8 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
             List<Map<String, String>> updateBeforeList = null;
             try {
                 tableIdentifier = StringUtils.join(
-                        jsonDynamicSchemaFormat.parse(rootNode, databasePattern), ".",
-                        jsonDynamicSchemaFormat.parse(rootNode, tablePattern));
+                        jsonDynamicSchemaFormat.parse(rootNode, databasePattern).replace("-", "_"), ".",
+                        jsonDynamicSchemaFormat.parse(rootNode, tablePattern).replace("-", "_"));
                 if (checkFlushException(tableIdentifier)) {
                     return;
                 }
@@ -493,8 +493,8 @@ public class DorisDynamicSchemaOutputFormat<T> extends RichOutputFormat<T> {
     @SuppressWarnings({"unchecked"})
     private void addRow(RowKind rowKind, JsonNode rootNode, JsonNode physicalNode, JsonNode updateBeforeNode,
             Map<String, String> physicalData, Map<String, String> updateBeforeData) throws IOException {
-        String database = jsonDynamicSchemaFormat.parse(rootNode, databasePattern);
-        String table = jsonDynamicSchemaFormat.parse(rootNode, tablePattern);
+        String database = jsonDynamicSchemaFormat.parse(rootNode, databasePattern).replace('-', '_');
+        String table = jsonDynamicSchemaFormat.parse(rootNode, tablePattern).replace('-', '_');
         String tableIdentifier = StringUtils.join(database, ".", table);
         if (dirtySinkHelper.getDirtySink() != null) {
             try {
