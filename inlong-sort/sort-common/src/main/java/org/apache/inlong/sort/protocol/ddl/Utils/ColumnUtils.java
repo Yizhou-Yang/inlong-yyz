@@ -59,7 +59,7 @@ public class ColumnUtils {
         List<String> columnSpecs = columnDefinition.getColumnSpecs();
 
         ColumnBuilder columnBuilder = Column.builder();
-        String columnName = reformatName(columnDefinition.getColumnName());
+        String columnName = escapeName(columnDefinition.getColumnName());
         Integer jdbcType = Types.OTHER;
         if (sqlType != null) {
             jdbcType = sqlType.get(columnName);
@@ -114,11 +114,11 @@ public class ColumnUtils {
     }
 
     public static String parseComment(List<String> specs) {
-        return removeContinuousQuotes(parseAdjacentString(specs, COMMENT, false));
+        return escapeName(parseAdjacentString(specs, COMMENT, false));
     }
 
     public static Position parsePosition(List<String> specs) {
-        String afterColumn = reformatName(parseAdjacentString(specs, AFTER, false));
+        String afterColumn = escapeName(parseAdjacentString(specs, AFTER, false));
         if (!afterColumn.isEmpty()) {
             return new Position(PositionType.AFTER, afterColumn);
         }
@@ -177,7 +177,15 @@ public class ColumnUtils {
     }
 
     public static String reformatName(String str) {
-        return removeContinuousChar(str, '`');
+        // return removeContinuousChar(str, '`');
+        return escapeName(str);
     }
 
+    public static String escapeName(String name) {
+        if (name == null || name.isEmpty()) {
+            return name;
+        }
+        return name.replaceAll("\"", "").replaceAll("'", "")
+                .replaceAll("`", "");
+    }
 }

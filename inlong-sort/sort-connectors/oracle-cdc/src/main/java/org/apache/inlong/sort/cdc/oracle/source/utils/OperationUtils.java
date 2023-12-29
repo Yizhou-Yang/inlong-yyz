@@ -53,10 +53,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.escapeName;
 import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.parseColumnWithPosition;
 import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.parseColumns;
 import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.parseComment;
-import static org.apache.inlong.sort.protocol.ddl.Utils.ColumnUtils.reformatName;
 
 /**
  * Utils for generate operation from statement from sqlParser.
@@ -139,13 +139,13 @@ public class OperationUtils {
                     }
                     if (alterExpression.getConstraintName() != null) {
                         alterColumns.add(new AlterColumn(AlterType.DROP_CONSTRAINT,
-                                new Column(reformatName(alterExpression.getConstraintName())),
+                                new Column(escapeName(alterExpression.getConstraintName())),
                                 null));
                         break;
                     }
                     alterColumns.add(new AlterColumn(AlterType.DROP_COLUMN,
                             null,
-                            Column.builder().name(reformatName(alterExpression.getColumnName()))
+                            Column.builder().name(escapeName(alterExpression.getColumnName()))
                                     .build()));
                     break;
                 case ADD:
@@ -162,15 +162,15 @@ public class OperationUtils {
                     break;
                 case RENAME:
                     alterColumns.add(new AlterColumn(AlterType.CHANGE_COLUMN,
-                            new Column(reformatName(alterExpression.getColumnName())),
-                            new Column(reformatName(alterExpression.getColumnOldName()))));
+                            new Column(escapeName(alterExpression.getColumnName())),
+                            new Column(escapeName(alterExpression.getColumnOldName()))));
                     break;
                 case MODIFY:
                 case CHANGE:
                     alterColumns.add(new AlterColumn(AlterType.CHANGE_COLUMN,
                             parseColumnWithPosition(isFirst, sqlType,
                                     alterExpression.getColDataTypeList().get(0)),
-                            new Column(reformatName(alterExpression.getColumnOldName()))));
+                            new Column(escapeName(alterExpression.getColumnOldName()))));
                     break;
                 default:
                     LOG.warn("doesn't support alter operation {}, statement {}",
@@ -234,8 +234,8 @@ public class OperationUtils {
                     break;
             }
             List<String> columns = new ArrayList<>();
-            perIndex.getColumnsNames().forEach(columnName -> columns.add(reformatName(columnName)));
-            index.setIndexName(reformatName(perIndex.getName()));
+            perIndex.getColumnsNames().forEach(columnName -> columns.add(escapeName(columnName)));
+            index.setIndexName(escapeName(perIndex.getName()));
             index.setIndexColumns(columns);
             indexList.add(index);
         }
@@ -260,7 +260,7 @@ public class OperationUtils {
      */
     private static String parseLikeTable(CreateTable statement) {
         if (statement.getLikeTable() != null) {
-            return statement.getLikeTable().getName();
+            return escapeName(statement.getLikeTable().getName());
         }
         return "";
     }
