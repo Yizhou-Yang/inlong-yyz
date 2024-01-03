@@ -90,13 +90,13 @@ public class IcebergSchemaChangeHelper extends SchemaChangeHelper {
                             doAddColumn(kv.getValue(), TableIdentifier.of(database, table));
                             break;
                         case DROP_COLUMN:
-                            doDropColumn(null, null, null, null, kv.getKey(), originSchema);
+                            doDropColumn(database, table, kv.getValue(), kv.getKey(), originSchema);
                             break;
                         case RENAME_COLUMN:
-                            doRenameColumn(null, null, null, null, kv.getKey(), originSchema);
+                            doRenameColumn(database, table, kv.getValue(), kv.getKey(), originSchema);
                             break;
                         case CHANGE_COLUMN_TYPE:
-                            doChangeColumnType(null, null, null, null, kv.getKey(), originSchema);
+                            doChangeColumnType(database, table, kv.getValue(), kv.getKey(), originSchema);
                             break;
                         default:
                     }
@@ -162,6 +162,74 @@ public class IcebergSchemaChangeHelper extends SchemaChangeHelper {
         LOGGER.info("Schema evolution in table({}) for table change: {}", tableId, tableChanges);
         transaction.commitTransaction();
         schemaCache.put(tableId, table.schema());
+    }
+
+    @Override
+    public String doDropColumn(String database, String tableName,
+            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema) {
+        List<TableChange> tableChanges = new ArrayList<>();
+        TableIdentifier tableId = TableIdentifier.of(database, tableName);
+        Table table = catalog.loadTable(tableId);
+        Transaction transaction = table.newTransaction();
+
+        alterColumns.forEach(alterColumn -> {
+            Column column = alterColumn.getOldColumn();
+
+            TableChange.DeleteColumn deleteColumn = new TableChange.DeleteColumn(new String[]{column.getName()});
+            tableChanges.add(deleteColumn);
+        });
+        IcebergSchemaChangeUtils.applySchemaChanges(transaction.updateSchema(), tableChanges);
+        LOGGER.info("Schema evolution in table({}) for table change drop column: {}", tableId, tableChanges);
+        transaction.commitTransaction();
+        schemaCache.put(tableId, table.schema());
+        return "";
+    }
+
+    @Override
+    public String doRenameColumn(String database, String tableName,
+            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema) {
+        List<TableChange> tableChanges = new ArrayList<>();
+        TableIdentifier tableId = TableIdentifier.of(database, tableName);
+        Table table = catalog.loadTable(tableId);
+        Transaction transaction = table.newTransaction();
+
+        alterColumns.forEach(alterColumn -> {
+            Column oldColumn = alterColumn.getOldColumn();
+            Column newColumn = alterColumn.getNewColumn();
+
+            TableChange.RenameColumn renameColumn =
+                    new TableChange.RenameColumn(new String[]{oldColumn.getName(), newColumn.getName()});
+            tableChanges.add(renameColumn);
+        });
+        IcebergSchemaChangeUtils.applySchemaChanges(transaction.updateSchema(), tableChanges);
+        LOGGER.info("Schema evolution in table({}) for table change rename column: {}", tableId, tableChanges);
+        transaction.commitTransaction();
+        schemaCache.put(tableId, table.schema());
+        return "";
+    }
+
+    @Override
+    public String doChangeColumnType(String database, String tableName,
+            List<AlterColumn> alterColumns, SchemaChangeType type, String originSchema) {
+        List<TableChange> tableChanges = new ArrayList<>();
+        TableIdentifier tableId = TableIdentifier.of(database, tableName);
+        Table table = catalog.loadTable(tableId);
+        Transaction transaction = table.newTransaction();
+
+        alterColumns.forEach(alterColumn -> {
+            Column column = alterColumn.getNewColumn();
+            LogicalType dataType = dynamicSchemaFormat.sqlType2FlinkType(column.getJdbcType());
+
+            TableChange.ChangeColumnType changeColumnType =
+                    new TableChange.ChangeColumnType(new String[]{column.getName()},
+                            dataType, column.getComment());
+            tableChanges.add(changeColumnType);
+        });
+        IcebergSchemaChangeUtils.applySchemaChanges(transaction.updateSchema(), tableChanges);
+        LOGGER.info("Schema evolution in table({}) for table change change column type: {}", tableId, tableChanges);
+        transaction.commitTransaction();
+        schemaCache.put(tableId, table.schema());
+        return "";
     }
 
     public AtomicBoolean ddlExecSuccess() {

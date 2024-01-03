@@ -520,8 +520,10 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             Map<String, ColumnSchema> newColumnSchemas = extractColumnSchema(newSchema);
             List<TableChange> tableChanges = IcebergSchemaChangeUtils.diffSchema(oldColumnSchemas, newColumnSchemas);
             for (TableChange tableChange : tableChanges) {
-                if (!(tableChange instanceof AddColumn)) {
-                    // todo:currently iceberg can only handle addColumn, so always return false
+                if (!(tableChange instanceof AddColumn) && !(tableChange instanceof TableChange.DeleteColumn)
+                        && !(tableChange instanceof TableChange.RenameColumn)
+                        && !(tableChange instanceof TableChange.ChangeColumnType)) {
+                    // todo:currently iceberg can only handle addColumn、deleteColumn、renameColumn and changeColumnType, so always return false
                     throw new RuntimeException(
                             String.format("Unsupported table %s schema change: %s.", tableId.toString(), tableChange));
                 }
@@ -584,8 +586,10 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
         for (TableChange tableChange : tableChanges) {
             canHandle &= MultipleSinkOption.canHandleWithSchemaUpdate(tableId.toString(), tableChange,
                     multipleSinkOption.getSchemaUpdatePolicy());
-            if (!(tableChange instanceof AddColumn)) {
-                // todo:currently iceberg can only handle addColumn, so always return false
+            if (!(tableChange instanceof AddColumn) && !(tableChange instanceof TableChange.DeleteColumn)
+                    && !(tableChange instanceof TableChange.RenameColumn)
+                    && !(tableChange instanceof TableChange.ChangeColumnType)) {
+                // todo:currently iceberg can only handle addColumn、deleteColumn、renameColumn and changeColumnType, so always return false
                 LOG.info("Ignore table {} schema change: {} because iceberg can't handle it.",
                         tableId, tableChange);
                 canHandle = false;

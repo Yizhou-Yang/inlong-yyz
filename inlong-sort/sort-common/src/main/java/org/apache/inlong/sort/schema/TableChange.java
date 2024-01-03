@@ -177,9 +177,142 @@ public interface TableChange {
 
     final class DeleteColumn implements ColumnChange {
 
+        private final String[] fieldNames;
+
+        public DeleteColumn(
+                String[] fieldNames) {
+            Preconditions.checkArgument(fieldNames.length > 0,
+                    "Invalid field name: at least one name is required");
+            this.fieldNames = fieldNames;
+        }
+
         @Override
         public String[] fieldNames() {
-            return new String[0];
+            return fieldNames;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            DeleteColumn addColumn = (DeleteColumn) o;
+            return Arrays.equals(fieldNames, addColumn.fieldNames);
+        }
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(fieldNames);
+        }
+
+        @Override
+        public String toString() {
+            return String.format("DELETE COLUMNS `%s`",
+                    fieldNames[fieldNames.length - 1]);
+        }
+    }
+
+    final class RenameColumn implements ColumnChange {
+
+        private final String[] fieldNames;
+
+        public RenameColumn(
+                String[] fieldNames) {
+            Preconditions.checkArgument(fieldNames.length > 1,
+                    "Invalid field name: at least two name is required");
+            this.fieldNames = fieldNames;
+        }
+
+        @Override
+        public String[] fieldNames() {
+            return fieldNames;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            RenameColumn addColumn = (RenameColumn) o;
+            return Arrays.equals(fieldNames, addColumn.fieldNames);
+        }
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(fieldNames);
+        }
+
+        @Override
+        public String toString() {
+            return String.format("RENAME COLUMNS `%s` to `%s`",
+                    fieldNames[fieldNames.length - 2], fieldNames[fieldNames.length - 1]);
+        }
+    }
+
+    final class ChangeColumnType implements ColumnChange {
+
+        private final String[] fieldNames;
+        private final LogicalType dataType;
+        private final String comment;
+
+        public ChangeColumnType(
+                String[] fieldNames,
+                LogicalType dataType,
+                String comment) {
+            Preconditions.checkArgument(fieldNames.length > 0,
+                    "Invalid field name: at least one name is required");
+            this.fieldNames = fieldNames;
+            this.dataType = dataType;
+            this.comment = comment;
+        }
+
+        @Override
+        public String[] fieldNames() {
+            return fieldNames;
+        }
+
+        public LogicalType dataType() {
+            return dataType;
+        }
+
+        @Nullable
+        public String comment() {
+            return comment;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            AddColumn addColumn = (AddColumn) o;
+            return Arrays.equals(fieldNames, addColumn.fieldNames)
+                    && dataType.equals(addColumn.dataType)
+                    && Objects.equals(comment, addColumn.comment);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(dataType, comment);
+            result = 31 * result + Arrays.hashCode(fieldNames);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("CHANGE COLUMNS TYPE `%s` %s %s",
+                    fieldNames[fieldNames.length - 1],
+                    dataType,
+                    comment);
         }
     }
 

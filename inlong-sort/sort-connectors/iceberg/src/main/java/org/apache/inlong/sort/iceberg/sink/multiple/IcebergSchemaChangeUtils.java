@@ -241,7 +241,13 @@ public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
         try {
             for (TableChange change : tableChanges) {
                 if (change instanceof TableChange.AddColumn) {
-                    apply(pendingUpdate, (TableChange.AddColumn) change);
+                    applyAdd(pendingUpdate, (TableChange.AddColumn) change);
+                } else if (change instanceof TableChange.DeleteColumn) {
+                    applyDelete(pendingUpdate, (TableChange.DeleteColumn) change);
+                } else if (change instanceof TableChange.RenameColumn) {
+                    applyRename(pendingUpdate, (TableChange.RenameColumn) change);
+                } else if (change instanceof TableChange.ChangeColumnType) {
+                    applyChangeColumnType(pendingUpdate, (TableChange.ChangeColumnType) change);
                 } else {
                     throw new UnsupportedOperationException("Cannot apply unknown table change: " + change);
                 }
@@ -257,7 +263,7 @@ public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
         }
     }
 
-    public static void apply(UpdateSchema pendingUpdate, TableChange.AddColumn add) {
+    public static void applyAdd(UpdateSchema pendingUpdate, TableChange.AddColumn add) {
         Type type = add.dataType().accept(new FlinkTypeToType(RowType.of(add.dataType())));
         pendingUpdate.addColumn(parentName(add.fieldNames()), leafName(add.fieldNames()), type, add.comment());
 
@@ -275,9 +281,29 @@ public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
         }
     }
 
+    public static void applyDelete(UpdateSchema pendingUpdate, TableChange.DeleteColumn add) {
+        pendingUpdate.deleteColumn(leafName(add.fieldNames()));
+    }
+
+    public static void applyRename(UpdateSchema pendingUpdate, TableChange.RenameColumn rename) {
+        pendingUpdate.renameColumn(leafOldName(rename.fieldNames()), leafName(rename.fieldNames()));
+    }
+
+    public static void applyChangeColumnType(UpdateSchema pendingUpdate,
+            TableChange.ChangeColumnType changeColumnType) {
+        Type type = changeColumnType.dataType().accept(new FlinkTypeToType(RowType.of(changeColumnType.dataType())));
+        pendingUpdate.updateColumn(leafName(changeColumnType.fieldNames()), type.asPrimitiveType(),
+                changeColumnType.comment());
+    }
+
     public static String leafName(String[] fieldNames) {
         Preconditions.checkArgument(fieldNames.length > 0, "Invalid field name: at least one name is required");
         return fieldNames[fieldNames.length - 1];
+    }
+
+    public static String leafOldName(String[] fieldNames) {
+        Preconditions.checkArgument(fieldNames.length > 1, "Invalid field name: at least two name is required");
+        return fieldNames[fieldNames.length - 2];
     }
 
     public static String peerName(String[] fieldNames, String fieldName) {

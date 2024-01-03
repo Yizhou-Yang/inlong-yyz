@@ -175,6 +175,7 @@ public class IcebergTableSink implements DynamicTableSink, SupportsPartitioning,
         } else {
             return (DataStreamSinkProvider) dataStream -> FlinkSink.forRowData(dataStream)
                     .tableLoader(tableLoader)
+                    .writeParallelism(parallelism)
                     .tableSchema(tableSchema)
                     .equalityFieldColumns(equalityColumns)
                     .overwrite(overwrite)
