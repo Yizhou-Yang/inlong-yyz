@@ -46,6 +46,7 @@ public class SourceType {
     public static final String HUDI = "HUDI";
     public static final String TDSQL_KAFKA = "TDSQL_KAFKA";
     public static final String TIDB = "TIDB";
+    public static final String DAMENG = "DAMENG";
 
     public static final Map<String, TaskTypeEnum> SOURCE_TASK_MAP = new HashMap<String, TaskTypeEnum>() {
 
@@ -69,6 +70,7 @@ public class SourceType {
             put(HUDI, TaskTypeEnum.HUDI);
 
             put(TIDB, TaskTypeEnum.TIDB);
+            put(DAMENG, TaskTypeEnum.DAMENG);
         }
     };
 

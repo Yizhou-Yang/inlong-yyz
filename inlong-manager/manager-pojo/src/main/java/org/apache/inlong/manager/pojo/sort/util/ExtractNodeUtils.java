@@ -25,6 +25,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.common.enums.DataTypeEnum;
 import org.apache.inlong.manager.common.consts.SourceType;
 import org.apache.inlong.manager.pojo.source.StreamSource;
+import org.apache.inlong.manager.pojo.source.dameng.DamengSource;
 import org.apache.inlong.manager.pojo.source.hudi.HudiSource;
 import org.apache.inlong.manager.pojo.source.kafka.KafkaOffset;
 import org.apache.inlong.manager.pojo.source.kafka.KafkaSource;
@@ -43,12 +44,14 @@ import org.apache.inlong.manager.pojo.source.tubemq.TubeMQSource;
 import org.apache.inlong.manager.pojo.stream.StreamField;
 import org.apache.inlong.sort.protocol.FieldInfo;
 import org.apache.inlong.sort.protocol.LookupOptions;
+import org.apache.inlong.sort.protocol.constant.DMConstant;
 import org.apache.inlong.sort.protocol.constant.OracleConstant.ScanStartUpMode;
 import org.apache.inlong.sort.protocol.enums.KafkaScanStartupMode;
 import org.apache.inlong.sort.protocol.enums.PulsarScanStartupMode;
 import org.apache.inlong.sort.protocol.enums.RedisCommand;
 import org.apache.inlong.sort.protocol.enums.RedisMode;
 import org.apache.inlong.sort.protocol.node.ExtractNode;
+import org.apache.inlong.sort.protocol.node.extract.DamengExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.KafkaExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.MongoExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.MySqlExtractNode;
@@ -123,6 +126,8 @@ public class ExtractNodeUtils {
                 return createExtractNode((TdsqlKafkaSource) sourceInfo);
             case SourceType.TIDB:
                 return createExtractNode((TidbSource) sourceInfo);
+            case SourceType.DAMENG:
+                return createExtractNode((DamengSource) sourceInfo);
             default:
                 throw new IllegalArgumentException(
                         String.format("Unsupported sourceType=%s to create extractNode", sourceType));
@@ -513,6 +518,37 @@ public class ExtractNodeUtils {
                 source.getUsername(),
                 source.getPassword(),
                 source.getDatabase());
+    }
+
+
+    /**
+     * Create Dameng extract node
+     *
+     * @param source Dameng source info
+     * @return Dameng extract node info
+     */
+    public static DamengExtractNode createExtractNode(DamengSource source) {
+        List<FieldInfo> fieldInfos = parseFieldInfos(source.getFieldList(), source.getSourceName());
+        DMConstant.ScanStartUpMode scanStartupMode = StringUtils.isBlank(source.getScanStartupMode())
+                ? null
+                : DMConstant.ScanStartUpMode.forName(source.getScanStartupMode());
+        Map<String, String> properties = parseProperties(source.getProperties());
+
+        return new DamengExtractNode(
+                source.getSourceName(),
+                source.getSourceName(),
+                fieldInfos,
+                null,
+                properties,
+                source.getPrimaryKey(),
+                source.getHost(),
+                source.getUsername(),
+                source.getPassword(),
+                source.getDbName(),
+                source.getSchemaName(),
+                source.getTableName(),
+                source.getPort(),
+                scanStartupMode);
     }
 
     /**

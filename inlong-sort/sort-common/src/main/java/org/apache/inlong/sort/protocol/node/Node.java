@@ -22,6 +22,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonInc
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonSubTypes;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.apache.inlong.sort.protocol.FieldInfo;
+import org.apache.inlong.sort.protocol.node.extract.DamengExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.FileSystemExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.HudiExtractNode;
 import org.apache.inlong.sort.protocol.node.extract.KafkaExtractNode;
@@ -76,6 +77,7 @@ import java.util.TreeMap;
         @JsonSubTypes.Type(value = SqlServerExtractNode.class, name = "sqlserverExtract"),
         @JsonSubTypes.Type(value = PulsarExtractNode.class, name = "pulsarExtract"),
         @JsonSubTypes.Type(value = MongoExtractNode.class, name = "mongoExtract"),
+        @JsonSubTypes.Type(value = DamengExtractNode.class, name = "damengExtract"),
         @JsonSubTypes.Type(value = OracleExtractNode.class, name = "oracleExtract"),
         @JsonSubTypes.Type(value = TubeMQExtractNode.class, name = "tubeMQExtract"),
         @JsonSubTypes.Type(value = RedisExtractNode.class, name = "redisExtract"),

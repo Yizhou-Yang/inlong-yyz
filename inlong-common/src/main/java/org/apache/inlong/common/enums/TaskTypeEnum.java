@@ -36,6 +36,7 @@ public enum TaskTypeEnum {
     REDIS(11),
     MQTT(12),
     HUDI(13),
+    DAMENG(15),
 
     // only used for unit test
     MOCK(201),
@@ -92,6 +93,8 @@ public enum TaskTypeEnum {
                 return CKAFKA;
             case 213:
                 return MYSQL;
+            case 15:
+                return DAMENG;
             default:
                 throw new RuntimeException("Unsupported task type " + taskType);
         }
