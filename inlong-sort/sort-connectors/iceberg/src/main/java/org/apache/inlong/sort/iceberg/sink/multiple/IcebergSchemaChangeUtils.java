@@ -69,6 +69,8 @@ public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
             }
             LOGGER.debug("createTable upsertMode:" + upsertMode + ", primaryKey:" + String.join(",", primaryKeyList));
 
+            // lakefs
+            properties.put("lakehouse.storage.type", "lakefs");
             properties.put("write.metadata.metrics.default", "full");
             // for hive visible
             properties.put("engine.hive.enabled", "true");
