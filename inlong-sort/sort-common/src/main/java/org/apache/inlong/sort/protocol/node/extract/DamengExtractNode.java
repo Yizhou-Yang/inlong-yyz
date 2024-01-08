@@ -121,8 +121,6 @@ public class DamengExtractNode extends ExtractNode implements Serializable, Meta
         return options;
     }
 
-
-
     @Override
     public String genTableName() {
         return String.format("node_%s", super.getId());
