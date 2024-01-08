@@ -135,7 +135,12 @@ public class DamengExtractNode extends ExtractNode implements Serializable, Meta
 
     @Override
     public Set<MetaField> supportedMetaFields() {
-        return EnumSet.of(MetaField.TABLE_NAME, MetaField.DATABASE_NAME, MetaField.SCHEMA_NAME);
+        return EnumSet.of(MetaField.PROCESS_TIME, MetaField.DATABASE_NAME, MetaField.TABLE_NAME, MetaField.SCHEMA_NAME,
+                MetaField.DATA_CANAL, MetaField.OP_TYPE, MetaField.OP_TS, MetaField.IS_DDL,
+                MetaField.TS, MetaField.SQL_TYPE, MetaField.MYSQL_TYPE, MetaField.PK_NAMES,
+                MetaField.BATCH_ID, MetaField.UPDATE_BEFORE, MetaField.DATA_BYTES_DEBEZIUM,
+                MetaField.DATA_DEBEZIUM, MetaField.DATA_BYTES_CANAL,
+                MetaField.DATA, MetaField.DATA_BYTES, MetaField.INCREMENTAL);
     }
 
     @Override
