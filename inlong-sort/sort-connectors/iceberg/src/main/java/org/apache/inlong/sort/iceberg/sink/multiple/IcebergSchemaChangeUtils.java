@@ -74,8 +74,6 @@ public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
             }
             LOGGER.debug("createTable upsertMode:" + upsertMode + ", primaryKey:" + String.join(",", primaryKeyList));
 
-            // lakefs
-            properties.put("lakehouse.storage.type", "lakefs");
             properties.put("write.metadata.metrics.default", "full");
             // for hive visible
             properties.put("engine.hive.enabled", "true");
@@ -221,7 +219,7 @@ public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
                     builder = builder.month(partitionColumn);
                     flag = true;
                 } else if (partitionPolicy.contains("day")) {
-                    builder = builder.year(partitionColumn);
+                    builder = builder.day(partitionColumn);
                     flag = true;
                 } else if (partitionPolicy.contains("hour")) {
                     builder = builder.hour(partitionColumn);

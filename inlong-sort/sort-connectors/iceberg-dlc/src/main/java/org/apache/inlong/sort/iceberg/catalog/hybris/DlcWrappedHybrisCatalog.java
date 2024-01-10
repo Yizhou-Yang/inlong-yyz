@@ -137,6 +137,7 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
     private FileIO fileIO;
     private ClientPool<DLCDataCatalogMetastoreClient, TException> clients;
     private boolean listAllTables = false;
+    private boolean isDlcManagedTable;
 
     public DlcWrappedHybrisCatalog() {
     }
@@ -166,6 +167,9 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
                         "Illegal warehouse location, supportted location:" + SUPPORTED_WAREHOUSE);
             }
             this.conf.set(HiveConf.ConfVars.METASTOREWAREHOUSE.varname, warehouse);
+            isDlcManagedTable = false;
+        } else {
+            isDlcManagedTable = true;
         }
 
         this.listAllTables = Boolean.parseBoolean(properties.getOrDefault(LIST_ALL_TABLES, LIST_ALL_TABLES_DEFAULT));
@@ -731,6 +735,14 @@ public class DlcWrappedHybrisCatalog extends BaseMetastoreCatalog implements Sup
                 AssignMangedTablePropertiesResponse response =
                         client.AssignMangedTableProperties(assignMangedTablePropertiesRequest);
                 Property[] propertiesRes = response.getProperties();
+
+                LOG.info("Check dlc managed table flag:{}, decide apply lakefs config or not.", isDlcManagedTable);
+                if (isDlcManagedTable) {
+                    // lakefs
+                    propertiesBuilder.put("lakehouse.storage.type", "lakefs");
+                } else {
+                    LOG.info("not dlc managed table, skip lakefs config!");
+                }
 
                 for (Property property : propertiesRes) {
                     String key = property.getKey();

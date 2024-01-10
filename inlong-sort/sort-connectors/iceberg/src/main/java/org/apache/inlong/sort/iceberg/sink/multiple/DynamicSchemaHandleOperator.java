@@ -57,6 +57,7 @@ import org.apache.inlong.sort.base.metric.sub.SinkTableMetricData;
 import org.apache.inlong.sort.base.sink.MultipleSinkOption;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.iceberg.schema.IcebergSchemaChangeHelper;
+import org.apache.inlong.sort.protocol.enums.SchemaChangeType;
 import org.apache.inlong.sort.schema.ColumnSchema;
 import org.apache.inlong.sort.schema.TableChange;
 import org.apache.inlong.sort.schema.TableChange.AddColumn;
@@ -450,7 +451,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
                         .map(JsonNode::asBoolean).orElse(false));
                 output.collect(new StreamRecord<>(recordWithSchema));
             } else {
-                LOG.warn("Table {} schema is different!", tableId);
+                LOG.warn("Table {} latestSchema{} dataSchema{} is different!", tableId, latestSchema, dataSchema);
                 if (SchemaUpdateExceptionPolicy.LOG_WITH_IGNORE == multipleSinkOption
                         .getSchemaUpdatePolicy()) {
                     RecordWithSchema recordWithSchema = queue.poll();
@@ -478,7 +479,10 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
     // ================================ All coordinator handle method ==============================================
     private void handleTableCreateEventFromOperator(TableIdentifier tableId, Schema schema,
             List<String> primaryKeyList, boolean upsertMode) {
-        if (this.autoCreateTableWhenSnapshot) {
+        boolean isCreateTableFlag = schemaChangeHelper.checkSchemaChangeTypeEnable(SchemaChangeType.CREATE_TABLE) ||
+                this.autoCreateTableWhenSnapshot;
+        LOG.info("handleTableCreateEventFromOperator isCreateTableFlag:{}", isCreateTableFlag);
+        if (isCreateTableFlag) {
             IcebergSchemaChangeUtils.createTable(catalog, tableId, asNamespaceCatalog, schema, primaryKeyList,
                     upsertMode, schemaChangeHelper.getSinkPartitionRules());
         }
