@@ -65,11 +65,20 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
     protected final SchemaUpdateExceptionPolicy exceptionPolicy;
     private final SinkTableMetricData metricData;
     private final DirtySinkHelper<Object> dirtySinkHelper;
+    private final String sinkPartitionRules;
 
     public SchemaChangeHelper(JsonDynamicSchemaFormat dynamicSchemaFormat, boolean schemaChange,
             Map<SchemaChangeType, SchemaChangePolicy> policyMap, String databasePattern, String schemaPattern,
             String tablePattern, SchemaUpdateExceptionPolicy exceptionPolicy, SinkTableMetricData metricData,
             DirtySinkHelper<Object> dirtySinkHelper) {
+        this(dynamicSchemaFormat, schemaChange, policyMap, databasePattern, schemaPattern, tablePattern,
+                exceptionPolicy, metricData, dirtySinkHelper, null);
+    }
+
+    public SchemaChangeHelper(JsonDynamicSchemaFormat dynamicSchemaFormat, boolean schemaChange,
+            Map<SchemaChangeType, SchemaChangePolicy> policyMap, String databasePattern, String schemaPattern,
+            String tablePattern, SchemaUpdateExceptionPolicy exceptionPolicy, SinkTableMetricData metricData,
+            DirtySinkHelper<Object> dirtySinkHelper, String sinkPartitionRules) {
         this.dynamicSchemaFormat = Preconditions.checkNotNull(dynamicSchemaFormat, "dynamicSchemaFormat is null");
         this.schemaChange = schemaChange;
         this.policyMap = policyMap;
@@ -79,6 +88,7 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
         this.exceptionPolicy = exceptionPolicy;
         this.metricData = metricData;
         this.dirtySinkHelper = dirtySinkHelper;
+        this.sinkPartitionRules = sinkPartitionRules;
     }
 
     @Override
@@ -99,6 +109,7 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
         try {
             database = dynamicSchemaFormat.parse(data, databasePattern);
             table = dynamicSchemaFormat.parse(data, tablePattern);
+            LOGGER.debug("sinkPartitionRules:{}", sinkPartitionRules);
             if (StringUtils.isNotBlank(schemaPattern)) {
                 schema = dynamicSchemaFormat.parse(data, schemaPattern);
             }
@@ -157,7 +168,7 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
         switch (type) {
             case CREATE_TABLE:
                 doCreateTable(originData, database, schema, table, type, originSchema, data,
-                        (CreateTableOperation) operation);
+                        (CreateTableOperation) operation, sinkPartitionRules);
                 break;
             case DROP_TABLE:
                 doDropTable(database, schema, table, type, originSchema);
@@ -258,6 +269,12 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
     @Override
     public void doCreateTable(byte[] originData, String database, String table, SchemaChangeType type,
             String originSchema, JsonNode data, CreateTableOperation operation) {
+        throw new SchemaChangeHandleException(String.format("Unsupported for %s: %s", type, originSchema));
+    }
+
+    @Override
+    public void doCreateTable(byte[] originData, String database, String schema, String table, SchemaChangeType type,
+            String originSchema, JsonNode data, CreateTableOperation operation, String partitionNameRules) {
         throw new SchemaChangeHandleException(String.format("Unsupported for %s: %s", type, originSchema));
     }
 
@@ -447,5 +464,9 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
         String comment = StringUtils.isBlank(column.getComment()) ? Constants.ADD_COLUMN_COMMENT
                 : column.getComment() + " " + Constants.ADD_COLUMN_COMMENT;
         return new RowField(column.getName(), logicalType, comment);
+    }
+
+    public String getSinkPartitionRules() {
+        return sinkPartitionRules;
     }
 }

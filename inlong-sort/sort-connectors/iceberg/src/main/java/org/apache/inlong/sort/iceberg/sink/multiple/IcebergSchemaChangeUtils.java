@@ -17,6 +17,7 @@
 
 package org.apache.inlong.sort.iceberg.sink.multiple;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -37,7 +38,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
 
@@ -46,7 +51,7 @@ public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
     private static final Joiner DOT = Joiner.on(".");
 
     public static void createTable(Catalog catalog, TableIdentifier tableId, SupportsNamespaces asNamespaceCatalog,
-            Schema schema, List<String> primaryKeyList, boolean upsertMode) {
+            Schema schema, List<String> primaryKeyList, boolean upsertMode, String sinkPartitionRules) {
         if (!catalog.tableExists(tableId)) {
             if (asNamespaceCatalog != null && !asNamespaceCatalog.namespaceExists(tableId.namespace())) {
                 try {
@@ -77,8 +82,41 @@ public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
             // fake properties for primary key
             properties.put("primary.keys", String.join(",", primaryKeyList));
             try {
-                Table table =
-                        catalog.createTable(tableId, schema, PartitionSpec.unpartitioned(), null, properties.build());
+                Table table = null;
+                String tableName = tableId.name();
+                List<Map<String, String>> list = parseSinkPartitionRules(tableName, sinkPartitionRules);
+                LOGGER.info("list size:{}", list.size());
+                boolean isCreate = false;
+                for (Map<String, String> map : list) {
+                    String partitionColumn = map.get("PartitionColumns");
+                    String partitionPolicy = map.get("PartitionPolicies");
+
+                    String[] partitionColumnArr = partitionColumn.split(",");
+                    String[] partitionPolicyArr = partitionPolicy.split(",");
+
+                    LOGGER.info("createTable partitionColumn:{} partitionPolicy:{}", partitionColumn, partitionPolicy);
+                    int partitionColumnLen = partitionColumnArr.length, partitionPolicyLen = partitionPolicyArr.length;
+                    if (partitionColumnLen == partitionPolicyLen) {
+                        PartitionSpec partitionSpec =
+                                parsePartitionPolicy(schema, partitionColumnArr, partitionPolicyArr);
+                        if (partitionSpec != null) {
+                            table = catalog.createTable(tableId, schema, partitionSpec, null, properties.build());
+                            isCreate = true;
+                        } else {
+                            LOGGER.warn("partitionSpec is null, skip partition!");
+                        }
+                    } else {
+                        LOGGER.warn("PartitionColumn size not equal to PartitionMethod, skip partition!");
+                    }
+                }
+
+                if (!isCreate) {
+                    table = catalog.createTable(tableId, schema, PartitionSpec.unpartitioned(), null,
+                            properties.build());
+                } else {
+                    LOGGER.debug("Already create table!");
+                }
+
                 if (table == null) {
                     LOGGER.warn(
                             "Auto create Table({}) in Database({}) in Catalog({}) failed, maybe something wrong or table exists!",
@@ -92,6 +130,113 @@ public class IcebergSchemaChangeUtils extends SchemaChangeUtils {
                         tableId.name(), tableId.namespace(), catalog.name());
             }
         }
+    }
+
+    private static List<Map<String, String>> parseSinkPartitionRules(String tableName, String sinkPartitionRules) {
+        List<Map<String, String>> list = new ArrayList<>();
+
+        LOGGER.info("tableName:{} sinkPartitionRules:{}", tableName, sinkPartitionRules);
+        if (StringUtils.isNotBlank(tableName) && StringUtils.isNotBlank(sinkPartitionRules)) {
+            String[] partitionNameRuleArr = sinkPartitionRules.split("\\|");
+            for (String str : partitionNameRuleArr) {
+                LOGGER.info("str:{}", str);
+                if (StringUtils.isNotBlank(str) && str.contains(":")) {
+                    String[] arrays = str.split(":");
+                    if (arrays.length == 3) {
+                        String partitionTableNames = arrays[0];
+                        String partitionColumns = arrays[1];
+                        String partitionPolicies = arrays[2];
+
+                        if (StringUtils.isNotBlank(partitionTableNames) && StringUtils.isNotBlank(partitionColumns)
+                                && StringUtils.isNotBlank(partitionPolicies)) {
+                            boolean isMatch = Pattern.matches(partitionTableNames, tableName);
+                            if (isMatch) {
+                                Map<String, String> map = new HashMap<>();
+
+                                map.put("PartitionColumns", partitionColumns);
+                                map.put("PartitionPolicies", partitionPolicies);
+                                list.add(map);
+                                return list;
+                            } else {
+                                LOGGER.debug("partitionTableNames:{} tableName:{} not match!", partitionTableNames,
+                                        tableName);
+                            }
+                        } else {
+                            LOGGER.info("partitionTableNames or partitionColumns or partitionPolicies is blank!");
+                        }
+                    } else {
+                        LOGGER.info("arrays size:{} is not equal to 3!", arrays.length);
+                    }
+                } else {
+                    LOGGER.info("str is blank or not contains ':'!");
+                }
+            }
+        } else {
+            LOGGER.debug("sinkPartitionRules or tableName is blank!");
+        }
+        return list;
+    }
+
+    private static PartitionSpec parsePartitionPolicy(Schema schema, String[] partitionColumnArr,
+            String[] partitionPolicyArr) {
+        PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
+
+        boolean flag = false;
+        PartitionSpec partitionSpec = null;
+        for (int i = 0; i < partitionColumnArr.length; i++) {
+            String partitionColumn = partitionColumnArr[i];
+            String partitionPolicy = partitionPolicyArr[i];
+
+            LOGGER.info("parsePartitionPolicy partitionColumn:{} partitionPolicy:{}", partitionColumn, partitionPolicy);
+            if (StringUtils.isNotBlank(partitionColumn) && StringUtils.isNotBlank(partitionPolicy)) {
+                if (partitionPolicy.contains("identity")) {
+                    builder = builder.identity(partitionColumn);
+                    flag = true;
+                } else if (Pattern.matches("bucket\\[.*]", partitionPolicy)) {
+                    int leftIndex = partitionPolicy.lastIndexOf("[");
+                    int rightIndex = partitionPolicy.lastIndexOf("]");
+                    String size = partitionPolicy.substring(leftIndex + 1, rightIndex);
+                    if (StringUtils.isNotBlank(size) && StringUtils.isNumeric(size)) {
+                        int sizeInt = Integer.parseInt(size);
+                        builder = builder.bucket(partitionColumn, sizeInt);
+                        flag = true;
+                    } else {
+                        LOGGER.info("Bucket size is blank or not numeric!");
+                    }
+                } else if (Pattern.matches("truncate\\[.*]", partitionPolicy)) {
+                    int leftIndex = partitionPolicy.lastIndexOf("[");
+                    int rightIndex = partitionPolicy.lastIndexOf("]");
+                    String size = partitionPolicy.substring(leftIndex + 1, rightIndex);
+                    if (StringUtils.isNotBlank(size) && StringUtils.isNumeric(size)) {
+                        int sizeInt = Integer.parseInt(size);
+                        builder = builder.truncate(partitionColumn, sizeInt);
+                        flag = true;
+                    } else {
+                        LOGGER.info("Bucket size is blank or not numeric!");
+                    }
+                } else if (partitionPolicy.contains("year")) {
+                    builder = builder.year(partitionColumn);
+                    flag = true;
+                } else if (partitionPolicy.contains("month")) {
+                    builder = builder.month(partitionColumn);
+                    flag = true;
+                } else if (partitionPolicy.contains("day")) {
+                    builder = builder.year(partitionColumn);
+                    flag = true;
+                } else if (partitionPolicy.contains("hour")) {
+                    builder = builder.hour(partitionColumn);
+                    flag = true;
+                }
+            } else {
+                LOGGER.warn("PartitionColumn is blank or PartitionMethod is blank, skip partition!");
+            }
+        }
+        if (flag) {
+            partitionSpec = builder.build();
+        } else {
+            LOGGER.warn("no partition policy!");
+        }
+        return partitionSpec;
     }
 
     public static void applySchemaChanges(UpdateSchema pendingUpdate, List<TableChange> tableChanges) {

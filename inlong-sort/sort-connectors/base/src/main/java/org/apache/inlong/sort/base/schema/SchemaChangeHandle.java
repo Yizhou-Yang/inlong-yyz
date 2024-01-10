@@ -109,6 +109,9 @@ public interface SchemaChangeHandle {
         doCreateTable(originData, database, table, type, originSchema, data, operation);
     }
 
+    void doCreateTable(byte[] originData, String database, String schema, String table, SchemaChangeType type,
+            String originSchema, JsonNode data, CreateTableOperation operation, String partitionNameRules);
+
     void doCreateTable(byte[] originData, String database, String table, SchemaChangeType type,
             String originSchema, JsonNode data, CreateTableOperation operation);
 

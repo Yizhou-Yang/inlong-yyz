@@ -191,7 +191,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
                 enableSchemaChange ? SchemaChangeUtils.deserialize(schemaChangePolicies) : Collections.emptyMap(),
                 multipleSinkOption.getDatabasePattern(), multipleSinkOption.getTablePattern(),
                 multipleSinkOption.getSchemaUpdatePolicy(), metricData, dirtySinkHelper,
-                catalog, asNamespaceCatalog);
+                catalog, asNamespaceCatalog, multipleSinkOption.getSinkPartitionRules());
         schemaChangeHelper.setSchemaCache(schemaCache);
         gson = new Gson();
     }
@@ -435,8 +435,8 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
                                     blacklist.add(tableId);
                                 } else {
                                     LOG.error("Table {} schema change, schemaUpdatePolicy:{} old: {} new: {}.",
-                                            tableId, multipleSinkOption.getSchemaUpdatePolicy(), dataSchema,
-                                            latestSchema, e);
+                                            tableId, multipleSinkOption.getSchemaUpdatePolicy(), latestSchema,
+                                            dataSchema, e);
                                     throw e;
                                 }
                             }
@@ -480,7 +480,7 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             List<String> primaryKeyList, boolean upsertMode) {
         if (this.autoCreateTableWhenSnapshot) {
             IcebergSchemaChangeUtils.createTable(catalog, tableId, asNamespaceCatalog, schema, primaryKeyList,
-                    upsertMode);
+                    upsertMode, schemaChangeHelper.getSinkPartitionRules());
         }
         handleSchemaInfoEvent(tableId, catalog.loadTable(tableId).schema());
     }

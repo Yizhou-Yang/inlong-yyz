@@ -481,6 +481,7 @@ public class IcebergSingleFileCommiter extends IcebergProcessFunction<WriteResul
             Long parentSnapshotId = snapshot.parentId();
             snapshot = parentSnapshotId != null ? table.snapshot(parentSnapshotId) : null;
         }
+        LOG.info("getMaxCommittedCheckpointId lastCommittedCheckpointId:{}", lastCommittedCheckpointId);
 
         return lastCommittedCheckpointId;
     }

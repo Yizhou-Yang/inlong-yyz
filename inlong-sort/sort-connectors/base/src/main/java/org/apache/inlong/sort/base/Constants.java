@@ -454,4 +454,12 @@ public final class Constants {
                     .withDescription("Whether include a incremental flag in data "
                             + "when migrating all databases");
 
+    public static final ConfigOption<String> SINK_PARTITION_RULES =
+            ConfigOptions.key("sink.partition.rules")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The option 'sink.partition.rules' "
+                            + "is used extract partition name from the with parameters, "
+                            + "this is only used in the multiple sink writing scenario.");
+
 }

@@ -69,9 +69,9 @@ public class IcebergSchemaChangeHelper extends SchemaChangeHelper {
             SchemaUpdateExceptionPolicy exceptionPolicy,
             SinkTableMetricData metricData, DirtySinkHelper<Object> dirtySinkHelper,
             Catalog catalog,
-            SupportsNamespaces asNamespaceCatalog) {
+            SupportsNamespaces asNamespaceCatalog, String sinkPartitionRules) {
         super(dynamicSchemaFormat, schemaChange, policyMap, databasePattern, null,
-                tablePattern, exceptionPolicy, metricData, dirtySinkHelper);
+                tablePattern, exceptionPolicy, metricData, dirtySinkHelper, sinkPartitionRules);
         this.catalog = catalog;
         this.asNamespaceCatalog = asNamespaceCatalog;
     }
@@ -115,15 +115,15 @@ public class IcebergSchemaChangeHelper extends SchemaChangeHelper {
     }
 
     @Override
-    public void doCreateTable(byte[] originData, String database, String table, SchemaChangeType type,
-            String originSchema, JsonNode data, CreateTableOperation operation) {
+    public void doCreateTable(byte[] originData, String database, String schemaNew, String table, SchemaChangeType type,
+            String originSchema, JsonNode data, CreateTableOperation operation, String sinkPartitionRules) {
         try {
             TableIdentifier tableId = TableIdentifier.of(database, table);
             List<String> pkListStr = dynamicSchemaFormat.extractPrimaryKeyNames(data);
             RowType rowType = dynamicSchemaFormat.extractSchema(data, pkListStr);
             Schema schema = FlinkSchemaUtil.convert(FlinkSchemaUtil.toSchema(rowType));
             IcebergSchemaChangeUtils.createTable(catalog, tableId, asNamespaceCatalog, schema, pkListStr,
-                    dynamicSchemaFormat.isUpsertMode());
+                    dynamicSchemaFormat.isUpsertMode(), sinkPartitionRules);
             isSuccessDDL.set(true);
         } catch (Exception e) {
             if (exceptionPolicy == SchemaUpdateExceptionPolicy.THROW_WITH_STOP) {
