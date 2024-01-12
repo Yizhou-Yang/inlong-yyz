@@ -349,8 +349,19 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
         } catch (Throwable e) {
             LOG.error("read change records failed ", e);
         }
+
+        // add record size, process specially for update records
+        int size = 0;
+        for (DMRecord record : records) {
+            if (record.getOpt().equals(OperationType.UPDATE)) {
+                size += 2;
+            } else {
+                size++;
+            }
+        }
+
         if (metricData != null) {
-            metricData.outputMetrics(records.size(), records.size() * 8L);
+            metricData.outputMetrics(size, records.size() * 8L);
             LOG.info("registering metrics {}", records.size());
         }
         LOG.info("finished processing {} incremental records", records.size());
