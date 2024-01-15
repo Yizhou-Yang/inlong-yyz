@@ -19,6 +19,8 @@ package org.apache.inlong.sort.hudi.table;
 
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
@@ -58,6 +60,8 @@ public class HudiTableInlongFactory extends HoodieTableFactory {
         Set<ConfigOption<?>> configOptions = super.optionalOptions();
         configOptions.add(INLONG_METRIC);
         configOptions.add(INLONG_AUDIT);
+        configOptions.add(SINK_UID);
+        configOptions.add(SOURCE_UID);
         return configOptions;
     }
 }

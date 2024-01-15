@@ -22,10 +22,11 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.connector.jdbc.JdbcExecutionOptions;
 import org.apache.flink.connector.jdbc.internal.options.JdbcDmlOptions;
 import org.apache.flink.connector.jdbc.internal.options.JdbcOptions;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
-import org.apache.flink.table.connector.sink.SinkFunctionProvider;
 import org.apache.flink.table.data.RowData;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
@@ -67,6 +68,7 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
     private final boolean enableSchemaChange;
     private @Nullable final String schemaChangePolicies;
     private final boolean autoCreateTableWhenSnapshot;
+    private final String uid;
 
     public JdbcDynamicTableSink(
             JdbcOptions jdbcOptions,
@@ -86,7 +88,8 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
             @Nullable DirtySink<Object> dirtySink,
             boolean enableSchemaChange,
             @Nullable String schemaChangePolicies,
-            boolean autoCreateTableWhenSnapshot) {
+            boolean autoCreateTableWhenSnapshot,
+            @Nullable String uid) {
         this.jdbcOptions = jdbcOptions;
         this.executionOptions = executionOptions;
         this.dmlOptions = dmlOptions;
@@ -106,6 +109,7 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
         this.enableSchemaChange = enableSchemaChange;
         this.schemaChangePolicies = schemaChangePolicies;
         this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
+        this.uid = uid;
     }
 
     @Override
@@ -136,6 +140,7 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
                 .setAuditHostAndPorts(auditHostAndPorts)
                 .setDirtyOptions(dirtyOptions)
                 .setDirtySink(dirtySink);
+        GenericJdbcSinkFunction function;
         if (multipleSink) {
             builder.setSinkMultipleFormat(sinkMultipleFormat)
                     .setDatabasePattern(databasePattern)
@@ -145,14 +150,23 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
                     .setEnableSchemaChange(enableSchemaChange)
                     .setAutoCreateTableWhenSnapshot(autoCreateTableWhenSnapshot)
                     .setSchemaChangePolicies(schemaChangePolicies);
-            return SinkFunctionProvider.of(
-                    new GenericJdbcSinkFunction<>(builder.buildMulti()), jdbcOptions.getParallelism());
+            function = new GenericJdbcSinkFunction<>(builder.buildMulti());
         } else {
             builder.setRowDataTypeInfo(rowDataTypeInformation);
             builder.setFieldDataTypes(tableSchema.getFieldDataTypes());
-            return SinkFunctionProvider.of(
-                    new GenericJdbcSinkFunction<>(builder.build()), jdbcOptions.getParallelism());
+            function = new GenericJdbcSinkFunction<>(builder.build());
         }
+        return (DataStreamSinkProvider) dataStream -> {
+            DataStreamSink sink =
+                    dataStream.addSink(function);
+            if (jdbcOptions.getParallelism() != null) {
+                sink = sink.setParallelism(jdbcOptions.getParallelism());
+            }
+            if (uid != null) {
+                sink = sink.uid(uid);
+            }
+            return sink;
+        };
     }
 
     @Override
@@ -160,7 +174,7 @@ public class JdbcDynamicTableSink implements DynamicTableSink {
         return new JdbcDynamicTableSink(jdbcOptions, executionOptions, dmlOptions, tableSchema, appendMode,
                 multipleSink, sinkMultipleFormat, databasePattern, tablePattern, schemaPattern, inlongMetric,
                 auditHostAndPorts, schemaUpdateExceptionPolicy, dirtyOptions, dirtySink, enableSchemaChange,
-                schemaChangePolicies, autoCreateTableWhenSnapshot);
+                schemaChangePolicies, autoCreateTableWhenSnapshot, uid);
     }
 
     @Override

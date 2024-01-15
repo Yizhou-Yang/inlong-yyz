@@ -21,14 +21,17 @@ import java.time.Duration;
 import java.time.ZoneId;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.inlong.sort.cdc.postgres.source.PostgresSourceBuilder;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
-import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
@@ -92,6 +95,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final Duration heartbeatInterval;
     private final StartupOptions startupOptions;
     private final String chunkKeyColumn;
+    private final String uid;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -136,7 +140,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             double distributionFactorLower,
             Duration heartbeatInterval,
             StartupOptions startupOptions,
-            @Nullable String chunkKeyColumn) {
+            @Nullable String chunkKeyColumn,
+            @Nullable String uid) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -168,6 +173,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.heartbeatInterval = heartbeatInterval;
         this.startupOptions = startupOptions;
         this.chunkKeyColumn = chunkKeyColumn;
+        this.uid = uid;
     }
 
     @Override
@@ -230,7 +236,22 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .chunkKeyColumn(chunkKeyColumn)
                             .heartbeatInterval(heartbeatInterval)
                             .build();
-            return SourceProvider.of(parallelSource);
+            return new DataStreamScanProvider() {
+
+                @Override
+                public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                    DataStreamSource<RowData> stream = execEnv.fromSource(parallelSource,
+                            WatermarkStrategy.noWatermarks(), "PostgresSQL-CDC");
+                    if (uid != null) {
+                        stream.uid(uid);
+                    }
+                    return stream;
+                }
+                @Override
+                public boolean isBounded() {
+                    return false;
+                }
+            };
         } else {
             LOGGER.info("in  PostgreSQLTableSource, enableParallelRead is false");
             DebeziumSourceFunction<RowData> sourceFunction =
@@ -250,7 +271,21 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .inlongAudit(inlongAudit)
                             .migrateAll(sourceMultipleEnable)
                             .build();
-            return SourceFunctionProvider.of(sourceFunction, false);
+            return new DataStreamScanProvider() {
+
+                @Override
+                public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                    DataStreamSource<RowData> stream = execEnv.addSource(sourceFunction);
+                    if (uid != null) {
+                        stream.uid(uid);
+                    }
+                    return stream;
+                }
+                @Override
+                public boolean isBounded() {
+                    return false;
+                }
+            };
         }
     }
 
@@ -300,7 +335,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         distributionFactorLower,
                         heartbeatInterval,
                         startupOptions,
-                        chunkKeyColumn);
+                        chunkKeyColumn,
+                        uid);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

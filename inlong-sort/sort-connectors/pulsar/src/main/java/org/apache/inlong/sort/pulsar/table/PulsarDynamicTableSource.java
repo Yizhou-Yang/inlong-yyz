@@ -34,6 +34,9 @@ import javax.annotation.Nullable;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.streaming.connectors.pulsar.config.StartupMode;
 import org.apache.flink.streaming.connectors.pulsar.internal.PulsarClientUtils;
@@ -42,9 +45,9 @@ import org.apache.flink.streaming.util.serialization.PulsarDeserializationSchema
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.format.DecodingFormat;
+import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.connector.source.abilities.SupportsWatermarkPushDown;
 import org.apache.flink.table.data.GenericMapData;
@@ -145,6 +148,8 @@ public class PulsarDynamicTableSource implements ScanTableSource, SupportsReadin
     protected String auditKeys;
     protected String auditHostAndPorts;
 
+    private final String uid;
+
     public PulsarDynamicTableSource(
             DataType physicalDataType,
             @Nullable DecodingFormat<DeserializationSchema<RowData>> keyDecodingFormat,
@@ -161,7 +166,8 @@ public class PulsarDynamicTableSource implements ScanTableSource, SupportsReadin
             boolean upsertMode,
             String inlongMetric,
             String auditHostAndPorts,
-            String auditKeys) {
+            String auditKeys,
+            @Nullable String uid) {
         this.producedDataType = physicalDataType;
         setTopicInfo(properties, topics, topicPattern);
 
@@ -191,6 +197,7 @@ public class PulsarDynamicTableSource implements ScanTableSource, SupportsReadin
         this.inlongMetric = inlongMetric;
         this.auditHostAndPorts = auditHostAndPorts;
         this.auditKeys = auditKeys;
+        this.uid = uid;
     }
 
     private void setTopicInfo(Properties properties, List<String> topics, String topicPattern) {
@@ -233,7 +240,21 @@ public class PulsarDynamicTableSource implements ScanTableSource, SupportsReadin
         SourceFunction<RowData> source = adminUrl != null
                 ? createPulsarSource(clientConfigurationData, deserializationSchema)
                 : createPulsarSourceWithoutAdmin(clientConfigurationData, deserializationSchema);
-        return SourceFunctionProvider.of(source, false);
+        return new DataStreamScanProvider() {
+
+            @Override
+            public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                DataStreamSource<RowData> stream = execEnv.addSource(source);
+                if (uid != null) {
+                    stream.uid(uid);
+                }
+                return stream;
+            }
+            @Override
+            public boolean isBounded() {
+                return false;
+            }
+        };
     }
 
     private PulsarDeserializationSchema<RowData> createPulsarDeserialization(
@@ -357,7 +378,8 @@ public class PulsarDynamicTableSource implements ScanTableSource, SupportsReadin
                 false,
                 inlongMetric,
                 auditHostAndPorts,
-                auditKeys);
+                auditKeys,
+                uid);
         copy.producedDataType = producedDataType;
         copy.metadataKeys = metadataKeys;
         copy.watermarkStrategy = watermarkStrategy;

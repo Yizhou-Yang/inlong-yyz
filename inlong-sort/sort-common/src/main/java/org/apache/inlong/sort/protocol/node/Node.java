@@ -64,7 +64,6 @@ import org.apache.inlong.sort.protocol.node.transform.TransformNode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * Base class for extract node \ load node \ transform node
@@ -121,7 +120,7 @@ public interface Node {
 
     @JsonInclude(Include.NON_NULL)
     default Map<String, String> getProperties() {
-        return new TreeMap<>();
+        return new LinkedHashMap<>();
     }
 
     @JsonInclude(Include.NON_NULL)

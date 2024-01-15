@@ -18,13 +18,16 @@
 package org.apache.inlong.sort.cdc.sqlserver.table;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
-import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
@@ -78,6 +81,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
     private final double distributionFactorLower;
     private final String chunkKeyColumn;
     private final boolean closeIdleReaders;
+    private final String uid;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -122,7 +126,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
             String inlongMetric,
             String auditHostAndPorts,
             boolean sourceMultipleEnable,
-            Duration heartbeatInterval) {
+            Duration heartbeatInterval,
+            @Nullable String uid) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -150,6 +155,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
         this.auditHostAndPorts = auditHostAndPorts;
         this.sourceMultipleEnable = sourceMultipleEnable;
         this.heartbeatInterval = heartbeatInterval;
+        this.uid = uid;
     }
 
     @Override
@@ -202,7 +208,22 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                             .heartbeatInterval(heartbeatInterval)
                             .migrateAll(sourceMultipleEnable)
                             .build();
-            return SourceProvider.of(sqlServerChangeEventSource);
+            return new DataStreamScanProvider() {
+
+                @Override
+                public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                    DataStreamSource<RowData> stream = execEnv.fromSource(sqlServerChangeEventSource,
+                            WatermarkStrategy.noWatermarks(), "SQLServer-CDC");
+                    if (uid != null) {
+                        stream.uid(uid);
+                    }
+                    return stream;
+                }
+                @Override
+                public boolean isBounded() {
+                    return false;
+                }
+            };
         } else {
             DebeziumSourceFunction<RowData> sourceFunction =
                     SqlServerSource.<RowData>builder()
@@ -218,7 +239,21 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                             .inlongMetric(inlongMetric)
                             .sourceMultipleEnable(sourceMultipleEnable)
                             .build();
-            return SourceFunctionProvider.of(sourceFunction, false);
+            return new DataStreamScanProvider() {
+
+                @Override
+                public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                    DataStreamSource<RowData> stream = execEnv.addSource(sourceFunction);
+                    if (uid != null) {
+                        stream.uid(uid);
+                    }
+                    return stream;
+                }
+                @Override
+                public boolean isBounded() {
+                    return false;
+                }
+            };
         }
     }
 
@@ -265,7 +300,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         inlongMetric,
                         auditHostAndPorts,
                         sourceMultipleEnable,
-                        heartbeatInterval);
+                        heartbeatInterval,
+                        uid);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

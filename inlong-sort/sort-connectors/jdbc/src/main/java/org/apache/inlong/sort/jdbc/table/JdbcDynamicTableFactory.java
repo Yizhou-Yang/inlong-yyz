@@ -72,6 +72,8 @@ import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_POLICIES;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 /**
  * Copy from org.apache.flink:flink-connector-jdbc_2.11:1.13.5
@@ -265,6 +267,7 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
         // Build the dirty data side-output
         final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(helper.getOptions());
         final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
+        String uid = helper.getOptions().get(SINK_UID);
         return new JdbcDynamicTableSink(
                 jdbcOptions,
                 getJdbcExecutionOptions(config),
@@ -283,7 +286,8 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
                 dirtySink,
                 enableSchemaChange,
                 schemaChangePolicies,
-                autoCreateTableWhenSnapshot);
+                autoCreateTableWhenSnapshot,
+                uid);
     }
 
     @Override
@@ -457,6 +461,8 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
         optionalOptions.add(SINK_SCHEMA_CHANGE_ENABLE);
         optionalOptions.add(SINK_SCHEMA_CHANGE_POLICIES);
         optionalOptions.add(SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT);
+        optionalOptions.add(SINK_UID);
+        optionalOptions.add(SOURCE_UID);
         return optionalOptions;
     }
 

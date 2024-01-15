@@ -64,7 +64,9 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_SCHEMA_UPDATE_POLICY;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
 import static org.apache.inlong.sort.base.Constants.SINK_PARTITION_POLICY;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
 import static org.apache.inlong.sort.base.Constants.SOURCE_PARTITION_FIELD_NAME;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 import static org.apache.inlong.sort.hive.HiveOptions.HIVE_DATABASE;
 import static org.apache.inlong.sort.hive.HiveOptions.HIVE_STORAGE_INPUT_FORMAT;
 import static org.apache.inlong.sort.hive.HiveOptions.HIVE_STORAGE_OUTPUT_FORMAT;
@@ -105,6 +107,8 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
         options.add(SINK_MULTIPLE_FORMAT);
         options.add(SINK_MULTIPLE_SCHEMA_UPDATE_POLICY);
         options.add(SOURCE_PARTITION_FIELD_NAME);
+        options.add(SINK_UID);
+        options.add(SOURCE_UID);
         return options;
     }
 
@@ -132,6 +136,7 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
             String inputFormat = helper.getOptions().get(HIVE_STORAGE_INPUT_FORMAT);
             String outputFormat = helper.getOptions().get(HIVE_STORAGE_OUTPUT_FORMAT);
             String serializationLib = helper.getOptions().get(HIVE_STORAGE_SERIALIZATION_LIB);
+            String uid = helper.getOptions().get(SINK_UID);
             return new HiveTableSink(
                     context.getConfiguration(),
                     new JobConf(hiveConf),
@@ -149,7 +154,8 @@ public class HiveTableInlongFactory implements DynamicTableSourceFactory, Dynami
                     sinkMultipleEnable,
                     inputFormat,
                     outputFormat,
-                    serializationLib);
+                    serializationLib,
+                    uid);
         } else {
             return FactoryUtil.createTableSink(
                     null, // we already in the factory of catalog

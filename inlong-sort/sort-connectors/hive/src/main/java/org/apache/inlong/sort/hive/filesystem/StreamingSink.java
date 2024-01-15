@@ -71,16 +71,21 @@ public class StreamingSink {
             String inlongMetric,
             String auditHostAndPorts,
             DirtyOptions dirtyOptions,
-            @Nullable DirtySink<Object> dirtySink) {
+            @Nullable DirtySink<Object> dirtySink,
+            @Nullable String uid) {
         StreamingFileWriter<T> fileWriter =
                 new StreamingFileWriter<>(bucketCheckInterval, bucketsBuilder,
                         inlongMetric, auditHostAndPorts, dirtyOptions, dirtySink);
-        return inputStream
+        SingleOutputStreamOperator<PartitionCommitInfo> partitionCommitInfoOperator = inputStream
                 .transform(
                         StreamingFileWriter.class.getSimpleName(),
                         TypeInformation.of(PartitionCommitInfo.class),
                         fileWriter)
                 .setParallelism(parallelism);
+        if (uid != null) {
+            partitionCommitInfoOperator.uid("partition-commitinfo-operator" + uid);
+        }
+        return partitionCommitInfoOperator;
     }
 
     /**
@@ -99,7 +104,8 @@ public class StreamingSink {
             String inlongMetric,
             String auditHostAndPorts,
             DirtyOptions dirtyOptions,
-            @Nullable DirtySink<Object> dirtySink) {
+            @Nullable DirtySink<Object> dirtySink,
+            @Nullable String uid) {
         CompactFileWriter<T> writer = new CompactFileWriter<>(
                 bucketCheckInterval, bucketsBuilder, inlongMetric, auditHostAndPorts, dirtyOptions, dirtySink);
 
@@ -108,19 +114,25 @@ public class StreamingSink {
 
         CompactCoordinator coordinator = new CompactCoordinator(fsSupplier, targetFileSize);
 
-        SingleOutputStreamOperator<CoordinatorOutput> coordinatorOp =
+        SingleOutputStreamOperator<CoordinatorInput> coordinatorInput =
                 inputStream
                         .transform(
                                 "streaming-writer",
                                 TypeInformation.of(CoordinatorInput.class),
                                 writer)
-                        .setParallelism(parallelism)
-                        .transform(
-                                "compact-coordinator",
-                                TypeInformation.of(CoordinatorOutput.class),
-                                coordinator)
-                        .setParallelism(1)
-                        .setMaxParallelism(1);
+                        .setParallelism(parallelism);
+        if (uid != null) {
+            coordinatorInput.uid("compact-streaming-writer-" + uid);
+        }
+        SingleOutputStreamOperator<CoordinatorOutput> coordinatorOutput = coordinatorInput.transform(
+                "compact-coordinator",
+                TypeInformation.of(CoordinatorOutput.class),
+                coordinator)
+                .setParallelism(1)
+                .setMaxParallelism(1);
+        if (uid != null) {
+            coordinatorOutput.uid("compact-coordinator-" + uid);
+        }
 
         CompactWriter.Factory<T> writerFactory =
                 CompactBucketWriter.factory(
@@ -129,13 +141,17 @@ public class StreamingSink {
         CompactOperator<T> compacter =
                 new CompactOperator<>(fsSupplier, readFactory, writerFactory);
 
-        return coordinatorOp
+        SingleOutputStreamOperator<PartitionCommitInfo> compactOperator = coordinatorOutput
                 .broadcast()
                 .transform(
                         "compact-operator",
                         TypeInformation.of(PartitionCommitInfo.class),
                         compacter)
                 .setParallelism(parallelism);
+        if (uid != null) {
+            compactOperator.uid("compact-operator-" + uid);
+        }
+        return compactOperator;
     }
 
     /**
@@ -149,19 +165,27 @@ public class StreamingSink {
             List<String> partitionKeys,
             TableMetaStoreFactory msFactory,
             FileSystemFactory fsFactory,
-            Configuration options) {
+            Configuration options,
+            @Nullable String uid) {
         DataStream<?> stream = writer;
         if (options.contains(SINK_PARTITION_COMMIT_POLICY_KIND)) {
             PartitionCommitter committer = new PartitionCommitter(locationPath, identifier, partitionKeys, msFactory,
                     fsFactory, options);
-            stream =
-                    writer.transform(
-                            PartitionCommitter.class.getSimpleName(), Types.VOID, committer)
-                            .setParallelism(1)
-                            .setMaxParallelism(1);
+            SingleOutputStreamOperator<Void> partitionCommitOperator = writer.transform(
+                    org.apache.flink.table.filesystem.stream.PartitionCommitter.class.getSimpleName(), Types.VOID,
+                    committer)
+                    .setParallelism(1)
+                    .setMaxParallelism(1);
+            if (uid != null) {
+                partitionCommitOperator.uid("partition-commit-operator" + uid);
+            }
+            stream = partitionCommitOperator;
         }
-
-        return stream.addSink(new DiscardingSink<>()).name("end").setParallelism(1);
+        DataStreamSink<?> discardSink = stream.addSink(new DiscardingSink<>()).name("end").setParallelism(1);
+        if (uid != null) {
+            discardSink.uid("discard-" + uid);
+        }
+        return discardSink;
     }
 
 }

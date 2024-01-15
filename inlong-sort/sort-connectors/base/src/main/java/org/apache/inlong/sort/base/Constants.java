@@ -462,4 +462,16 @@ public final class Constants {
                             + "is used extract partition name from the with parameters, "
                             + "this is only used in the multiple sink writing scenario.");
 
+    public static final ConfigOption<String> SINK_UID =
+            ConfigOptions.key("sink.uid")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The uid for the sink operator");
+
+    public static final ConfigOption<String> SOURCE_UID =
+            ConfigOptions.key("source.uid")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The uid for the source operator");
+
 }

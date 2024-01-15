@@ -68,6 +68,8 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_PK_AUTO_GENERA
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_SCHEMA_UPDATE_POLICY;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TYPE_MAP_COMPATIBLE_WITH_SPARK;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 /**
  * Copy from org.apache.iceberg.flink:iceberg-flink-runtime-1.13:0.13.2
@@ -294,10 +296,11 @@ public class FlinkDynamicTableFactory implements DynamicTableSinkFactory, Dynami
         final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
         boolean multipleSink = Boolean.parseBoolean(
                 tableProps.getOrDefault(SINK_MULTIPLE_ENABLE.key(), SINK_MULTIPLE_ENABLE.defaultValue().toString()));
+        String uid = tableProps.getOrDefault(SINK_UID.key(), null);
         if (multipleSink) {
             CatalogLoader catalogLoader = createCatalogLoader(tableProps);
             return new IcebergTableSink(null, tableSchema, catalogTable,
-                    catalogLoader, actionsLoader, dirtyOptions, dirtySink);
+                    catalogLoader, actionsLoader, dirtyOptions, dirtySink, uid);
         } else {
             TableLoader tableLoader;
             if (catalog != null) {
@@ -307,7 +310,7 @@ public class FlinkDynamicTableFactory implements DynamicTableSinkFactory, Dynami
                         objectPath.getObjectName());
             }
             return new IcebergTableSink(tableLoader, tableSchema, catalogTable,
-                    null, actionsLoader, dirtyOptions, dirtySink);
+                    null, actionsLoader, dirtyOptions, dirtySink, uid);
         }
     }
 
@@ -380,6 +383,8 @@ public class FlinkDynamicTableFactory implements DynamicTableSinkFactory, Dynami
         options.add(COMMIT_CONCURRENCY);
         options.add(COMMIT_TIMEOUT);
         options.add(MULTI_PARALLELISM);
+        options.add(SINK_UID);
+        options.add(SOURCE_UID);
         return options;
     }
 

@@ -71,6 +71,7 @@ import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_POLICIES;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 /**
  * Copy from org.apache.flink:flink-connector-jdbc_2.11:1.13.5
@@ -493,6 +494,7 @@ public class JdbcDynamicTableFactory implements DynamicTableSourceFactory, Dynam
         optionalOptions.add(SINK_CONCURRENCY_WRITE);
         optionalOptions.add(SINK_UID);
         optionalOptions.add(SINK_UID_HASH);
+        optionalOptions.add(SOURCE_UID);
         return optionalOptions;
     }
 

@@ -18,13 +18,16 @@
 package org.apache.inlong.sort.cdc.oracle.table;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
-import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
@@ -83,6 +86,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final boolean closeIdleReaders;
     private final boolean isAppend;
     private final boolean includeSchemaChange;
+    private final String uid;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -121,7 +125,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             @Nullable String chunkKeyColumn,
             boolean closeIdleReaders,
             boolean isAppend,
-            boolean includeSchemaChange) {
+            boolean includeSchemaChange,
+            @Nullable String uid) {
         this.physicalSchema = physicalSchema;
         this.url = url;
         this.port = port;
@@ -151,6 +156,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.closeIdleReaders = closeIdleReaders;
         this.isAppend = isAppend;
         this.includeSchemaChange = includeSchemaChange;
+        this.uid = uid;
     }
 
     @Override
@@ -209,7 +215,22 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .includeSchemaChanges(includeSchemaChange)
                             .closeIdleReaders(closeIdleReaders)
                             .build();
-            return SourceProvider.of(oracleChangeEventSource);
+            return new DataStreamScanProvider() {
+
+                @Override
+                public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                    DataStreamSource<RowData> stream = execEnv.fromSource(oracleChangeEventSource,
+                            WatermarkStrategy.noWatermarks(), "Oracle-CDC");
+                    if (uid != null) {
+                        stream.uid(uid);
+                    }
+                    return stream;
+                }
+                @Override
+                public boolean isBounded() {
+                    return false;
+                }
+            };
         } else {
             OracleSource.Builder<RowData> builder =
                     OracleSource.<RowData>builder()
@@ -228,8 +249,21 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .inlongAudit(inlongAudit)
                             .sourceMultipleEnable(sourceMultipleEnable);
             DebeziumSourceFunction<RowData> sourceFunction = builder.build();
+            return new DataStreamScanProvider() {
 
-            return SourceFunctionProvider.of(sourceFunction, false);
+                @Override
+                public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                    DataStreamSource<RowData> stream = execEnv.addSource(sourceFunction);
+                    if (uid != null) {
+                        stream.uid(uid);
+                    }
+                    return stream;
+                }
+                @Override
+                public boolean isBounded() {
+                    return false;
+                }
+            };
         }
     }
 
@@ -278,7 +312,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         chunkKeyColumn,
                         closeIdleReaders,
                         isAppend,
-                        includeSchemaChange);
+                        includeSchemaChange,
+                        uid);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

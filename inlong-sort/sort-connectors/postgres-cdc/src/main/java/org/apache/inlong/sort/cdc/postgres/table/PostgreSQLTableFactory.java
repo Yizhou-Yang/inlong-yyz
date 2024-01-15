@@ -42,6 +42,7 @@ import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SOURCE_MULTIPLE_ENABLE;
 
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 import static org.apache.inlong.sort.cdc.base.util.ObjectUtils.doubleCompare;
 import static org.apache.inlong.sort.cdc.postgres.source.options.PostgresSourceOptions.CHANGELOG_MODE;
 import static org.apache.inlong.sort.cdc.postgres.source.options.PostgresSourceOptions.CHUNK_META_GROUP_SIZE;
@@ -222,7 +223,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
             validateDistributionFactorUpper(distributionFactorUpper);
             validateDistributionFactorLower(distributionFactorLower);
         }
-
+        String uid = helper.getOptions().get(SOURCE_UID);
         return new PostgreSQLTableSource(
                 physicalSchema,
                 port,
@@ -252,7 +253,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 distributionFactorLower,
                 heartbeatInterval,
                 startupOptions,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                uid);
     }
 
     @Override
@@ -301,6 +303,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(CONNECT_MAX_RETRIES);
         options.add(CONNECTION_POOL_SIZE);
         options.add(HEARTBEAT_INTERVAL);
+        options.add(SOURCE_UID);
         return options;
     }
 

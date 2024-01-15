@@ -25,6 +25,7 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_SCHEMA_UPDATE_POLICY;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
 
 import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import java.util.HashSet;
@@ -76,7 +77,7 @@ public class StarRocksDynamicTableSinkFactory implements DynamicTableSinkFactory
                 sinkMultipleFormat,
                 databasePattern,
                 tablePattern);
-
+        String uid = options.get(SINK_UID);
         return new StarRocksDynamicTableSink(sinkOptions,
                 physicalSchema,
                 multipleSink,
@@ -86,7 +87,8 @@ public class StarRocksDynamicTableSinkFactory implements DynamicTableSinkFactory
                 inlongMetric,
                 auditHostAndPorts,
                 schemaUpdatePolicy,
-                dirtySinkHelper);
+                dirtySinkHelper,
+                uid);
     }
 
     @Override
@@ -125,7 +127,7 @@ public class StarRocksDynamicTableSinkFactory implements DynamicTableSinkFactory
         optionalOptions.add(SINK_MULTIPLE_SCHEMA_UPDATE_POLICY);
         optionalOptions.add(INLONG_METRIC);
         optionalOptions.add(INLONG_AUDIT);
-
+        optionalOptions.add(SINK_UID);
         return optionalOptions;
     }
 

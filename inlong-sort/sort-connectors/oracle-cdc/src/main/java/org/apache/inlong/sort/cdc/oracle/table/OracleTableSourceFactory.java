@@ -62,6 +62,7 @@ import static org.apache.inlong.sort.base.Constants.INCLUDE_SCHEMA_CHANGE;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SOURCE_MULTIPLE_ENABLE;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 /**
  * Factory for creating configured instance of {@link OracleTableSource}.
@@ -115,6 +116,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
             validateDistributionFactorLower(distributionFactorLower);
         }
         OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
+        String uid = helper.getOptions().get(SOURCE_UID);
         return new OracleTableSource(
                 physicalSchema,
                 url,
@@ -142,7 +144,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 chunkKeyColumn,
                 closeIdlerReaders,
                 isAppend,
-                includeSchemaChange);
+                includeSchemaChange,
+                uid);
     }
 
     @Override
@@ -185,6 +188,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(AUDIT_KEYS);
         options.add(APPEND_MODE);
         options.add(INCLUDE_SCHEMA_CHANGE);
+        options.add(SOURCE_UID);
         return options;
     }
 

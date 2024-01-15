@@ -79,6 +79,8 @@ import static org.apache.flink.table.factories.FactoryUtil.SINK_PARALLELISM;
 import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 /**
  * Copy from io.streamnative.connectors:pulsar-flink-connector_2.11:1.13.6.1-rc9
@@ -207,6 +209,7 @@ public class PulsarDynamicTableFactory
 
         final String formatType = tableOptions.getOptional(FORMAT).orElseGet(() -> tableOptions.get(VALUE_FORMAT));
         final Integer parallelism = tableOptions.getOptional(SINK_PARALLELISM).orElse(null);
+        String uid = tableOptions.get(SINK_UID);
         return new PulsarDynamicTableSink(
                 serverUrl,
                 adminUrl,
@@ -222,7 +225,8 @@ public class PulsarDynamicTableFactory
                 formatType,
                 false,
                 parallelism,
-                getMessageRouter(tableOptions, context.getClassLoader()).orElse(null));
+                getMessageRouter(tableOptions, context.getClassLoader()).orElse(null),
+                uid);
     }
 
     @Override
@@ -277,7 +281,7 @@ public class PulsarDynamicTableFactory
         String auditHostAndPorts = tableOptions.get(INLONG_AUDIT);
 
         String auditKeys = tableOptions.get(AUDIT_KEYS);
-
+        String uid = helper.getOptions().get(SOURCE_UID);
         return createPulsarTableSource(
                 physicalDataType,
                 keyDecodingFormat.orElse(null),
@@ -292,7 +296,7 @@ public class PulsarDynamicTableFactory
                 properties,
                 startupOptions,
                 inlongMetric,
-                auditHostAndPorts, auditKeys);
+                auditHostAndPorts, auditKeys, uid);
     }
 
     @Override
@@ -333,7 +337,8 @@ public class PulsarDynamicTableFactory
         options.add(INLONG_METRIC);
         options.add(INLONG_AUDIT);
         options.add(AUDIT_KEYS);
-
+        options.add(SOURCE_UID);
+        options.add(SINK_UID);
         return options;
     }
 
@@ -366,7 +371,8 @@ public class PulsarDynamicTableFactory
             PulsarTableOptions.StartupOptions startupOptions,
             String inlongMetric,
             String auditHostAndPorts,
-            String auditKeys) {
+            String auditKeys,
+            @Nullable String uid) {
         return new PulsarDynamicTableSource(
                 physicalDataType,
                 keyDecodingFormat,
@@ -383,6 +389,7 @@ public class PulsarDynamicTableFactory
                 false,
                 inlongMetric,
                 auditHostAndPorts,
-                auditKeys);
+                auditKeys,
+                uid);
     }
 }

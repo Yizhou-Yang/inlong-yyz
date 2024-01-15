@@ -45,6 +45,7 @@ import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.DIRTY_PREFIX;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
 import static org.apache.inlong.sort.elasticsearch.table.ElasticsearchOptions.BULK_FLASH_MAX_SIZE_OPTION;
 import static org.apache.inlong.sort.elasticsearch.table.ElasticsearchOptions.BULK_FLUSH_BACKOFF_DELAY_OPTION;
 import static org.apache.inlong.sort.elasticsearch.table.ElasticsearchOptions.BULK_FLUSH_BACKOFF_MAX_RETRIES_OPTION;
@@ -91,6 +92,7 @@ public class Elasticsearch6DynamicSinkFactory implements DynamicTableSinkFactory
                     USERNAME_OPTION,
                     INLONG_METRIC,
                     INLONG_AUDIT,
+                    SINK_UID,
                     AUDIT_KEYS)
                     .collect(Collectors.toSet());
 
@@ -119,9 +121,10 @@ public class Elasticsearch6DynamicSinkFactory implements DynamicTableSinkFactory
         final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(helper.getOptions());
         final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
         final DirtySinkHelper<Object> dirtySinkHelper = new DirtySinkHelper<>(dirtyOptions, dirtySink);
+        String uid = helper.getOptions().get(SINK_UID);
         return new Elasticsearch6DynamicSink(
                 format, config, TableSchemaUtils.getPhysicalSchema(tableSchema),
-                inlongMetric, auditHostAndPorts, dirtySinkHelper);
+                inlongMetric, auditHostAndPorts, dirtySinkHelper, uid);
     }
 
     private void validate(Elasticsearch6Configuration config, Configuration originalConfiguration) {

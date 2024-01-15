@@ -29,14 +29,15 @@ import java.time.Duration;
 import java.util.Map;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.configuration.ReadableConfig;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 import org.apache.flink.streaming.connectors.redis.common.config.FlinkJedisConfigBase;
 import org.apache.flink.streaming.connectors.redis.common.hanlder.RedisHandlerServices;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.format.EncodingFormat;
+import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
-import org.apache.flink.table.connector.sink.SinkFunctionProvider;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.RowKind;
 import org.apache.inlong.sort.redis.common.config.RedisDataType;
@@ -45,6 +46,8 @@ import org.apache.inlong.sort.redis.common.handler.InlongJedisConfigHandler;
 import org.apache.inlong.sort.redis.common.schema.RedisSchema;
 import org.apache.inlong.sort.redis.common.schema.RedisSchemaFactory;
 import org.apache.inlong.sort.redis.common.schema.StateEncoder;
+
+import javax.annotation.Nullable;
 
 public class RedisDynamicTableSink implements DynamicTableSink {
 
@@ -61,6 +64,7 @@ public class RedisDynamicTableSink implements DynamicTableSink {
 
     private final String inlongMetric;
     private final String auditHostAndPorts;
+    private final String uid;
 
     public RedisDynamicTableSink(
             EncodingFormat<SerializationSchema<RowData>> format,
@@ -70,7 +74,8 @@ public class RedisDynamicTableSink implements DynamicTableSink {
             ReadableConfig config,
             Map<String, String> properties,
             String inlongMetric,
-            String auditHostAndPorts) {
+            String auditHostAndPorts,
+            @Nullable String uid) {
         this.format = format;
         this.resolvedSchema = resolvedSchema;
         this.dataType = dataType;
@@ -88,6 +93,7 @@ public class RedisDynamicTableSink implements DynamicTableSink {
         batchSize = config.get(SINK_BATCH_SIZE);
         flushInterval = parseDuration(config.get(SINK_FLUSH_INTERVAL));
         expireTime = parseDuration(config.get(EXPIRE_TIME));
+        this.uid = uid;
     }
 
     private final Duration expireTime;
@@ -148,15 +154,20 @@ public class RedisDynamicTableSink implements DynamicTableSink {
                         flushInterval,
                         expireTime,
                         flinkJedisConfigBase,
-
                         inlongMetric,
                         auditHostAndPorts);
                 break;
             default:
                 throw new UnsupportedOperationException();
         }
-
-        return SinkFunctionProvider.of(redisSinkFunction);
+        return (DataStreamSinkProvider) dataStream -> {
+            DataStreamSink<RowData> sink =
+                    dataStream.addSink(redisSinkFunction);
+            if (uid != null) {
+                sink = sink.uid(uid);
+            }
+            return sink;
+        };
     }
 
     private int getValueStartIndexInSchema(
@@ -195,7 +206,8 @@ public class RedisDynamicTableSink implements DynamicTableSink {
                 config,
                 properties,
                 inlongMetric,
-                auditHostAndPorts);
+                auditHostAndPorts,
+                uid);
     }
 
     @Override

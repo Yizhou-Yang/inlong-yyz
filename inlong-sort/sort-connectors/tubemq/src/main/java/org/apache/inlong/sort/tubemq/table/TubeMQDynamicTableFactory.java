@@ -19,6 +19,7 @@ package org.apache.inlong.sort.tubemq.table;
 
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
@@ -35,6 +36,7 @@ import org.apache.flink.table.factories.FactoryUtil.TableFactoryHelper;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.RowKind;
 
+import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -61,6 +63,12 @@ public class TubeMQDynamicTableFactory implements DynamicTableSourceFactory {
     public static final String IDENTIFIER = "tubemq";
 
     public static final List<String> INNERFORMATTYPE = Arrays.asList("inlong-msg");
+
+    public static final ConfigOption<String> SOURCE_UID =
+            ConfigOptions.key("source.uid")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The uid for the source operator");
 
     public static boolean innerFormat = false;
 
@@ -116,7 +124,7 @@ public class TubeMQDynamicTableFactory implements DynamicTableSourceFactory {
         final Configuration properties = getTubeMQProperties(context.getCatalogTable().getOptions());
 
         final DataType physicalDataType = context.getCatalogTable().getSchema().toPhysicalRowDataType();
-
+        String uid = helper.getOptions().get(SOURCE_UID);
         return createTubeMQTableSource(
                 physicalDataType,
                 valueDecodingFormat,
@@ -125,7 +133,8 @@ public class TubeMQDynamicTableFactory implements DynamicTableSourceFactory {
                 TubeMQOptions.getTiSet(tableOptions),
                 TubeMQOptions.getConsumerGroup(tableOptions),
                 TubeMQOptions.getSessionKey(tableOptions),
-                properties);
+                properties,
+                uid);
     }
 
     protected TubeMQTableSource createTubeMQTableSource(
@@ -136,7 +145,8 @@ public class TubeMQDynamicTableFactory implements DynamicTableSourceFactory {
             TreeSet<String> tid,
             String consumerGroup,
             String sessionKey,
-            Configuration properties) {
+            Configuration properties,
+            @Nullable String uid) {
         return new TubeMQTableSource(
                 physicalDataType,
                 valueDecodingFormat,
@@ -149,7 +159,8 @@ public class TubeMQDynamicTableFactory implements DynamicTableSourceFactory {
                 null,
                 null,
                 false,
-                innerFormat);
+                innerFormat,
+                uid);
     }
 
     @Override
@@ -174,6 +185,7 @@ public class TubeMQDynamicTableFactory implements DynamicTableSourceFactory {
         options.add(SESSION_KEY);
         options.add(BOOTSTRAP_FROM_MAX);
         options.add(TOPIC_PATTERN);
+        options.add(SOURCE_UID);
         return options;
     }
 }

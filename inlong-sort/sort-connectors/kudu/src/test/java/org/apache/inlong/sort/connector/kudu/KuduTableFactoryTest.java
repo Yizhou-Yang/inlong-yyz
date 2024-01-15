@@ -60,6 +60,7 @@ public class KuduTableFactoryTest extends KuduTestBase {
                         kuduTableInfo,
                         new Configuration(),
                         null,
+                        null,
                         null);
 
         assertEquals(expectedSink, actualSink);

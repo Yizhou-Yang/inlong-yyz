@@ -55,6 +55,8 @@ import static org.apache.inlong.sort.base.Constants.DIRTY_PREFIX;
 import static org.apache.inlong.sort.base.Constants.IGNORE_ALL_CHANGELOG;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 /**
  * File system {@link TableFactory}.
@@ -92,6 +94,7 @@ public class FileSystemTableFactory implements DynamicTableSourceFactory, Dynami
         validate(helper);
         final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(helper.getOptions());
         final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
+        String uid = helper.getOptions().get(SINK_UID);
         return new FileSystemTableSink(
                 context,
                 discoverDecodingFormat(context, BulkReaderFormatFactory.class),
@@ -100,7 +103,8 @@ public class FileSystemTableFactory implements DynamicTableSourceFactory, Dynami
                 discoverEncodingFormat(context, BulkWriterFormatFactory.class),
                 discoverEncodingFormat(context, SerializationFormatFactory.class),
                 dirtyOptions,
-                dirtySink);
+                dirtySink,
+                uid);
     }
 
     @Override
@@ -135,6 +139,8 @@ public class FileSystemTableFactory implements DynamicTableSourceFactory, Dynami
         options.add(INLONG_AUDIT);
         options.add(IGNORE_ALL_CHANGELOG);
         options.add(AUDIT_KEYS);
+        options.add(SINK_UID);
+        options.add(SOURCE_UID);
         return options;
     }
 

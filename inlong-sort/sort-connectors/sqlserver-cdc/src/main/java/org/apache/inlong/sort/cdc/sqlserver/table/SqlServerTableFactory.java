@@ -54,6 +54,7 @@ import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SOURCE_MULTIPLE_ENABLE;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 /** Factory for creating configured instance of {@link SqlServerTableSource}. */
 public class SqlServerTableFactory implements DynamicTableSourceFactory {
@@ -166,7 +167,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         }
 
         OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
-
+        String uid = helper.getOptions().get(SOURCE_UID);
         return new SqlServerTableSource(
                 physicalSchema,
                 port,
@@ -192,7 +193,8 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                 inlongMetric,
                 auditHostAndPorts,
                 sourceMultipleEnable,
-                heartbeatInterval);
+                heartbeatInterval,
+                uid);
     }
 
     @Override
@@ -232,6 +234,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         options.add(INLONG_AUDIT);
         options.add(AUDIT_KEYS);
         options.add(SOURCE_MULTIPLE_ENABLE);
+        options.add(SOURCE_UID);
         return options;
     }
 

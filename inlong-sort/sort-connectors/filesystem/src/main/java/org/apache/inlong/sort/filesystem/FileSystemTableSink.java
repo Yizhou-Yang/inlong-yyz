@@ -136,6 +136,7 @@ public class FileSystemTableSink extends AbstractFileSystemTable
     private final String inlongAudit;
     private final DirtyOptions dirtyOptions;
     private @Nullable final DirtySink<Object> dirtySink;
+    private final String uid;
 
     FileSystemTableSink(
             DynamicTableFactory.Context context,
@@ -145,7 +146,8 @@ public class FileSystemTableSink extends AbstractFileSystemTable
             @Nullable EncodingFormat<BulkWriter.Factory<RowData>> bulkWriterFormat,
             @Nullable EncodingFormat<SerializationSchema<RowData>> serializationFormat,
             DirtyOptions dirtyOptions,
-            @Nullable DirtySink<Object> dirtySink) {
+            @Nullable DirtySink<Object> dirtySink,
+            @Nullable String uid) {
         super(context);
         this.bulkReaderFormat = bulkReaderFormat;
         this.deserializationFormat = deserializationFormat;
@@ -166,6 +168,7 @@ public class FileSystemTableSink extends AbstractFileSystemTable
         this.inlongAudit = tableOptions.get(INLONG_AUDIT);
         this.dirtyOptions = dirtyOptions;
         this.dirtySink = dirtySink;
+        this.uid = uid;
     }
 
     @Override
@@ -183,7 +186,6 @@ public class FileSystemTableSink extends AbstractFileSystemTable
             if (overwrite) {
                 throw new IllegalStateException("Streaming mode not support overwrite.");
             }
-
             return createStreamingSink(dataStream, sinkContext, parallelism);
         }
     }
@@ -292,12 +294,13 @@ public class FileSystemTableSink extends AbstractFileSystemTable
                             inlongMetric,
                             inlongAudit,
                             dirtyOptions,
-                            dirtySink);
+                            dirtySink,
+                            uid);
         } else {
             writerStream =
                     StreamingSink.writer(
                             dataStream, bucketCheckInterval, bucketsBuilder, parallelism,
-                            inlongMetric, inlongAudit, dirtyOptions, dirtySink);
+                            inlongMetric, inlongAudit, dirtyOptions, dirtySink, uid);
         }
 
         return StreamingSink.sink(
@@ -307,7 +310,8 @@ public class FileSystemTableSink extends AbstractFileSystemTable
                 partitionKeys,
                 new EmptyMetaStoreFactory(path),
                 fsFactory,
-                tableOptions);
+                tableOptions,
+                uid);
     }
 
     private Optional<CompactReader.Factory<RowData>> createCompactReaderFactory(Context context) {
@@ -555,7 +559,8 @@ public class FileSystemTableSink extends AbstractFileSystemTable
                         bulkWriterFormat,
                         serializationFormat,
                         dirtyOptions,
-                        dirtySink);
+                        dirtySink,
+                        uid);
         sink.overwrite = overwrite;
         sink.dynamicGrouping = dynamicGrouping;
         sink.staticPartitions = staticPartitions;

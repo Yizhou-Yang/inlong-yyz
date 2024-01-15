@@ -24,15 +24,18 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.connectors.kafka.KafkaDeserializationSchema;
 import org.apache.flink.streaming.connectors.kafka.config.StartupMode;
 import org.apache.flink.streaming.connectors.kafka.internals.KafkaTopicPartition;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.format.DecodingFormat;
+import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.connector.source.abilities.SupportsWatermarkPushDown;
 import org.apache.flink.table.data.GenericMapData;
@@ -182,6 +185,7 @@ public class KafkaDynamicSource
 
     private final DirtyOptions dirtyOptions;
     private @Nullable final DirtySink<String> dirtySink;
+    private final String uid;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -205,7 +209,8 @@ public class KafkaDynamicSource
             final String auditHostAndPorts,
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<String> dirtySink,
-            final String auditKeys) {
+            final String auditKeys,
+            @Nullable String uid) {
         // Format attributes
         this.physicalDataType =
                 Preconditions.checkNotNull(
@@ -243,6 +248,7 @@ public class KafkaDynamicSource
         this.dirtyOptions = dirtyOptions;
         this.dirtySink = dirtySink;
         this.auditKeys = auditKeys;
+        this.uid = uid;
     }
 
     @Override
@@ -264,8 +270,21 @@ public class KafkaDynamicSource
         final FlinkKafkaConsumer<RowData> kafkaConsumer =
                 createKafkaConsumer(keyDeserialization, valueDeserialization,
                         producedTypeInfo, inlongMetric, auditHostAndPorts, auditKeys);
+        return new DataStreamScanProvider() {
 
-        return SourceFunctionProvider.of(kafkaConsumer, false);
+            @Override
+            public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                DataStreamSource<RowData> stream = execEnv.addSource(kafkaConsumer);
+                if (uid != null) {
+                    stream.uid(uid);
+                }
+                return stream;
+            }
+            @Override
+            public boolean isBounded() {
+                return false;
+            }
+        };
     }
 
     @Override
@@ -338,7 +357,8 @@ public class KafkaDynamicSource
                         auditHostAndPorts,
                         dirtyOptions,
                         dirtySink,
-                        auditKeys);
+                        auditKeys,
+                        uid);
         copy.producedDataType = producedDataType;
         copy.metadataKeys = metadataKeys;
         copy.watermarkStrategy = watermarkStrategy;

@@ -88,6 +88,7 @@ public class IcebergTableSink implements DynamicTableSink, SupportsPartitioning,
 
     private final DirtyOptions dirtyOptions;
     private @Nullable final DirtySink<Object> dirtySink;
+    private final String uid;
 
     private IcebergTableSink(IcebergTableSink toCopy) {
         this.tableLoader = toCopy.tableLoader;
@@ -98,6 +99,7 @@ public class IcebergTableSink implements DynamicTableSink, SupportsPartitioning,
         this.actionsProvider = toCopy.actionsProvider;
         this.dirtyOptions = toCopy.dirtyOptions;
         this.dirtySink = toCopy.dirtySink;
+        this.uid = toCopy.uid;
     }
 
     public IcebergTableSink(TableLoader tableLoader,
@@ -106,7 +108,8 @@ public class IcebergTableSink implements DynamicTableSink, SupportsPartitioning,
             CatalogLoader catalogLoader,
             ActionsProvider actionsProvider,
             DirtyOptions dirtyOptions,
-            @Nullable DirtySink<Object> dirtySink) {
+            @Nullable DirtySink<Object> dirtySink,
+            @Nullable String uid) {
         this.tableLoader = tableLoader;
         this.tableSchema = tableSchema;
         this.catalogTable = catalogTable;
@@ -114,6 +117,7 @@ public class IcebergTableSink implements DynamicTableSink, SupportsPartitioning,
         this.actionsProvider = actionsProvider;
         this.dirtyOptions = dirtyOptions;
         this.dirtySink = dirtySink;
+        this.uid = uid;
     }
 
     @Override
@@ -161,6 +165,7 @@ public class IcebergTableSink implements DynamicTableSink, SupportsPartitioning,
                     .dirtyOptions(dirtyOptions)
                     .dirtySink(dirtySink)
                     .action(actionsProvider)
+                    .uidPrefix(uid)
                     .tableOptions(tableOptions)
                     .distributionMode(DistributionMode.fromName(tableOptions.get(WRITE_DISTRIBUTION_MODE)))
                     .enableSchemaChange(schemaChange)
@@ -178,6 +183,7 @@ public class IcebergTableSink implements DynamicTableSink, SupportsPartitioning,
                     .dirtyOptions(dirtyOptions)
                     .dirtySink(dirtySink)
                     .action(actionsProvider)
+                    .uidPrefix(uid)
                     .tableOptions(tableOptions)
                     .distributionMode(DistributionMode.fromName(tableOptions.get(WRITE_DISTRIBUTION_MODE)))
                     .switchAppendUpsertEnable(tableOptions.get(SWITCH_APPEND_UPSERT_ENABLE))

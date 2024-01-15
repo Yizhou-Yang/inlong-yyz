@@ -45,6 +45,7 @@ import static org.apache.inlong.sort.base.Constants.GH_OST_DDL_CHANGE;
 import static org.apache.inlong.sort.base.Constants.GH_OST_TABLE_REGEX;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 import static org.apache.inlong.sort.cdc.base.debezium.table.DebeziumOptions.getDebeziumProperties;
 import static org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceOptions.APPEND_MODE;
 import static org.apache.inlong.sort.cdc.mysql.source.config.MySqlSourceOptions.CHUNK_META_GROUP_SIZE;
@@ -176,7 +177,7 @@ public class MySqlTableInlongSourceFactory implements DynamicTableSourceFactory 
             validateDistributionFactorUpper(distributionFactorUpper);
             validateDistributionFactorLower(distributionFactorLower);
         }
-
+        String uid = helper.getOptions().get(SOURCE_UID);
         return new MySqlTableSource(
                 physicalSchema,
                 port,
@@ -210,7 +211,8 @@ public class MySqlTableInlongSourceFactory implements DynamicTableSourceFactory 
                 includeIncremental,
                 ghostDdlChange,
                 ghostTableRegex,
-                dataSourceName);
+                dataSourceName,
+                uid);
     }
 
     @Override
@@ -264,6 +266,7 @@ public class MySqlTableInlongSourceFactory implements DynamicTableSourceFactory 
         options.add(GH_OST_DDL_CHANGE);
         options.add(GH_OST_TABLE_REGEX);
         options.add(DATASOURCE_NAME);
+        options.add(SOURCE_UID);
         return options;
     }
 

@@ -22,9 +22,10 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.connector.hbase.options.HBaseWriteOptions;
 import org.apache.flink.connector.hbase.sink.RowDataToMutationConverter;
 import org.apache.flink.connector.hbase.util.HBaseTableSchema;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
-import org.apache.flink.table.connector.sink.SinkFunctionProvider;
 import org.apache.flink.table.data.RowData;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
@@ -45,6 +46,7 @@ public class HBaseDynamicTableSink implements DynamicTableSink {
     private final String inlongAudit;
     private final DirtyOptions dirtyOptions;
     private @Nullable final DirtySink<Object> dirtySink;
+    private final String uid;
 
     public HBaseDynamicTableSink(
             String tableName,
@@ -55,7 +57,8 @@ public class HBaseDynamicTableSink implements DynamicTableSink {
             String inlongMetric,
             String inlongAudit,
             DirtyOptions dirtyOptions,
-            @Nullable DirtySink<Object> dirtySink) {
+            @Nullable DirtySink<Object> dirtySink,
+            @Nullable String uid) {
         this.tableName = tableName;
         this.hbaseTableSchema = hbaseTableSchema;
         this.hbaseConf = hbaseConf;
@@ -65,6 +68,7 @@ public class HBaseDynamicTableSink implements DynamicTableSink {
         this.inlongAudit = inlongAudit;
         this.dirtyOptions = dirtyOptions;
         this.dirtySink = dirtySink;
+        this.uid = uid;
     }
 
     @Override
@@ -78,7 +82,17 @@ public class HBaseDynamicTableSink implements DynamicTableSink {
                         writeOptions.getBufferFlushMaxRows(),
                         writeOptions.getBufferFlushIntervalMillis(),
                         inlongMetric, inlongAudit, dirtyOptions, dirtySink);
-        return SinkFunctionProvider.of(sinkFunction, writeOptions.getParallelism());
+        return (DataStreamSinkProvider) dataStream -> {
+            DataStreamSink<RowData> sink =
+                    dataStream.addSink(sinkFunction);
+            if (writeOptions.getParallelism() != null) {
+                sink = sink.setParallelism(writeOptions.getParallelism());
+            }
+            if (uid != null) {
+                sink = sink.uid(uid);
+            }
+            return sink;
+        };
     }
 
     @Override
@@ -90,7 +104,8 @@ public class HBaseDynamicTableSink implements DynamicTableSink {
     public DynamicTableSink copy() {
         return new HBaseDynamicTableSink(
                 tableName, hbaseTableSchema, hbaseConf, writeOptions,
-                nullStringLiteral, inlongMetric, inlongAudit, dirtyOptions, dirtySink);
+                nullStringLiteral, inlongMetric, inlongAudit, dirtyOptions, dirtySink,
+                uid);
     }
 
     @Override

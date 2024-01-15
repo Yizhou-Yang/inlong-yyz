@@ -136,6 +136,7 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
     private final String inputFormat;
     private final String outputFormat;
     private final String serializationLib;
+    private final String uid;
 
     public HiveTableSink(
             ReadableConfig flinkConf,
@@ -154,7 +155,8 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
             boolean sinkMultipleEnable,
             String inputFormat,
             String outputFormat,
-            String serializationLib) {
+            String serializationLib,
+            @Nullable String uid) {
         this.flinkConf = flinkConf;
         this.jobConf = jobConf;
         this.identifier = identifier;
@@ -178,6 +180,7 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
         this.inputFormat = inputFormat;
         this.outputFormat = outputFormat;
         this.serializationLib = serializationLib;
+        this.uid = uid;
     }
 
     @Override
@@ -397,7 +400,7 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
                             inlongMetric,
                             auditHostAndPorts,
                             dirtyOptions,
-                            dirtySink);
+                            dirtySink, uid);
         } else {
             writerStream =
                     StreamingSink.writer(
@@ -408,11 +411,11 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
                             inlongMetric,
                             auditHostAndPorts,
                             dirtyOptions,
-                            dirtySink);
+                            dirtySink, uid);
         }
 
         return StreamingSink.sink(
-                writerStream, path, identifier, getPartitionKeys(), msFactory(), fsFactory(), conf);
+                writerStream, path, identifier, getPartitionKeys(), msFactory(), fsFactory(), conf, uid);
     }
 
     private CompactReader.Factory<RowData> createCompactReaderFactory(
@@ -564,7 +567,8 @@ public class HiveTableSink implements DynamicTableSink, SupportsPartitioning, Su
                         sinkMultipleEnable,
                         inputFormat,
                         outputFormat,
-                        serializationLib);
+                        serializationLib,
+                        uid);
         sink.staticPartitionSpec = staticPartitionSpec;
         sink.overwrite = overwrite;
         sink.dynamicGrouping = dynamicGrouping;

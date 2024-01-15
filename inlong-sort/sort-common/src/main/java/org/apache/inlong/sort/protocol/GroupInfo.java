@@ -44,9 +44,10 @@ public class GroupInfo implements Serializable {
      * Whether align the type between source and sink, default is true.
      */
     private boolean typeAlign = true;
-
+    /**
+     * The config for group, maybe it only contains nodeIdAsUid:true or false
+     */
     private Map<String, String> properties;
-
     /**
      * Information of group.
      * 

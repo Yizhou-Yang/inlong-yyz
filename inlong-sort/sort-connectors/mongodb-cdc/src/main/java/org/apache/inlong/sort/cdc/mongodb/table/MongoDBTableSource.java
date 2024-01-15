@@ -18,13 +18,16 @@
 package org.apache.inlong.sort.cdc.mongodb.table;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
-import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
@@ -92,6 +95,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
 
     /** Metadata that is appended at the end of a physical source row. */
     protected List<String> metadataKeys;
+    private final String uid;
 
     public MongoDBTableSource(
             ResolvedSchema physicalSchema,
@@ -115,7 +119,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             String inlongAudit,
             String rowFilter,
             Boolean sourceMultipleEnable,
-            Boolean changelogNormalizeEnabled) {
+            Boolean changelogNormalizeEnabled,
+            @Nullable String uid) {
         this.physicalSchema = physicalSchema;
         this.hosts = checkNotNull(hosts);
         this.username = username;
@@ -140,6 +145,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.rowValidator = rowFilter;
         this.sourceMultipleEnable = sourceMultipleEnable;
         this.changelogNormalizeEnabled = changelogNormalizeEnabled;
+        this.uid = uid;
     }
 
     @Override
@@ -208,8 +214,22 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             Optional.ofNullable(splitSizeMB).ifPresent(builder::splitSizeMB);
             Optional.ofNullable(inlongMetric).ifPresent(builder::inlongMetric);
             Optional.ofNullable(inlongAudit).ifPresent(builder::inlongAudit);
+            return new DataStreamScanProvider() {
 
-            return SourceProvider.of(builder.build());
+                @Override
+                public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                    DataStreamSource<RowData> stream = execEnv.fromSource(builder.build(),
+                            WatermarkStrategy.noWatermarks(), "MongoDB-CDC");
+                    if (uid != null) {
+                        stream.uid(uid);
+                    }
+                    return stream;
+                }
+                @Override
+                public boolean isBounded() {
+                    return false;
+                }
+            };
         } else {
             org.apache.inlong.sort.cdc.mongodb.MongoDBSource.Builder<RowData> builder =
                     org.apache.inlong.sort.cdc.mongodb.MongoDBSource.<RowData>builder().hosts(hosts)
@@ -230,8 +250,21 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             Optional.ofNullable(inlongAudit).ifPresent(builder::inlongAudit);
             Optional.ofNullable(sourceMultipleEnable).ifPresent(builder::migrateAll);
             DebeziumSourceFunction<RowData> sourceFunction = builder.build();
+            return new DataStreamScanProvider() {
 
-            return SourceFunctionProvider.of(sourceFunction, false);
+                @Override
+                public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                    DataStreamSource<RowData> stream = execEnv.addSource(sourceFunction);
+                    if (uid != null) {
+                        stream.uid(uid);
+                    }
+                    return stream;
+                }
+                @Override
+                public boolean isBounded() {
+                    return false;
+                }
+            };
         }
     }
 
@@ -290,7 +323,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         inlongAudit,
                         rowValidator,
                         sourceMultipleEnable,
-                        changelogNormalizeEnabled);
+                        changelogNormalizeEnabled,
+                        uid);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

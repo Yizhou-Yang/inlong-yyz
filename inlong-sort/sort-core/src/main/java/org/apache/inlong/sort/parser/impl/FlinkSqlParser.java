@@ -90,6 +90,7 @@ public class FlinkSqlParser implements Parser {
     private final List<String> transformTableSqls = new ArrayList<>();
     private final List<String> loadTableSqls = new ArrayList<>();
     private final List<String> insertSqls = new ArrayList<>();
+    private final boolean nodeIdAsUid;
 
     /**
      * Flink sql parse constructor
@@ -100,6 +101,7 @@ public class FlinkSqlParser implements Parser {
     public FlinkSqlParser(TableEnvironment tableEnv, GroupInfo groupInfo) {
         this.tableEnv = tableEnv;
         this.groupInfo = groupInfo;
+        nodeIdAsUid = "true".equalsIgnoreCase(groupInfo.getProperties().get("nodeIdAsUid"));
         registerUDF();
     }
 
@@ -263,6 +265,16 @@ public class FlinkSqlParser implements Parser {
         }
         if (node instanceof ExtractNode) {
             log.info("start parse node, node id:{}", node.getId());
+            if (nodeIdAsUid) {
+                Map<String, String> config = node.getProperties();
+                if (config == null) {
+                    config = new LinkedHashMap<>();
+                    ((ExtractNode) node).setProperties(config);
+                }
+                if (!config.containsKey("source.uid")) {
+                    config.put("source.uid", node.getId());
+                }
+            }
             String sql = genCreateSql(node, relation, nodeMap);
             log.info("node id:{}, create table sql:\n{}", node.getId(), maskSensitiveMessage(sql));
             registerTableSql(node, sql);
@@ -277,12 +289,21 @@ public class FlinkSqlParser implements Parser {
                     parseNode(upstreamNode, relationMap.get(upstreamNodeId), nodeMap, relationMap);
                 }
             }
-
             if (node instanceof LoadNode) {
                 LoadNode loadNode = (LoadNode) node;
                 String insertSql = genLoadNodeInsertSql(loadNode, relation, nodeMap);
                 log.info("node id:{}, insert sql:\n{}", node.getId(), insertSql);
                 insertSqls.add(insertSql);
+                if (nodeIdAsUid) {
+                    Map<String, String> config = node.getProperties();
+                    if (config == null) {
+                        config = new LinkedHashMap<>();
+                        ((LoadNode) node).setProperties(config);
+                    }
+                    if (!config.containsKey("sink.uid")) {
+                        config.put("sink.uid", node.getId());
+                    }
+                }
                 String createSql = genCreateSql(node, relation, nodeMap);
                 log.info("node id:{}, create table sql:\n{}", node.getId(), maskSensitiveMessage(createSql));
                 registerTableSql(node, createSql);

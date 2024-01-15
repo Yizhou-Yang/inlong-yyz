@@ -42,6 +42,8 @@ import static org.apache.flink.shaded.guava18.com.google.common.base.Preconditio
 import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 import static org.apache.inlong.sort.kudu.common.KuduOptions.CONNECTOR_MASTERS;
 import static org.apache.inlong.sort.kudu.common.KuduOptions.CONNECTOR_TABLE;
 import static org.apache.inlong.sort.kudu.common.KuduOptions.ENABLE_KEY_FIELD_CHECK;
@@ -94,13 +96,14 @@ public class KuduDynamicTableFactory
         ReadableConfig options = helper.getOptions();
         String inlongMetric = options.getOptional(INLONG_METRIC).orElse(null);
         String auditHostAndPorts = options.getOptional(INLONG_AUDIT).orElse(null);
-
+        String uid = helper.getOptions().get(SINK_UID);
         // Query the fields through the kudu client and select the fields in the tableSchema
         return new KuduDynamicTableSink(
                 getKuduTableInfo(context),
                 configuration,
                 inlongMetric,
-                auditHostAndPorts);
+                auditHostAndPorts,
+                uid);
     }
 
     @Override
@@ -112,7 +115,6 @@ public class KuduDynamicTableFactory
         String auditHostAndPorts = configuration.getOptional(INLONG_AUDIT).orElse(null);
 
         KuduTableInfo kuduTableInfo = getKuduTableInfo(context);
-
         return new KuduDynamicTableSource(
                 kuduTableInfo,
                 configuration,
@@ -179,6 +181,8 @@ public class KuduDynamicTableFactory
         options.add(INLONG_METRIC);
         options.add(INLONG_AUDIT);
         options.add(AUDIT_KEYS);
+        options.add(SOURCE_UID);
+        options.add(SINK_UID);
         return options;
     }
 }

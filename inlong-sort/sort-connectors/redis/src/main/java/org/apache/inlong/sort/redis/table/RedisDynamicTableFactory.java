@@ -21,6 +21,8 @@ import static org.apache.flink.util.Preconditions.checkState;
 import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 import static org.apache.inlong.sort.redis.common.config.RedisOptions.DATA_TYPE;
 import static org.apache.inlong.sort.redis.common.config.RedisOptions.LOOKUP_ASYNC;
 import static org.apache.inlong.sort.redis.common.config.RedisOptions.LOOKUP_CACHE_MAX_ROWS;
@@ -122,7 +124,7 @@ public class RedisDynamicTableFactory implements DynamicTableSourceFactory, Dyna
         ResolvedSchema resolvedSchema = context.getCatalogTable().getResolvedSchema();
         EncodingFormat<SerializationSchema<RowData>> encodingFormat = helper
                 .discoverEncodingFormat(SerializationFormatFactory.class, FactoryUtil.FORMAT);
-
+        String uid = config.get(SINK_UID);
         return new RedisDynamicTableSink(
                 encodingFormat,
                 resolvedSchema,
@@ -131,7 +133,8 @@ public class RedisDynamicTableFactory implements DynamicTableSourceFactory, Dyna
                 config,
                 properties,
                 inlongMetric,
-                auditHostAndPorts);
+                auditHostAndPorts,
+                uid);
     }
 
     private RedisLookupOptions getJdbcLookupOptions(ReadableConfig readableConfig) {
@@ -212,6 +215,8 @@ public class RedisDynamicTableFactory implements DynamicTableSourceFactory, Dyna
         options.add(RedisOptions.SOCKET_TIMEOUT);
         options.add(RedisOptions.TIMEOUT);
         options.add(AUDIT_KEYS);
+        options.add(SINK_UID);
+        options.add(SOURCE_UID);
         return options;
     }
 

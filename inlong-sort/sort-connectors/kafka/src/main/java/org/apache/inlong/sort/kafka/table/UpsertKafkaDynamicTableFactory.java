@@ -86,6 +86,8 @@ import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_POLICIES;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 import static org.apache.inlong.sort.kafka.table.KafkaDynamicTableFactory.SINK_PARTITIONER_VALUE_PRIMARY_KEY;
 import static org.apache.inlong.sort.kafka.table.KafkaOptions.KAFKA_IGNORE_ALL_CHANGELOG;
 
@@ -216,6 +218,8 @@ public class UpsertKafkaDynamicTableFactory
         options.add(SINK_PARTITIONER);
         options.add(SINK_MULTIPLE_PARTITION_PATTERN);
         options.add(SINK_FIXED_IDENTIFIER);
+        options.add(SOURCE_UID);
+        options.add(SINK_UID);
         return options;
     }
 
@@ -246,6 +250,7 @@ public class UpsertKafkaDynamicTableFactory
         final String inlongMetric = tableOptions.getOptional(INLONG_METRIC).orElse(null);
         final String auditHostAndPorts = tableOptions.getOptional(INLONG_AUDIT).orElse(null);
         final String auditKeys = tableOptions.getOptional(AUDIT_KEYS).orElse(null);
+        String uid = helper.getOptions().get(SOURCE_UID);
         return new KafkaDynamicSource(
                 schema.toPhysicalRowDataType(),
                 keyDecodingFormat,
@@ -264,7 +269,8 @@ public class UpsertKafkaDynamicTableFactory
                 auditHostAndPorts,
                 dirtyOptions,
                 dirtySink,
-                auditKeys);
+                auditKeys,
+                uid);
     }
 
     private Optional<FlinkKafkaPartitioner<RowData>> getFlinkKafkaPartitioner(
@@ -325,7 +331,7 @@ public class UpsertKafkaDynamicTableFactory
         final FlinkKafkaPartitioner<RowData> partitioner =
                 getFlinkKafkaPartitioner(tableOptions, context.getClassLoader(),
                         context.getCatalogTable().getSchema()).orElse(null);
-
+        String uid = helper.getOptions().get(SINK_UID);
         // use {@link org.apache.kafka.clients.producer.internals.DefaultPartitioner}.
         // it will use hash partition if key is set else in round-robin behaviour.
         return new KafkaDynamicSink(
@@ -351,7 +357,8 @@ public class UpsertKafkaDynamicTableFactory
                 dirtyOptions,
                 dirtySink,
                 multipleSink,
-                policyMap);
+                policyMap,
+                uid);
     }
 
     private Tuple2<int[], int[]> createKeyValueProjections(CatalogTable catalogTable) {

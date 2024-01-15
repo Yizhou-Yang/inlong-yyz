@@ -60,6 +60,8 @@ import static org.apache.flink.table.factories.FactoryUtil.createTableFactoryHel
 import static org.apache.inlong.sort.base.Constants.DIRTY_PREFIX;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 /** HBase connector factory. */
 public class HBase2DynamicTableFactory
@@ -112,9 +114,10 @@ public class HBase2DynamicTableFactory
         String inlongAudit = tableOptions.get(INLONG_AUDIT);
         final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(tableOptions);
         final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
+        String uid = helper.getOptions().get(SINK_UID);
         return new HBaseDynamicTableSink(
                 tableName, hbaseSchema, hbaseConf, hBaseWriteOptions, nullStringLiteral,
-                inlongMetric, inlongAudit, dirtyOptions, dirtySink);
+                inlongMetric, inlongAudit, dirtyOptions, dirtySink, uid);
     }
 
     @Override
@@ -145,6 +148,8 @@ public class HBase2DynamicTableFactory
         set.add(LOOKUP_MAX_RETRIES);
         set.add(INLONG_METRIC);
         set.add(INLONG_AUDIT);
+        set.add(SINK_UID);
+        set.add(SOURCE_UID);
         return set;
     }
 }

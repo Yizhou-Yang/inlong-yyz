@@ -17,13 +17,16 @@
 
 package org.apache.inlong.sort.cdc.mysql.table;
 
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
-import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
@@ -104,6 +107,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     protected List<String> metadataKeys;
 
     private String dataSourceName;
+    private final String uid;
 
     /**
      * Constructor of MySqlTableSource.
@@ -141,7 +145,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             boolean includeIncremental,
             boolean ghostDdlChange,
             String ghostTableRegex,
-            String dataSourceName) {
+            String dataSourceName,
+            @Nullable String uid) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -178,6 +183,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.ghostDdlChange = ghostDdlChange;
         this.ghostTableRegex = ghostTableRegex;
         this.dataSourceName = dataSourceName;
+        this.uid = uid;
     }
 
     @Override
@@ -247,7 +253,22 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .dataSourceName(dataSourceName)
                             .migrateAll(migrateAll)
                             .build();
-            return SourceProvider.of(parallelSource);
+            return new DataStreamScanProvider() {
+
+                @Override
+                public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                    DataStreamSource<RowData> stream = execEnv.fromSource(parallelSource,
+                            WatermarkStrategy.noWatermarks(), "MySQL-CDC");
+                    if (uid != null) {
+                        stream.uid(uid);
+                    }
+                    return stream;
+                }
+                @Override
+                public boolean isBounded() {
+                    return false;
+                }
+            };
         } else {
             org.apache.inlong.sort.cdc.mysql.MySqlSource.Builder<RowData> builder =
                     org.apache.inlong.sort.cdc.mysql.MySqlSource.<RowData>builder()
@@ -267,7 +288,21 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             Optional.ofNullable(serverId)
                     .ifPresent(serverId -> builder.serverId(Integer.parseInt(serverId)));
             DebeziumSourceFunction<RowData> sourceFunction = builder.build();
-            return SourceFunctionProvider.of(sourceFunction, false);
+            return new DataStreamScanProvider() {
+
+                @Override
+                public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                    DataStreamSource<RowData> stream = execEnv.addSource(sourceFunction);
+                    if (uid != null) {
+                        stream.uid(uid);
+                    }
+                    return stream;
+                }
+                @Override
+                public boolean isBounded() {
+                    return false;
+                }
+            };
         }
     }
 
@@ -340,7 +375,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         includeIncremental,
                         ghostDdlChange,
                         ghostTableRegex,
-                        dataSourceName);
+                        dataSourceName,
+                        uid);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

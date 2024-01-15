@@ -117,6 +117,8 @@ import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.PATTERN_PARTITION_MAP;
 import static org.apache.inlong.sort.base.Constants.PATTERN_PARTITION_MAP;
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_FORMAT;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 import static org.apache.inlong.sort.kafka.table.KafkaOptions.KAFKA_IGNORE_ALL_CHANGELOG;
 
 /**
@@ -358,6 +360,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
         options.add(SINK_SCHEMA_CHANGE_ENABLE);
         options.add(SINK_SCHEMA_CHANGE_POLICIES);
         options.add(SINK_FIXED_IDENTIFIER);
+        options.add(SINK_UID);
+        options.add(SOURCE_UID);
         return options;
     }
 
@@ -414,6 +418,7 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
         // Build the dirty data side-output
         final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(tableOptions);
         final DirtySink<String> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
+        String uid = helper.getOptions().get(SOURCE_UID);
         return createKafkaTableSource(
                 physicalDataType,
                 keyDecodingFormat.orElse(null),
@@ -431,7 +436,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
                 auditHostAndPorts,
                 dirtyOptions,
                 dirtySink,
-                auditKeys);
+                auditKeys,
+                uid);
     }
 
     @Override
@@ -481,7 +487,7 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
         final boolean enableSchemaChange = tableOptions.get(SINK_SCHEMA_CHANGE_ENABLE);
         final Map<SchemaChangeType, SchemaChangePolicy> policyMap =
                 enableSchemaChange ? SchemaChangeUtils.deserialize(schemaChangePolicies) : Collections.emptyMap();
-
+        String uid = helper.getOptions().get(SINK_UID);
         return createKafkaTableSink(
                 physicalDataType,
                 keyEncodingFormat.orElse(null),
@@ -503,7 +509,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
                 dirtyOptions,
                 dirtySink,
                 multipleSink,
-                policyMap);
+                policyMap,
+                uid);
     }
 
     private void validateSinkMultipleFormatAndPhysicalDataType(DataType physicalDataType,
@@ -550,7 +557,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
             String auditHostAndPorts,
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<String> dirtySink,
-            String auditKeys) {
+            String auditKeys,
+            @Nullable String uid) {
         return new KafkaDynamicSource(
                 physicalDataType,
                 keyDecodingFormat,
@@ -569,7 +577,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
                 auditHostAndPorts,
                 dirtyOptions,
                 dirtySink,
-                auditKeys);
+                auditKeys,
+                uid);
     }
 
     protected KafkaDynamicSink createKafkaTableSink(
@@ -592,7 +601,8 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
             boolean multipleSink,
-            Map<SchemaChangeType, SchemaChangePolicy> policyMap) {
+            Map<SchemaChangeType, SchemaChangePolicy> policyMap,
+            @Nullable String uid) {
         return new KafkaDynamicSink(
                 physicalDataType,
                 physicalDataType,
@@ -616,6 +626,7 @@ public class KafkaDynamicTableFactory implements DynamicTableSourceFactory, Dyna
                 dirtyOptions,
                 dirtySink,
                 multipleSink,
-                policyMap);
+                policyMap,
+                uid);
     }
 }

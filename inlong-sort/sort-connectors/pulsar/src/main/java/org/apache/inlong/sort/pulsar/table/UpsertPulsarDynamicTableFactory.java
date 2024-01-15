@@ -69,6 +69,8 @@ import static org.apache.flink.table.factories.FactoryUtil.FORMAT;
 import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 /**
  * Upsert-Pulsar factory.
@@ -152,6 +154,8 @@ public class UpsertPulsarDynamicTableFactory implements DynamicTableSourceFactor
         options.add(FactoryUtil.SINK_PARALLELISM);
         options.add(PROPERTIES);
         options.add(INLONG_METRIC);
+        options.add(SOURCE_UID);
+        options.add(SINK_UID);
         return options;
     }
 
@@ -190,7 +194,7 @@ public class UpsertPulsarDynamicTableFactory implements DynamicTableSourceFactor
         String inlongMetric = tableOptions.getOptional(INLONG_METRIC).orElse(null);
         String auditHostAndPorts = tableOptions.get(INLONG_AUDIT);
         String auditKeys = tableOptions.get(AUDIT_KEYS);
-
+        String uid = helper.getOptions().get(SOURCE_UID);
         return new PulsarDynamicTableSource(
                 schema.toPhysicalRowDataType(),
                 keyDecodingFormat,
@@ -206,7 +210,8 @@ public class UpsertPulsarDynamicTableFactory implements DynamicTableSourceFactor
                 startupOptions,
                 true,
                 inlongMetric,
-                auditHostAndPorts, auditKeys);
+                auditHostAndPorts, auditKeys,
+                uid);
     }
 
     @Override
@@ -235,7 +240,7 @@ public class UpsertPulsarDynamicTableFactory implements DynamicTableSourceFactor
         String adminUrl = tableOptions.get(ADMIN_URL);
         String serverUrl = tableOptions.get(SERVICE_URL);
         String formatType = tableOptions.getOptional(FORMAT).orElseGet(() -> tableOptions.get(VALUE_FORMAT));
-
+        String uid = tableOptions.get(SINK_UID);
         return new PulsarDynamicTableSink(
                 serverUrl,
                 adminUrl,
@@ -251,7 +256,8 @@ public class UpsertPulsarDynamicTableFactory implements DynamicTableSourceFactor
                 formatType,
                 true,
                 parallelism,
-                KeyHashMessageRouterImpl.INSTANCE);
+                KeyHashMessageRouterImpl.INSTANCE,
+                uid);
     }
 
     private Tuple2<int[], int[]> createKeyValueProjections(CatalogTable catalogTable) {

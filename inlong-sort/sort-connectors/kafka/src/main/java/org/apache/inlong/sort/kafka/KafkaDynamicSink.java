@@ -19,6 +19,7 @@ package org.apache.inlong.sort.kafka;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner;
 import org.apache.flink.streaming.connectors.kafka.table.BufferedUpsertSinkFunction;
 import org.apache.flink.streaming.connectors.kafka.table.KafkaSinkSemantic;
@@ -27,8 +28,8 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.format.EncodingFormat;
+import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
-import org.apache.flink.table.connector.sink.SinkFunctionProvider;
 import org.apache.flink.table.connector.sink.abilities.SupportsWritingMetadata;
 import org.apache.flink.table.data.ArrayData;
 import org.apache.flink.table.data.MapData;
@@ -162,6 +163,7 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
     private boolean multipleSink;
 
     private Map<SchemaChangeType, SchemaChangePolicy> policyMap;
+    private final String uid;
 
     /**
      * Constructor of KafkaDynamicSink.
@@ -189,7 +191,8 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
             boolean multipleSink,
-            Map<SchemaChangeType, SchemaChangePolicy> policyMap) {
+            Map<SchemaChangeType, SchemaChangePolicy> policyMap,
+            @Nullable String uid) {
         // Format attributes
         this.consumedDataType =
                 checkNotNull(consumedDataType, "Consumed data type must not be null.");
@@ -224,6 +227,7 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
         this.dirtySink = dirtySink;
         this.multipleSink = multipleSink;
         this.policyMap = policyMap;
+        this.uid = uid;
     }
 
     @Override
@@ -256,9 +260,29 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
                             keyProjection,
                             context.createTypeInformation(consumedDataType),
                             flushMode);
-            return SinkFunctionProvider.of(buffedSinkFunction, parallelism);
+            return (DataStreamSinkProvider) dataStream -> {
+                DataStreamSink<RowData> sink =
+                        dataStream.addSink(buffedSinkFunction);
+                if (parallelism != null) {
+                    sink = sink.setParallelism(parallelism);
+                }
+                if (uid != null) {
+                    sink = sink.uid(uid);
+                }
+                return sink;
+            };
         } else {
-            return SinkFunctionProvider.of(kafkaProducer, parallelism);
+            return (DataStreamSinkProvider) dataStream -> {
+                DataStreamSink<RowData> sink =
+                        dataStream.addSink(kafkaProducer);
+                if (parallelism != null) {
+                    sink = sink.setParallelism(parallelism);
+                }
+                if (uid != null) {
+                    sink = sink.uid(uid);
+                }
+                return sink;
+            };
         }
     }
 
@@ -331,7 +355,8 @@ public class KafkaDynamicSink implements DynamicTableSink, SupportsWritingMetada
                         dirtyOptions,
                         dirtySink,
                         multipleSink,
-                        policyMap);
+                        policyMap,
+                        uid);
         copy.metadataKeys = metadataKeys;
         return copy;
     }

@@ -17,10 +17,12 @@
 
 package org.apache.inlong.sort.tchousex.flink.table;
 
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
-import org.apache.flink.table.connector.sink.SinkFunctionProvider;
+import org.apache.flink.table.data.RowData;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
 import org.apache.inlong.sort.base.dirty.sink.DirtySink;
 import org.apache.inlong.sort.base.sink.SchemaUpdateExceptionPolicy;
@@ -50,6 +52,7 @@ public class TCHouseXDynamicTableSink implements DynamicTableSink {
     private final String schemaChangePolicies;
     private final TCHouseXSinkOptions tcHouseXSinkOptions;
     private final TCHouseXOptions tcHouseXOptions;
+    private final String uid;
 
     public TCHouseXDynamicTableSink(
             TCHouseXOptions tcHouseXOptions,
@@ -66,7 +69,8 @@ public class TCHouseXDynamicTableSink implements DynamicTableSink {
             DirtyOptions dirtyOptions,
             @Nullable DirtySink<Object> dirtySink,
             boolean enableSchemaChange,
-            @Nullable String schemaChangePolicies) {
+            @Nullable String schemaChangePolicies,
+            @Nullable String uid) {
         this.tcHouseXOptions = tcHouseXOptions;
         this.tcHouseXSinkOptions = tcHouseXSinkOptions;
         this.tableSchema = tableSchema;
@@ -82,6 +86,7 @@ public class TCHouseXDynamicTableSink implements DynamicTableSink {
         this.dirtySink = dirtySink;
         this.enableSchemaChange = enableSchemaChange;
         this.schemaChangePolicies = schemaChangePolicies;
+        this.uid = uid;
     }
 
     @Override
@@ -115,8 +120,18 @@ public class TCHouseXDynamicTableSink implements DynamicTableSink {
                 .setDirtySink(dirtySink)
                 .setEnableSchemaChange(enableSchemaChange)
                 .setSchemaChangePolicies(schemaChangePolicies);
-        return SinkFunctionProvider.of(
-                new GenericTCHouseXSinkFunction<>(builder.build()), parallelism);
+        return (DataStreamSinkProvider) dataStream -> {
+            DataStreamSink<RowData> sink =
+                    dataStream.addSink(new GenericTCHouseXSinkFunction<>(builder.build()));
+
+            if (parallelism != null) {
+                sink = sink.setParallelism(parallelism);
+            }
+            if (uid != null) {
+                sink = sink.uid(uid);
+            }
+            return sink;
+        };
     }
 
     @Override
@@ -136,7 +151,8 @@ public class TCHouseXDynamicTableSink implements DynamicTableSink {
                 dirtyOptions,
                 dirtySink,
                 enableSchemaChange,
-                schemaChangePolicies);
+                schemaChangePolicies,
+                uid);
     }
 
     @Override

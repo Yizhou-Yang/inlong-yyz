@@ -76,6 +76,8 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_SCHEMA_UPDATE_
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_POLICIES;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 /**
  * This class copy from {@link org.apache.doris.flink.table.DorisDynamicTableFactory}
@@ -287,6 +289,8 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
         options.add(SINK_RATE_TREND_CYCLE);
         options.add(SINK_RATE_TREND_NUMBER);
         options.add(SINK_RATE_LIMIT_ENABLE);
+        options.add(SINK_UID);
+        options.add(SOURCE_UID);
         return options;
     }
 
@@ -384,6 +388,7 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
         // Build the dirty data side-output
         final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(helper.getOptions());
         final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
+        String uid = helper.getOptions().get(SINK_UID);
         // create and return dynamic table sink
         return new DorisDynamicTableSink(
                 getDorisOptions(helper.getOptions()),
@@ -404,7 +409,8 @@ public final class DorisDynamicTableFactory implements DynamicTableSourceFactory
                 enableSchemaChange,
                 schemaChangePolicies,
                 autoCreateTableWhenSnapshot,
-                getDorisRateControlParams(helper.getOptions()));
+                getDorisRateControlParams(helper.getOptions()),
+                uid);
     }
 
     private RateControlParams getDorisRateControlParams(ReadableConfig options) {

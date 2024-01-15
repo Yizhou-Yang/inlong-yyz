@@ -19,6 +19,7 @@ package org.apache.inlong.sort.pulsar.table;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.connectors.pulsar.FlinkPulsarSink;
 import org.apache.flink.streaming.connectors.pulsar.internal.PulsarClientUtils;
@@ -28,8 +29,8 @@ import org.apache.flink.streaming.util.serialization.PulsarSerializationSchema;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.format.EncodingFormat;
+import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
-import org.apache.flink.table.connector.sink.SinkFunctionProvider;
 import org.apache.flink.table.connector.sink.abilities.SupportsWritingMetadata;
 import org.apache.flink.table.data.ArrayData;
 import org.apache.flink.table.data.MapData;
@@ -119,6 +120,8 @@ public class PulsarDynamicTableSink implements DynamicTableSink, SupportsWriting
      */
     protected List<String> metadataKeys;
 
+    private final String uid;
+
     protected PulsarDynamicTableSink(
             String serviceUrl,
             String adminUrl,
@@ -134,7 +137,8 @@ public class PulsarDynamicTableSink implements DynamicTableSink, SupportsWriting
             String formatType,
             boolean upsertMode,
             @Nullable Integer parallelism,
-            @Nullable MessageRouter messageRouter) {
+            @Nullable MessageRouter messageRouter,
+            @Nullable String uid) {
         this.serviceUrl = Preconditions.checkNotNull(serviceUrl, "serviceUrl data type must not be null.");
         this.adminUrl = Preconditions.checkNotNull(adminUrl, "adminUrl data type must not be null.");
         this.topic = Preconditions.checkNotNull(topic, "Topic must not be null.");
@@ -152,6 +156,7 @@ public class PulsarDynamicTableSink implements DynamicTableSink, SupportsWriting
         this.upsertMode = upsertMode;
         this.parallelism = parallelism;
         this.messageRouter = messageRouter;
+        this.uid = uid;
     }
 
     @Override
@@ -175,7 +180,17 @@ public class PulsarDynamicTableSink implements DynamicTableSink, SupportsWriting
                 this.properties,
                 pulsarSerializer);
 
-        return SinkFunctionProvider.of(pulsarSink, parallelism);
+        return (DataStreamSinkProvider) dataStream -> {
+            DataStreamSink<RowData> sink =
+                    dataStream.addSink(pulsarSink);
+            if (parallelism != null) {
+                sink = sink.setParallelism(parallelism);
+            }
+            if (uid != null) {
+                sink = sink.uid(uid);
+            }
+            return sink;
+        };
     }
 
     private PulsarSerializationSchema<RowData> createPulsarSerializer(SerializationSchema<RowData> keySerialization,
@@ -273,7 +288,8 @@ public class PulsarDynamicTableSink implements DynamicTableSink, SupportsWriting
                 this.formatType,
                 this.upsertMode,
                 this.parallelism,
-                this.messageRouter);
+                this.messageRouter,
+                uid);
         copy.metadataKeys = metadataKeys;
         return copy;
     }

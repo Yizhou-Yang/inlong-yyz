@@ -53,6 +53,7 @@ import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SOURCE_MULTIPLE_ENABLE;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 /**
  * Factory for creating configured instance of {@link MongoDBTableSource}.
@@ -151,7 +152,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 ? ROW_KINDS_FILTERED.defaultValue()
                 : config.get(ROW_KINDS_FILTERED);
         Boolean changelogNormalizeEnabled = config.get(CHANGELOG_NORMALIZE_ENABLED);
-
+        String uid = helper.getOptions().get(SOURCE_UID);
         return new MongoDBTableSource(
                 physicalSchema,
                 hosts,
@@ -174,7 +175,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 inlongAudit,
                 rowKindFiltered,
                 sourceMultipleEnable,
-                changelogNormalizeEnabled);
+                changelogNormalizeEnabled,
+                uid);
     }
 
     private void checkPrimaryKey(UniqueConstraint pk, String message) {
@@ -219,6 +221,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(CHUNK_META_GROUP_SIZE);
         options.add(CHANGELOG_NORMALIZE_ENABLED);
         options.add(SERVER_TIME_ZONE);
+        options.add(SOURCE_UID);
         return options;
     }
 }

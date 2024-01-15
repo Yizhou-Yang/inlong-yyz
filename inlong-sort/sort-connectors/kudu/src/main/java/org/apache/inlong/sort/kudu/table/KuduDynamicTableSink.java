@@ -69,12 +69,14 @@ public class KuduDynamicTableSink implements DynamicTableSink {
     @Nullable
     private String[] keyFieldNames;
     private final boolean ignoreAllChangeLog;
+    private final String uid;
 
     public KuduDynamicTableSink(
             KuduTableInfo kuduTableInfo,
             Configuration configuration,
             String inlongMetric,
-            String auditHostAndPorts) {
+            String auditHostAndPorts,
+            @Nullable String uid) {
         this.kuduTableInfo = kuduTableInfo;
         this.configuration = configuration;
         this.inlongMetric = inlongMetric;
@@ -89,6 +91,7 @@ public class KuduDynamicTableSink implements DynamicTableSink {
                 this.keyFieldNames = userKeyFieldsConfig.split("\\s*,\\s*");
             }
         }
+        this.uid = uid;
     }
 
     public DataStreamSink<?> consumeStream(DataStream<RowData> dataStream) {
@@ -179,7 +182,11 @@ public class KuduDynamicTableSink implements DynamicTableSink {
             @Override
             public DataStreamSink<?> consumeDataStream(DataStream<RowData> dataStream) {
                 int parallelism = dataStream.getParallelism();
-                return consumeStream(dataStream);
+                DataStreamSink<?> sink =  consumeStream(dataStream);
+                if(uid != null){
+                    sink.uid(uid);
+                }
+                return sink;
             }
         };
     }
@@ -190,7 +197,8 @@ public class KuduDynamicTableSink implements DynamicTableSink {
                 kuduTableInfo,
                 configuration,
                 inlongMetric,
-                auditHostAndPorts);
+                auditHostAndPorts,
+                uid);
     }
 
     @Override

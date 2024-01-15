@@ -20,12 +20,13 @@ package org.apache.inlong.sort.elasticsearch6.table;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.connectors.elasticsearch6.RestClientFactory;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.format.EncodingFormat;
+import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
-import org.apache.flink.table.connector.sink.SinkFunctionProvider;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.util.StringUtils;
 import org.apache.http.HttpHost;
@@ -68,6 +69,7 @@ final class Elasticsearch6DynamicSink implements DynamicTableSink {
     private final String auditHostAndPorts;
     private final ElasticSearchBuilderProvider builderProvider;
     private final DirtySinkHelper<Object> dirtySinkHelper;
+    private final String uid;
 
     // --------------------------------------------------------------
     // Hack to make configuration testing possible.
@@ -85,9 +87,10 @@ final class Elasticsearch6DynamicSink implements DynamicTableSink {
             TableSchema schema,
             String inlongMetric,
             String auditHostAndPorts,
-            DirtySinkHelper<Object> dirtySinkHelper) {
+            DirtySinkHelper<Object> dirtySinkHelper,
+            @Nullable String uid) {
         this(format, config, schema, (ElasticsearchSink.Builder::new),
-                inlongMetric, auditHostAndPorts, dirtySinkHelper);
+                inlongMetric, auditHostAndPorts, dirtySinkHelper, uid);
     }
 
     Elasticsearch6DynamicSink(
@@ -97,7 +100,8 @@ final class Elasticsearch6DynamicSink implements DynamicTableSink {
             ElasticSearchBuilderProvider builderProvider,
             String inlongMetric,
             String auditHostAndPorts,
-            DirtySinkHelper<Object> dirtySinkHelper) {
+            DirtySinkHelper<Object> dirtySinkHelper,
+            @Nullable String uid) {
         this.format = format;
         this.schema = schema;
         this.config = config;
@@ -105,6 +109,7 @@ final class Elasticsearch6DynamicSink implements DynamicTableSink {
         this.inlongMetric = inlongMetric;
         this.auditHostAndPorts = auditHostAndPorts;
         this.dirtySinkHelper = dirtySinkHelper;
+        this.uid = uid;
     }
 
     @Override
@@ -117,54 +122,59 @@ final class Elasticsearch6DynamicSink implements DynamicTableSink {
     // --------------------------------------------------------------
 
     @Override
-    public SinkFunctionProvider getSinkRuntimeProvider(Context context) {
-        return () -> {
-            SerializationSchema<RowData> format =
-                    this.format.createRuntimeEncoder(context, schema.toRowDataType());
+    public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
+        SerializationSchema<RowData> format =
+                this.format.createRuntimeEncoder(context, schema.toRowDataType());
 
-            final RowElasticsearchSinkFunction upsertFunction =
-                    new RowElasticsearchSinkFunction(
-                            IndexGeneratorFactory.createIndexGenerator(config.getIndex(), schema),
-                            config.getDocumentType(),
-                            format,
-                            XContentType.JSON,
-                            REQUEST_FACTORY,
-                            KeyExtractor.createKeyExtractor(schema, config.getKeyDelimiter()),
-                            RoutingExtractor.createRoutingExtractor(
-                                    schema, config.getRoutingField().orElse(null)),
-                            dirtySinkHelper);
+        final RowElasticsearchSinkFunction upsertFunction =
+                new RowElasticsearchSinkFunction(
+                        IndexGeneratorFactory.createIndexGenerator(config.getIndex(), schema),
+                        config.getDocumentType(),
+                        format,
+                        XContentType.JSON,
+                        REQUEST_FACTORY,
+                        KeyExtractor.createKeyExtractor(schema, config.getKeyDelimiter()),
+                        RoutingExtractor.createRoutingExtractor(
+                                schema, config.getRoutingField().orElse(null)),
+                        dirtySinkHelper);
 
-            final ElasticsearchSink.Builder<RowData> builder =
-                    builderProvider.createBuilder(config.getHosts(), upsertFunction);
-            builder.setFailureHandler(config.getFailureHandler());
-            builder.setBulkFlushMaxActions(config.getBulkFlushMaxActions());
-            builder.setBulkFlushMaxSizeMb((int) (config.getBulkFlushMaxByteSize() >> 20));
-            builder.setBulkFlushInterval(config.getBulkFlushInterval());
-            builder.setBulkFlushBackoff(config.isBulkFlushBackoffEnabled());
-            builder.setInLongMetric(inlongMetric);
-            builder.setDirtySinkHelper(dirtySinkHelper);
-            builder.setAuditHostAndPorts(auditHostAndPorts);
-            config.getBulkFlushBackoffType().ifPresent(builder::setBulkFlushBackoffType);
-            config.getBulkFlushBackoffRetries().ifPresent(builder::setBulkFlushBackoffRetries);
-            config.getBulkFlushBackoffDelay().ifPresent(builder::setBulkFlushBackoffDelay);
-            // we must overwrite the default factory which is defined with a lambda because of a bug
-            // in shading lambda serialization shading see FLINK-18006
-            if (config.getUsername().isPresent()
-                    && config.getPassword().isPresent()
-                    && !StringUtils.isNullOrWhitespaceOnly(config.getUsername().get())
-                    && !StringUtils.isNullOrWhitespaceOnly(config.getPassword().get())) {
-                builder.setRestClientFactory(
-                        new AuthRestClientFactory(
-                                config.getPathPrefix().orElse(null),
-                                config.getUsername().get(),
-                                config.getPassword().get()));
-            } else {
-                builder.setRestClientFactory(
-                        new DefaultRestClientFactory(config.getPathPrefix().orElse(null)));
-            }
-            final ElasticsearchSink<RowData> sink = builder.build();
-            if (config.isDisableFlushOnCheckpoint()) {
-                sink.disableFlushOnCheckpoint();
+        final ElasticsearchSink.Builder<RowData> builder =
+                builderProvider.createBuilder(config.getHosts(), upsertFunction);
+        builder.setFailureHandler(config.getFailureHandler());
+        builder.setBulkFlushMaxActions(config.getBulkFlushMaxActions());
+        builder.setBulkFlushMaxSizeMb((int) (config.getBulkFlushMaxByteSize() >> 20));
+        builder.setBulkFlushInterval(config.getBulkFlushInterval());
+        builder.setBulkFlushBackoff(config.isBulkFlushBackoffEnabled());
+        builder.setInLongMetric(inlongMetric);
+        builder.setDirtySinkHelper(dirtySinkHelper);
+        builder.setAuditHostAndPorts(auditHostAndPorts);
+        config.getBulkFlushBackoffType().ifPresent(builder::setBulkFlushBackoffType);
+        config.getBulkFlushBackoffRetries().ifPresent(builder::setBulkFlushBackoffRetries);
+        config.getBulkFlushBackoffDelay().ifPresent(builder::setBulkFlushBackoffDelay);
+        // we must overwrite the default factory which is defined with a lambda because of a bug
+        // in shading lambda serialization shading see FLINK-18006
+        if (config.getUsername().isPresent()
+                && config.getPassword().isPresent()
+                && !StringUtils.isNullOrWhitespaceOnly(config.getUsername().get())
+                && !StringUtils.isNullOrWhitespaceOnly(config.getPassword().get())) {
+            builder.setRestClientFactory(
+                    new AuthRestClientFactory(
+                            config.getPathPrefix().orElse(null),
+                            config.getUsername().get(),
+                            config.getPassword().get()));
+        } else {
+            builder.setRestClientFactory(
+                    new DefaultRestClientFactory(config.getPathPrefix().orElse(null)));
+        }
+        final ElasticsearchSink<RowData> elasticsearchSink = builder.build();
+        if (config.isDisableFlushOnCheckpoint()) {
+            elasticsearchSink.disableFlushOnCheckpoint();
+        }
+        return (DataStreamSinkProvider) dataStream -> {
+            DataStreamSink<RowData> sink =
+                    dataStream.addSink(elasticsearchSink);
+            if (uid != null) {
+                sink = sink.uid(uid);
             }
             return sink;
         };

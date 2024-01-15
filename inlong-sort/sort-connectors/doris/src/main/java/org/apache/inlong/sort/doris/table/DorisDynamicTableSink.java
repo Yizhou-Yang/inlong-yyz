@@ -20,10 +20,12 @@ package org.apache.inlong.sort.doris.table;
 import org.apache.doris.flink.cfg.DorisExecutionOptions;
 import org.apache.doris.flink.cfg.DorisOptions;
 import org.apache.doris.flink.cfg.DorisReadOptions;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
-import org.apache.flink.table.connector.sink.SinkFunctionProvider;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.RowKind;
 import org.apache.inlong.sort.base.dirty.DirtyOptions;
 import org.apache.inlong.sort.base.dirty.sink.DirtySink;
@@ -60,6 +62,7 @@ public class DorisDynamicTableSink implements DynamicTableSink {
     private final String schemaChangePolicies;
     private final boolean autoCreateTableWhenSnapshot;
     private final RateControlParams rateControlParams;
+    private final String uid;
 
     public DorisDynamicTableSink(DorisOptions options,
             DorisReadOptions readOptions,
@@ -79,7 +82,8 @@ public class DorisDynamicTableSink implements DynamicTableSink {
             boolean enableSchemaChange,
             @Nullable String schemaChangePolicies,
             boolean autoCreateTableWhenSnapshot,
-            RateControlParams rateControlParams) {
+            RateControlParams rateControlParams,
+            @Nullable String uid) {
         this.options = options;
         this.readOptions = readOptions;
         this.executionOptions = executionOptions;
@@ -99,6 +103,7 @@ public class DorisDynamicTableSink implements DynamicTableSink {
         this.schemaChangePolicies = schemaChangePolicies;
         this.autoCreateTableWhenSnapshot = autoCreateTableWhenSnapshot;
         this.rateControlParams = rateControlParams;
+        this.uid = uid;
     }
 
     @Override
@@ -142,8 +147,18 @@ public class DorisDynamicTableSink implements DynamicTableSink {
                 .setSchemaChangePolicies(schemaChangePolicies)
                 .setAutoCreateTableWhenSnapshot(autoCreateTableWhenSnapshot)
                 .setRateControlParams(rateControlParams);
-        return SinkFunctionProvider.of(
-                new GenericDorisSinkFunction<>(builder.build()), parallelism);
+        return (DataStreamSinkProvider) dataStream -> {
+            DataStreamSink<RowData> sink =
+                    dataStream.addSink(new GenericDorisSinkFunction<>(builder.build()));
+
+            if (parallelism != null) {
+                sink = sink.setParallelism(parallelism);
+            }
+            if (uid != null) {
+                sink = sink.uid(uid);
+            }
+            return sink;
+        };
     }
 
     @Override
@@ -166,7 +181,8 @@ public class DorisDynamicTableSink implements DynamicTableSink {
                 enableSchemaChange,
                 schemaChangePolicies,
                 autoCreateTableWhenSnapshot,
-                rateControlParams);
+                rateControlParams,
+                uid);
     }
 
     @Override

@@ -21,12 +21,15 @@ import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.format.DecodingFormat;
+import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.connector.source.abilities.SupportsWatermarkPushDown;
 import org.apache.flink.table.data.RowData;
@@ -124,12 +127,15 @@ public class TubeMQTableSource implements ScanTableSource, SupportsReadingMetada
     @Nullable
     private WatermarkStrategy<RowData> watermarkStrategy;
 
+    private final String uid;
+
     public TubeMQTableSource(DataType physicalDataType,
             DecodingFormat<DeserializationSchema<RowData>> valueDecodingFormat,
             String masterAddress, String topic,
             TreeSet<String> tidSet, String consumerGroup, String sessionKey,
             Configuration configuration, @Nullable WatermarkStrategy<RowData> watermarkStrategy,
-            Optional<String> proctimeAttribute, Boolean ignoreErrors, Boolean innerFormat) {
+            Optional<String> proctimeAttribute, Boolean ignoreErrors, Boolean innerFormat,
+            @Nullable String uid) {
 
         Preconditions.checkNotNull(physicalDataType, "Physical data type must not be null.");
         Preconditions.checkNotNull(valueDecodingFormat, "The deserialization schema must not be null.");
@@ -153,6 +159,7 @@ public class TubeMQTableSource implements ScanTableSource, SupportsReadingMetada
         this.proctimeAttribute = proctimeAttribute;
         this.ignoreErrors = ignoreErrors;
         this.innerFormat = innerFormat;
+        this.uid = uid;
     }
 
     @Override
@@ -172,8 +179,22 @@ public class TubeMQTableSource implements ScanTableSource, SupportsReadingMetada
 
         final FlinkTubeMQConsumer<RowData> tubeMQConsumer = createTubeMQConsumer(deserialization, producedTypeInfo,
                 ignoreErrors);
+        return new DataStreamScanProvider() {
 
-        return SourceFunctionProvider.of(tubeMQConsumer, false);
+            @Override
+            public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                DataStreamSource<RowData> stream = execEnv.addSource(tubeMQConsumer);
+                if (uid != null) {
+                    stream.uid(uid);
+                }
+                return stream;
+            }
+
+            @Override
+            public boolean isBounded() {
+                return false;
+            }
+        };
     }
 
     @Override
@@ -181,7 +202,7 @@ public class TubeMQTableSource implements ScanTableSource, SupportsReadingMetada
         return new TubeMQTableSource(
                 physicalDataType, valueDecodingFormat, masterAddress,
                 topic, tidSet, consumerGroup, sessionKey, configuration,
-                watermarkStrategy, proctimeAttribute, ignoreErrors, innerFormat);
+                watermarkStrategy, proctimeAttribute, ignoreErrors, innerFormat, uid);
     }
 
     @Override

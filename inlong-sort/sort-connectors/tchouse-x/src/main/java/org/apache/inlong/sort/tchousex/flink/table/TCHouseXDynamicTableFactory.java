@@ -58,6 +58,7 @@ import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_SCHEMA_UPDATE_
 import static org.apache.inlong.sort.base.Constants.SINK_MULTIPLE_TABLE_PATTERN;
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_ENABLE;
 import static org.apache.inlong.sort.base.Constants.SINK_SCHEMA_CHANGE_POLICIES;
+import static org.apache.inlong.sort.base.Constants.SINK_UID;
 import static org.apache.inlong.sort.tchousex.flink.option.TCHouseXOptions.HOSTNAME;
 import static org.apache.inlong.sort.tchousex.flink.option.TCHouseXOptions.PASSWORD;
 import static org.apache.inlong.sort.tchousex.flink.option.TCHouseXOptions.PORT;
@@ -135,6 +136,7 @@ public final class TCHouseXDynamicTableFactory implements DynamicTableSinkFactor
         options.add(SINK_SCHEMA_CHANGE_ENABLE);
         options.add(SINK_SCHEMA_CHANGE_POLICIES);
         options.add(SINK_AUTO_CREATE_TABLE_WHEN_SNAPSHOT);
+        options.add(SINK_UID);
         return options;
     }
 
@@ -162,6 +164,7 @@ public final class TCHouseXDynamicTableFactory implements DynamicTableSinkFactor
         // Build the dirty data side-output
         final DirtyOptions dirtyOptions = DirtyOptions.fromConfig(helper.getOptions());
         final DirtySink<Object> dirtySink = DirtySinkFactoryUtils.createDirtySink(context, dirtyOptions);
+        String uid = readableConfig.get(SINK_UID);
         // create and return dynamic table sink
         return new TCHouseXDynamicTableSink(
                 tCHouseXOptions,
@@ -178,7 +181,8 @@ public final class TCHouseXDynamicTableFactory implements DynamicTableSinkFactor
                 dirtyOptions,
                 dirtySink,
                 enableSchemaChange,
-                schemaChangePolicies);
+                schemaChangePolicies,
+                uid);
     }
 
     private TCHouseXSinkOptions createTCHouseXSinkOptions(ReadableConfig readableConfig) {
