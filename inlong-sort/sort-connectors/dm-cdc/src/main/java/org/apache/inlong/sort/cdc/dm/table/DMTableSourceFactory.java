@@ -36,6 +36,7 @@ import static org.apache.inlong.sort.base.Constants.AUDIT_KEYS;
 import static org.apache.inlong.sort.base.Constants.INLONG_AUDIT;
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC;
 import static org.apache.inlong.sort.base.Constants.SOURCE_MULTIPLE_ENABLE;
+import static org.apache.inlong.sort.base.Constants.SOURCE_UID;
 
 /** Factory for creating configured instance of {@link DMTableSource}. */
 public class DMTableSourceFactory implements DynamicTableSourceFactory {
@@ -211,6 +212,7 @@ public class DMTableSourceFactory implements DynamicTableSourceFactory {
         options.add(INLONG_AUDIT);
         options.add(AUDIT_KEYS);
         options.add(SOURCE_MULTIPLE_ENABLE);
+        options.add(SOURCE_UID);
         return options;
     }
 }
