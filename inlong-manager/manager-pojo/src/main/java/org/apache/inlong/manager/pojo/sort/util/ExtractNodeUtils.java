@@ -556,7 +556,6 @@ public class ExtractNodeUtils {
                 source.getDatabase());
     }
 
-
     /**
      * Create Dameng extract node
      *

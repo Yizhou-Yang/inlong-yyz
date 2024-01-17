@@ -160,4 +160,22 @@
             </plugin>
         </plugins>
     </build>
+
+    <repositories>
+        <repository>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+            <id>tencent.snapshots</id>
+            <url>https://mirrors.tencent.com/repository/maven/tencent_public_snapshots/</url>
+        </repository>
+        <repository>
+            <id>tencent_public</id>
+            <name>tencent_public</name>
+            <url>https://mirrors.tencent.com/repository/maven/tencent_public</url>
+        </repository>
+    </repositories>
 </project>

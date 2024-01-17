@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 package org.apache.inlong.manager.pojo.source.dameng;
 
 import io.swagger.annotations.ApiModel;
@@ -32,8 +31,6 @@ import org.apache.inlong.manager.common.util.JsonTypeDefine;
 import org.apache.inlong.manager.pojo.source.SourceRequest;
 import org.apache.inlong.manager.pojo.source.StreamSource;
 
-import java.util.Map;
-
 @Data
 @SuperBuilder
 @AllArgsConstructor
@@ -42,6 +39,7 @@ import java.util.Map;
 @ApiModel(value = "Dameng source info")
 @JsonTypeDefine(value = SourceType.DAMENG)
 public class DamengSource extends StreamSource {
+
     @ApiModelProperty("The database name")
     private String dbName;
 

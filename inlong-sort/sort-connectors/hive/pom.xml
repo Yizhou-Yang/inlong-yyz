@@ -235,12 +235,6 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <dependency>
-            <!-- jar包源地址https://github.com/tencentyun/flink-chdfs/releases/tag/v0.1.4-->
-            <groupId>com.tencent.cloud.oceanus</groupId>
-            <artifactId>oceanus-flink-chdfs-hadoop</artifactId>
-            <version>0.1.4</version>
-        </dependency>
     </dependencies>
 
     <build>

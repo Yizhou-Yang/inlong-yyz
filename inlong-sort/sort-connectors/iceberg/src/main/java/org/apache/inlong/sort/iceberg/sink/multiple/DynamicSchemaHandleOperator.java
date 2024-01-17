@@ -523,7 +523,8 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
                 if (!(tableChange instanceof AddColumn) && !(tableChange instanceof TableChange.DeleteColumn)
                         && !(tableChange instanceof TableChange.RenameColumn)
                         && !(tableChange instanceof TableChange.ChangeColumnType)) {
-                    // todo:currently iceberg can only handle addColumn、deleteColumn、renameColumn and changeColumnType, so always return false
+                    // todo:currently iceberg can only handle addColumn、deleteColumn、renameColumn and changeColumnType,
+                    // so always return false
                     throw new RuntimeException(
                             String.format("Unsupported table %s schema change: %s.", tableId.toString(), tableChange));
                 }
@@ -589,7 +590,8 @@ public class DynamicSchemaHandleOperator extends AbstractStreamOperator<RecordWi
             if (!(tableChange instanceof AddColumn) && !(tableChange instanceof TableChange.DeleteColumn)
                     && !(tableChange instanceof TableChange.RenameColumn)
                     && !(tableChange instanceof TableChange.ChangeColumnType)) {
-                // todo:currently iceberg can only handle addColumn、deleteColumn、renameColumn and changeColumnType, so always return false
+                // todo:currently iceberg can only handle addColumn、deleteColumn、renameColumn and changeColumnType, so
+                // always return false
                 LOG.info("Ignore table {} schema change: {} because iceberg can't handle it.",
                         tableId, tableChange);
                 canHandle = false;

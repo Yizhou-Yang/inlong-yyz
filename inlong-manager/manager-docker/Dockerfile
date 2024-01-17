@@ -43,11 +43,7 @@ WORKDIR /opt/inlong-manager
 ARG VERSION
 ADD target/manager-web-${VERSION}-bin.tar.gz /opt/inlong-manager
 # add sort resource
-ADD target/sort-dist-${VERSION}.jar /opt/inlong-sort/
-ADD target/sort-connector-pulsar-${VERSION}.jar /opt/inlong-sort/connectors/
-ADD target/sort-connector-kafka-${VERSION}.jar /opt/inlong-sort/connectors/
-ADD target/sort-connector-jdbc-${VERSION}.jar /opt/inlong-sort/connectors/
-ADD target/sort-connector-hive-${VERSION}.jar /opt/inlong-sort/connectors/
+
 # audit clickhouse
 ENV AUDIT_CK_URL=127.0.0.1:8123
 ENV AUDIT_CK_USERNAME=default
