@@ -30,7 +30,7 @@
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
-        <cdw-dataloader.version>1.0.3</cdw-dataloader.version>
+        <cdw-dataloader.version>1.0.6</cdw-dataloader.version>
         <HikariCP.version>4.0.3</HikariCP.version>
         <mysql.version>8.0.25</mysql.version>
     </properties>

@@ -20,6 +20,8 @@ package org.apache.inlong.sort.tchousex.flink.catalog;
 import com.google.common.base.Objects;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.Locale;
+
 public class Field {
 
     private String name;
@@ -40,7 +42,7 @@ public class Field {
     }
 
     public String getName() {
-        return name;
+        return name.toLowerCase(Locale.ROOT);
     }
 
     public void setName(String name) {

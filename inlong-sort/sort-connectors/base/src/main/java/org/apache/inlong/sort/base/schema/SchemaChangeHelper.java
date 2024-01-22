@@ -167,8 +167,13 @@ public abstract class SchemaChangeHelper implements SchemaChangeHandle {
         }
         switch (type) {
             case CREATE_TABLE:
-                doCreateTable(originData, database, schema, table, type, originSchema, data,
-                        (CreateTableOperation) operation, sinkPartitionRules);
+                if (sinkPartitionRules == null) {
+                    doCreateTable(originData, database, schema, table, type, originSchema, data,
+                            (CreateTableOperation) operation);
+                } else {
+                    doCreateTable(originData, database, schema, table, type, originSchema, data,
+                            (CreateTableOperation) operation, sinkPartitionRules);
+                }
                 break;
             case DROP_TABLE:
                 doDropTable(database, schema, table, type, originSchema);

@@ -226,7 +226,7 @@ public class FlinkSchemaUtil {
         }
         Map<String, Field> tableFromSourceMap =
                 tableFromSource.getAllFields().stream()
-                        .collect(Collectors.toMap(f -> f.getName().toLowerCase(Locale.ROOT), Function.identity()));
+                        .collect(Collectors.toMap(Field::getName, Function.identity()));
         for (int i = 0; i < existTable.getAllFields().size(); i++) {
             Field fieldForExistTable = existTable.getAllFields().get(i);
             Field fieldFromSource = tableFromSourceMap.get(fieldForExistTable.getName());
