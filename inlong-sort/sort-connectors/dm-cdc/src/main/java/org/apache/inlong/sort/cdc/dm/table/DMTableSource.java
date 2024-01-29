@@ -156,6 +156,7 @@ public class DMTableSource implements ScanTableSource, SupportsReadingMetadata {
                         .auditHostAndPorts(inlongAudit);
 
         return new DataStreamScanProvider() {
+
             @Override
             public boolean isBounded() {
                 return false;

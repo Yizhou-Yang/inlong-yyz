@@ -473,5 +473,4 @@ public final class Constants {
                     .stringType()
                     .noDefaultValue()
                     .withDescription("The uid for the source operator");
-
 }
