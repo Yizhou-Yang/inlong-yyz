@@ -454,4 +454,15 @@ public final class Constants {
                     .withDescription("Whether include a incremental flag in data "
                             + "when migrating all databases");
 
+    public static final ConfigOption<String> SINK_UID =
+            ConfigOptions.key("sink.uid")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The uid for the sink operator");
+
+    public static final ConfigOption<String> SOURCE_UID =
+            ConfigOptions.key("source.uid")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The uid for the source operator");
 }
