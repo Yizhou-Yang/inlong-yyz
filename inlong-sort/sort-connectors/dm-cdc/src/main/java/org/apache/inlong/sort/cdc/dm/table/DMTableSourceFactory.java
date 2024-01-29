@@ -156,10 +156,10 @@ public class DMTableSourceFactory implements DynamicTableSourceFactory {
         Integer port = config.get(PORT);
 
         Long startupTimestamp = config.get(SCAN_STARTUP_TIMESTAMP);
+        String uid = config.get(SOURCE_UID);
 
         String inlongMetric = config.getOptional(INLONG_METRIC).orElse(null);
         String auditHostAndPorts = config.get(INLONG_AUDIT);
-
         OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
 
         return new DMTableSource(
@@ -178,7 +178,8 @@ public class DMTableSourceFactory implements DynamicTableSourceFactory {
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 startupTimestamp,
                 inlongMetric,
-                auditHostAndPorts);
+                auditHostAndPorts,
+                uid);
     }
 
     @Override
