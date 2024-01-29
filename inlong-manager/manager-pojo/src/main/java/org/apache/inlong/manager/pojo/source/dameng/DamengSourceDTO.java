@@ -29,7 +29,6 @@ import org.apache.inlong.manager.common.util.JsonUtils;
 
 import javax.validation.constraints.NotNull;
 
-
 @Data
 @Builder
 @NoArgsConstructor

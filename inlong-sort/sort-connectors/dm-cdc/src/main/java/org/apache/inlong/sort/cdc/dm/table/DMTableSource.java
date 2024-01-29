@@ -18,11 +18,14 @@
 package org.apache.inlong.sort.cdc.dm.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
@@ -30,6 +33,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.inlong.sort.cdc.dm.DMSource;
 import org.apache.inlong.sort.cdc.dm.source.RowDataDMDeserializationSchema;
 
+import javax.annotation.Nullable;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Collections;
@@ -62,7 +66,7 @@ public class DMTableSource implements ScanTableSource, SupportsReadingMetadata {
     private final Long startupTimestamp;
     private final String inlongMetrics;
     private final String inlongAudit;
-
+    private final String uid;
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
     // --------------------------------------------------------------------------------------------
@@ -89,7 +93,8 @@ public class DMTableSource implements ScanTableSource, SupportsReadingMetadata {
             Properties jdbcProperties,
             Long startupTimestamp,
             String inlongMetrics,
-            String inlongAudit) {
+            String inlongAudit,
+            @Nullable String uid) {
         this.physicalSchema = physicalSchema;
         this.startupMode = checkNotNull(startupMode);
         this.username = checkNotNull(username);
@@ -108,6 +113,7 @@ public class DMTableSource implements ScanTableSource, SupportsReadingMetadata {
         this.metadataKeys = Collections.emptyList();
         this.inlongMetrics = inlongMetrics;
         this.inlongAudit = inlongAudit;
+        this.uid = uid;
     }
 
     @Override
@@ -148,7 +154,23 @@ public class DMTableSource implements ScanTableSource, SupportsReadingMetadata {
                         .deserializer(deserializer)
                         .inlongMetric(inlongMetrics)
                         .auditHostAndPorts(inlongAudit);
-        return SourceFunctionProvider.of(builder.build(), false);
+
+        return new DataStreamScanProvider() {
+            @Override
+            public boolean isBounded() {
+                return false;
+            }
+
+            @Override
+            public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
+                SingleOutputStreamOperator<RowData> source =
+                        execEnv.addSource(builder.build());
+                if (uid != null) {
+                    source = source.uid(uid);
+                }
+                return source;
+            }
+        };
     }
 
     protected DMMetadataConverter[] getMetadataConverters() {
@@ -199,7 +221,8 @@ public class DMTableSource implements ScanTableSource, SupportsReadingMetadata {
                         jdbcProperties,
                         startupTimestamp,
                         inlongMetrics,
-                        inlongAudit);
+                        inlongAudit,
+                        uid);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

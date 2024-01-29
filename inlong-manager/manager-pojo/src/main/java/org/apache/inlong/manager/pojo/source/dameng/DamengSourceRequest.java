@@ -19,9 +19,6 @@ package org.apache.inlong.manager.pojo.source.dameng;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 import lombok.Builder;
 import lombok.Data;
