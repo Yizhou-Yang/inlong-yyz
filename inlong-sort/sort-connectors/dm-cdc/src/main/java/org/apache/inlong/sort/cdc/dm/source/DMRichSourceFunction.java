@@ -336,6 +336,7 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
 
     private List<DMRecord> getNewRecords() {
         List<DMRecord> records = client.processIncrementalRecords(databaseName, schemaName, scn, logMinerDmlParser);
+        // does not support multithreading for now, no latch or thread management/ connection pool is required.
         try {
             records.forEach(
                     r -> {

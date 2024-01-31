@@ -19,6 +19,7 @@ package org.apache.inlong.sort.cdc.dm.source;
 
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
+import lombok.extern.slf4j.Slf4j;
 
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -27,9 +28,11 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+@Slf4j
 public class DMConnection extends JdbcConnection {
 
     private static final String QUOTED_CHARACTER = "\"";
@@ -63,6 +66,11 @@ public class DMConnection extends JdbcConnection {
         defaultJdbcProperties.setProperty("zeroDateTimeBehavior", "convertToNull");
         defaultJdbcProperties.setProperty("characterEncoding", "UTF-8");
         defaultJdbcProperties.setProperty("characterSetResults", "UTF-8");
+        defaultJdbcProperties.setProperty("characterSetResults", "UTF-8");
+        // add program id to enforce that no two instances share the same connection.
+        Random random = new Random();
+        int randomNumber = random.nextInt(1000000) + 1;
+        defaultJdbcProperties.setProperty("programId", String.valueOf(randomNumber));
         return defaultJdbcProperties;
     }
 
@@ -89,12 +97,13 @@ public class DMConnection extends JdbcConnection {
         if (jdbcProperties != null) {
             combinedProperties.putAll(jdbcProperties);
         }
-        String urlPattern = DM_URL_PATTERN;
-        StringBuilder jdbcUrlStringBuilder = new StringBuilder(urlPattern);
+        StringBuilder jdbcUrlStringBuilder = new StringBuilder(DM_URL_PATTERN);
         combinedProperties.forEach(
                 (key, value) -> {
                     jdbcUrlStringBuilder.append("&").append(key).append("=").append(value);
                 });
+
+        log.info("jdbc connection string is: {}", jdbcUrlStringBuilder);
         return jdbcUrlStringBuilder.toString();
     }
 
