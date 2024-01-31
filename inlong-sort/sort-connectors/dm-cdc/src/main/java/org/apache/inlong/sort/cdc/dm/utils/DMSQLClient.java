@@ -70,7 +70,7 @@ public class DMSQLClient {
         // then, find all redo log paths. Only those incremental logs which are after current scn are added
         String queryLogPaths =
                 "SELECT NAME, FIRST_TIME, NEXT_TIME, FIRST_CHANGE#, NEXT_CHANGE# FROM V$ARCHIVED_LOG WHERE STATUS = 'A'"
-                        + "AND NEXT_CHANGE# > " + (scn - 2000000);
+                        + "AND NEXT_CHANGE# >= " + scn;
         try {
             connection.query(queryLogPaths,
                     rs -> {
@@ -103,7 +103,7 @@ public class DMSQLClient {
 
         log.info("executing start logminer");
         // start log miner, and commit everything.
-        String startLogmnrSql = "DBMS_LOGMNR.START_LOGMNR(OPTIONS=>2066)";
+        String startLogmnrSql = "DBMS_LOGMNR.START_LOGMNR(OPTIONS=>2066, STARTSCN=>" + scn + ")";
         try {
             connection.execute(startLogmnrSql);
             connection.commit();
@@ -165,8 +165,7 @@ public class DMSQLClient {
             // no need for jdbc fields in snapshot phase anymore, instead we need update before & after fields
             // TODO: use metadata to generate the schema
             List<Map<String, Object>> fields = parser.parse(rs.getString("SQL_REDO"), operation);
-            DMRecord record = new DMRecord(sourceInfo, opt, fields.get(0), fields.get(1));
-            return record;
+            return new DMRecord(sourceInfo, opt, fields.get(0), fields.get(1));
         } catch (Throwable e) {
             log.error("generate DM record failed ", e);
             return null;
