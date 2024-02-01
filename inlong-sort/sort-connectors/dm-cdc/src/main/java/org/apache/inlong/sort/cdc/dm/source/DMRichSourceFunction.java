@@ -114,6 +114,7 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
 
     // reserved for whole db migration
     private final boolean sourceMultipleEnable = false;
+    private final boolean createNewLogFiles = false;
 
     public DMRichSourceFunction(
             boolean snapshot,
@@ -176,6 +177,10 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
             LOG.info("Snapshot reading started");
             readSnapshotRecords();
             LOG.info("Snapshot reading finished, start readChangeRecords process");
+            //start new redo log files if the option is enabled
+            if (createNewLogFiles) {
+                client.switchlog();
+            }
             scn = client.openlogminer();
             isRunning = true;
             readChangeRecords();

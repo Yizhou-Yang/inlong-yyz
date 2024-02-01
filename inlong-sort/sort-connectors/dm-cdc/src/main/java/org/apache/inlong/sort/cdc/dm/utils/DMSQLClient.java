@@ -126,6 +126,20 @@ public class DMSQLClient {
         return true;
     }
 
+    //create a new log file
+    public boolean switchlog(){
+        String alterLogFileSql = "ALTER SYSTEM SWITCH LOGFILE";
+        try {
+            connection.execute(alterLogFileSql);
+        } catch (Throwable e) {
+            // continue, since this operation is not essential.
+            log.error("alter log file failed", e);
+            return false;
+        }
+        return true;
+    }
+
+
     // read incremental records and send them downwards.
     public List<DMRecord> processIncrementalRecords(String database, String schema, long scn,
             LogMinerDmlParser parser) {
