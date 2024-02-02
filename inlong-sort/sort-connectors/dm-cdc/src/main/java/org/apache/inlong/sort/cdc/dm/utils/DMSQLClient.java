@@ -43,11 +43,6 @@ public class DMSQLClient {
         // before the actual execution, first find the latest scn.
         this.connection = globalConnection;
         this.tablename = tablename;
-    }
-
-    public long openlogminer() {
-        // a flag to indicate if the logminer is runnable
-        boolean runnable = true;
 
         // before the actual execution, first find the latest scn.
         String querySCN = "select CUR_LSN from v$rlog";
@@ -62,10 +57,14 @@ public class DMSQLClient {
                     });
         } catch (Throwable e) {
             log.error("select lsn failed ", e);
-            runnable = false;
         }
+    }
 
-        log.info("selecting archived logs");
+    public long openlogminer() {
+        // a flag to indicate if the logminer is runnable
+        boolean runnable = true;
+
+        log.debug("selecting archived logs");
         List<String> paths = new ArrayList<>();
         // then, find all redo log paths. Only those incremental logs which are after current scn are added
         String queryLogPaths =
@@ -85,7 +84,7 @@ public class DMSQLClient {
         }
 
         // add all paths to logminer, path need to have ''
-        log.info("adding {} log files", paths.size());
+        log.info("adding log files: {}", paths);
         try {
             connection.setAutoCommit(false);
             for (String path : paths) {
@@ -101,7 +100,7 @@ public class DMSQLClient {
             return 0;
         }
 
-        log.info("executing start logminer");
+        log.debug("executing start logminer");
         // start log miner, and commit everything.
         String startLogmnrSql = "DBMS_LOGMNR.START_LOGMNR(OPTIONS=>2066, STARTSCN=>" + scn + ")";
         try {
@@ -111,7 +110,7 @@ public class DMSQLClient {
             log.error("start logminer failed ", e);
         }
 
-        log.info("finished to open logminer");
+        log.debug("finished to open logminer");
         return scn;
     }
 
@@ -126,8 +125,8 @@ public class DMSQLClient {
         return true;
     }
 
-    //create a new log file
-    public boolean switchlog(){
+    // create a new log file
+    public boolean switchlog() {
         String alterLogFileSql = "ALTER SYSTEM SWITCH LOGFILE";
         try {
             connection.execute(alterLogFileSql);
@@ -138,7 +137,6 @@ public class DMSQLClient {
         }
         return true;
     }
-
 
     // read incremental records and send them downwards.
     public List<DMRecord> processIncrementalRecords(String database, String schema, long scn,

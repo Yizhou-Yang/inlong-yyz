@@ -156,7 +156,7 @@ public class DMTableSourceFactory implements DynamicTableSourceFactory {
         Integer port = config.get(PORT);
 
         Long startupTimestamp = config.get(SCAN_STARTUP_TIMESTAMP);
-        String uid = config.get(SOURCE_UID);
+        String uid = config.getOptional(SOURCE_UID).orElse(null);
 
         String inlongMetric = config.getOptional(INLONG_METRIC).orElse(null);
         String auditHostAndPorts = config.get(INLONG_AUDIT);
