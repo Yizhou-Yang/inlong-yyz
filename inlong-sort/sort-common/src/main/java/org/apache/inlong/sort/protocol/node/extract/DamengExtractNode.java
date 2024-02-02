@@ -154,6 +154,15 @@ public class DamengExtractNode extends ExtractNode implements Serializable, Meta
             case SCHEMA_NAME:
                 metadataKey = "meta.schema_name";
                 break;
+            case OP_TYPE:
+                metadataKey = "meta.event_type";
+                break;
+            case PROCESS_TIME:
+                metadataKey = "meta.proc_time";
+                break;
+            case TS:
+                metadataKey = "meta.meta_ts";
+                break;
             default:
                 throw new UnsupportedOperationException(String.format("Unsupport meta field for %s: %s",
                         this.getClass().getSimpleName(), metaField));
