@@ -92,7 +92,9 @@ public class DMRecord implements Serializable {
         return logMessageFieldsAfter;
     }
 
-    public long getTimeProcessed() { return timeProcessed;}
+    public long getTimeProcessed() {
+        return timeProcessed;
+    }
 
     // public long getTimeWritten() { return timeWritten;}
 

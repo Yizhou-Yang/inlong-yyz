@@ -453,7 +453,7 @@ public final class Constants {
                     .defaultValue(false)
                     .withDescription("Whether include a incremental flag in data "
                             + "when migrating all databases");
-    
+
     public static final ConfigOption<String> SINK_PARTITION_RULES =
             ConfigOptions.key("sink.partition.rules")
                     .stringType()

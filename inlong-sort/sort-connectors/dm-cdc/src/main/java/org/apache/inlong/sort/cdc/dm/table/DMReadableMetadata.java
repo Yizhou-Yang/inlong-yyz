@@ -82,8 +82,6 @@ public enum DMReadableMetadata {
                 }
             }),
 
-
-
     /**
      * It indicates the type of the operation
      */
@@ -92,12 +90,12 @@ public enum DMReadableMetadata {
             DataTypes.STRING().notNull(),
             new DMMetadataConverter() {
 
-                    private static final long serialVersionUID = 1L;
+                private static final long serialVersionUID = 1L;
 
-                    @Override
-                    public Object read(DMRecord record) {
-                        return StringData.fromString(record.getOpt().toString());
-                    }
+                @Override
+                public Object read(DMRecord record) {
+                    return StringData.fromString(record.getOpt().toString());
+                }
             }),
 
     /**
@@ -116,7 +114,6 @@ public enum DMReadableMetadata {
                 }
             }),
 
-
     /**
      * It indicates the time when the data is written to the database
      * TODO: support this metadata
@@ -126,13 +123,13 @@ public enum DMReadableMetadata {
             DataTypes.STRING().notNull(),
             new DMMetadataConverter() {
 
-        private static final long serialVersionUID = 1L;
+                private static final long serialVersionUID = 1L;
 
-        @Override
-        public Object read(DMRecord record) {
-            return record.getTimeProcessed();
-        }
-    });
+                @Override
+                public Object read(DMRecord record) {
+                    return record.getTimeProcessed();
+                }
+            });
 
     private final String key;
 
