@@ -114,7 +114,7 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
 
     // reserved for whole db migration
     private final boolean sourceMultipleEnable = false;
-    private final boolean createNewLogFiles = false;
+    private final boolean createNewLogFiles = true;
 
     public DMRichSourceFunction(
             boolean snapshot,
