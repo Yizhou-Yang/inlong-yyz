@@ -25,7 +25,7 @@ public enum DMReadableMetadata {
 
     /** Name of the database that contains the row. */
     DATABASE(
-            "database_name",
+            "meta.database_name",
             DataTypes.STRING().notNull(),
             new DMMetadataConverter() {
 
@@ -39,7 +39,7 @@ public enum DMReadableMetadata {
 
     /** Name of the database that contains the row. */
     SCHEMA(
-            "schema_name",
+            "meta.schema_name",
             DataTypes.STRING().notNull(),
             new DMMetadataConverter() {
 
@@ -53,7 +53,7 @@ public enum DMReadableMetadata {
 
     /** Name of the table that contains the row. */
     TABLE(
-            "table_name",
+            "meta.table_name",
             DataTypes.STRING().notNull(),
             new DMMetadataConverter() {
 
@@ -80,7 +80,59 @@ public enum DMReadableMetadata {
                 public Object read(DMRecord record) {
                     return record.getSourceInfo().getSCN();
                 }
-            });
+            }),
+
+
+
+    /**
+     * It indicates the type of the operation
+     */
+    OP_TYPE(
+            "meta.event_type",
+            DataTypes.STRING().notNull(),
+            new DMMetadataConverter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object read(DMRecord record) {
+                        return StringData.fromString(record.getOpt().toString());
+                    }
+            }),
+
+    /**
+     * It indicates the when the data is processed
+     */
+    PROCESS_TIME(
+            "meta.proc_time",
+            DataTypes.BIGINT().notNull(),
+            new DMMetadataConverter() {
+
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(DMRecord record) {
+                    return (record.getTimeProcessed());
+                }
+            }),
+
+
+    /**
+     * It indicates the time when the data is written to the database
+     * TODO: support this metadata
+     */
+    OP_TS(
+            "op_ts",
+            DataTypes.STRING().notNull(),
+            new DMMetadataConverter() {
+
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Object read(DMRecord record) {
+            return record.getTimeProcessed();
+        }
+    });
 
     private final String key;
 

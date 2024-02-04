@@ -36,6 +36,9 @@ public class DMRecord implements Serializable {
     private final Map<String, Object> jdbcFields;
     private final Map<String, Object> logMessageFieldsBefore;
     private final Map<String, Object> logMessageFieldsAfter;
+    // the timestamp metadata
+    private final long timeProcessed;
+    // private final long timeWritten;
 
     public DMRecord(
             SourceInfo sourceInfo,
@@ -47,6 +50,8 @@ public class DMRecord implements Serializable {
         this.opt = opt;
         this.logMessageFieldsBefore = new HashMap<>();
         this.logMessageFieldsAfter = new HashMap<>();
+        this.timeProcessed = System.currentTimeMillis();
+
     }
 
     public DMRecord(
@@ -60,6 +65,7 @@ public class DMRecord implements Serializable {
         this.opt = opt;
         this.logMessageFieldsBefore = logMessageFieldsBefore;
         this.logMessageFieldsAfter = logMessageFieldsAfter;
+        this.timeProcessed = System.currentTimeMillis();
     }
 
     public SourceInfo getSourceInfo() {
@@ -85,6 +91,10 @@ public class DMRecord implements Serializable {
     public Map<String, Object> getLogMessageFieldsAfter() {
         return logMessageFieldsAfter;
     }
+
+    public long getTimeProcessed() { return timeProcessed;}
+
+    // public long getTimeWritten() { return timeWritten;}
 
     @Override
     public String toString() {
