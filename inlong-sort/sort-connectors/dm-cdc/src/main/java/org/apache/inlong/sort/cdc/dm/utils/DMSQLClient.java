@@ -24,9 +24,13 @@ import org.apache.inlong.sort.cdc.dm.table.DMRecord.SourceInfo;
 import org.apache.inlong.sort.protocol.ddl.enums.OperationType;
 
 import java.sql.ResultSet;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 // interact with DBMS_LOGMNR, one connection per client
 @Slf4j
@@ -66,6 +70,7 @@ public class DMSQLClient {
 
         log.debug("selecting archived logs");
         List<String> paths = new ArrayList<>();
+        AtomicBoolean hasLatestLog = new AtomicBoolean(false);
         // then, find all redo log paths. Only those incremental logs which are after current scn are added
         String queryLogPaths =
                 "SELECT NAME, FIRST_TIME, NEXT_TIME, FIRST_CHANGE#, NEXT_CHANGE# FROM V$ARCHIVED_LOG WHERE STATUS = 'A'"
@@ -76,11 +81,21 @@ public class DMSQLClient {
                         // handle the result set
                         while (rs.next()) {
                             paths.add(rs.getString("NAME"));
+                            Timestamp timestamp = rs.getTimestamp("FIRST_TIME");
+                            LocalDateTime localDateTime = timestamp.toLocalDateTime();
+                            LocalDate today = LocalDate.now().atStartOfDay().toLocalDate();
+                            if (localDateTime.toLocalDate().equals(today)) {
+                                hasLatestLog.set(true);
+                            }
                         }
                     });
         } catch (Throwable e) {
             log.error("query log paths failed ", e);
             runnable = false;
+        }
+
+        if (!hasLatestLog.get()) {
+            switchlog();
         }
 
         // add all paths to logminer, path need to have ''
@@ -125,8 +140,9 @@ public class DMSQLClient {
         return true;
     }
 
-    // create a new log file
+    // create a new log file for every day, to avoid data corruption.
     public boolean switchlog() {
+        log.info("switching logs");
         String alterLogFileSql = "ALTER SYSTEM SWITCH LOGFILE";
         try {
             connection.execute(alterLogFileSql);
@@ -135,6 +151,7 @@ public class DMSQLClient {
             log.error("alter log file failed", e);
             return false;
         }
+        log.info("finished switching logs");
         return true;
     }
 

@@ -174,9 +174,6 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
             LOG.info("Start to initialize table whitelist");
             initTableWhiteList();
             // initialize the scn before redo log is read.
-            if (createNewLogFiles) {
-                client.switchlog();
-            }
             scn = client.openlogminer();
             // check where to do the snapshot phase
             LOG.info("Snapshot reading started");
