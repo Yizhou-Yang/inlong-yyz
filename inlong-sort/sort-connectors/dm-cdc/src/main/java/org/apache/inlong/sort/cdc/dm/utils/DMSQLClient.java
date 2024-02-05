@@ -177,7 +177,8 @@ public class DMSQLClient {
             // no need for jdbc fields in snapshot phase anymore, instead we need update before & after fields
             // TODO: use metadata to generate the schema
             List<Map<String, Object>> fields = parser.parse(rs.getString("SQL_REDO"), operation);
-            return new DMRecord(sourceInfo, opt, fields.get(0), fields.get(1));
+            long timestamp = rs.getTime("TIMESTAMP").getTime();
+            return new DMRecord(sourceInfo, opt, fields.get(0), fields.get(1), timestamp);
         } catch (Throwable e) {
             log.error("generate DM record failed ", e);
             return null;

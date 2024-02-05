@@ -51,21 +51,21 @@ public class DMRecord implements Serializable {
         this.logMessageFieldsBefore = new HashMap<>();
         this.logMessageFieldsAfter = new HashMap<>();
         this.timeProcessed = System.currentTimeMillis();
-
     }
 
     public DMRecord(
             SourceInfo sourceInfo,
             OperationType opt,
             Map<String, Object> logMessageFieldsBefore,
-            Map<String, Object> logMessageFieldsAfter) {
+            Map<String, Object> logMessageFieldsAfter,
+            long processtime) {
         this.sourceInfo = sourceInfo;
         this.isSnapshotRecord = false;
         this.jdbcFields = new HashMap<>();
         this.opt = opt;
         this.logMessageFieldsBefore = logMessageFieldsBefore;
         this.logMessageFieldsAfter = logMessageFieldsAfter;
-        this.timeProcessed = System.currentTimeMillis();
+        this.timeProcessed = processtime;
     }
 
     public SourceInfo getSourceInfo() {
