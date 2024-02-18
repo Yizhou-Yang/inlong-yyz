@@ -233,7 +233,6 @@ public class RowDataDMDeserializationSchema
             case TIME_WITHOUT_TIME_ZONE:
                 return convertToTime();
             case TIMESTAMP_WITHOUT_TIME_ZONE:
-                return convertToTimestamp();
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return convertToLocalTimeZoneTimestamp(serverTimeZone);
             case FLOAT:

@@ -345,6 +345,7 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
                         try {
                             deserializer.deserialize(r, outputCollector);
                             scn = r.getSourceInfo().getSCN();
+                            client.setScn(scn);
                         } catch (Exception e) {
                             throw new FlinkRuntimeException(e);
                         }
@@ -356,7 +357,7 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
         // add record size, process specially for update records
         int size = 0;
         for (DMRecord record : records) {
-            if (record.getOpt().equals(OperationType.UPDATE)) {
+            if (record != null && record.getOpt().equals(OperationType.UPDATE)) {
                 size += 2;
             } else {
                 size++;

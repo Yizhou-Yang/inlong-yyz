@@ -198,8 +198,13 @@ public class DMSQLClient {
             return new DMRecord(sourceInfo, opt, fields.get(0), fields.get(1), timestamp);
         } catch (Throwable e) {
             log.error("generate DM record failed ", e);
-            return null;
+            // for now, there is no error handling strategy, just throw the exception out.
+            throw new RuntimeException(e);
         }
+    }
+
+    public void setScn(long scn) {
+        this.scn = Math.max(this.scn, scn);
     }
 
     private OperationType generateOperationType(String operation) {
