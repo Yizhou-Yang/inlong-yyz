@@ -19,7 +19,10 @@ package org.apache.inlong.sort.cdc.dm.table;
 
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.StringData;
+import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
+
+import java.sql.Timestamp;
 
 public enum DMReadableMetadata {
 
@@ -104,14 +107,17 @@ public enum DMReadableMetadata {
      */
     OP_TS(
             "op_ts",
-            DataTypes.BIGINT().notNull(),
+            DataTypes.TIMESTAMP_LTZ().notNull(),
             new DMMetadataConverter() {
 
                 private static final long serialVersionUID = 1L;
 
                 @Override
                 public Object read(DMRecord record) {
-                    return record.getTimeProcessed();
+                    long timestampmillis = record.getTimeProcessed();
+                    Timestamp timestamp = new Timestamp(timestampmillis);
+                    timestamp.setNanos(0); // set nanoseconds to 0 to match the precision of TIMESTAMP_LTZ
+                    return TimestampData.fromTimestamp(timestamp);
                 }
             });
 

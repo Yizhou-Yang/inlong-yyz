@@ -260,9 +260,10 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
     private void readSnapshotRecordsByTable(String databaseName, String schemaName, String tableName) {
         // snapshot phase can't determine exact scn, assign 0 to all.
         DMRecord.SourceInfo sourceInfo = new DMRecord.SourceInfo(databaseName, schemaName, tableName, 0);
-        String fullName = String.format("%s.%s", schemaName, tableName);
+        // use an option to control whether the user is case sensitive. for now just turn into upper case.
+        String fullName = String.format("\"%s\".\"%s\"", schemaName.toUpperCase(), tableName.toUpperCase());
         StringBuilder queryString = new StringBuilder("SELECT * FROM " + fullName);
-        // for incremental mode, just read one snapshot to get the table schema
+        // for incremental mode, just read one snapshot to get the table schema.
         if (!snapshot) {
             queryString.append(" LIMIT 1");
         }

@@ -44,7 +44,6 @@ public class DMSQLClient {
     private static final int BATCH_SIZE = 100000;
 
     public DMSQLClient(DMConnection globalConnection, String tablename) {
-        // before the actual execution, first find the latest scn.
         this.connection = globalConnection;
         this.tablename = tablename;
 
