@@ -19,7 +19,11 @@ package org.apache.inlong.sort.cdc.dm.source;
 
 import akka.protobuf.ByteString;
 import com.ververica.cdc.debezium.utils.TemporalConversions;
+import dm.jdbc.driver.DmdbClob;
+import dm.jdbc.driver.DmdbNClob;
 import lombok.extern.slf4j.Slf4j;
+import oracle.jdbc.internal.OracleClob;
+import oracle.sql.CHAR;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericArrayData;
@@ -533,6 +537,11 @@ public class RowDataDMDeserializationSchema
 
             @Override
             public Object convert(Object object) {
+                //support deserializing clob objects
+                if (object instanceof DmdbClob) {
+                    return ((DmdbClob) object).getSubString(1L, (int) ((DmdbClob) object).length);
+                }
+
                 String data = object.toString();
                 if (data.startsWith("'") && data.endsWith("'")) {
                     data = data.substring(1, data.length() - 1);
