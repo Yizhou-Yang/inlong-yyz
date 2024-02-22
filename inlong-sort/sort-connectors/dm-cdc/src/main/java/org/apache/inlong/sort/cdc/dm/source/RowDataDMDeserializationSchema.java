@@ -20,9 +20,7 @@ package org.apache.inlong.sort.cdc.dm.source;
 import akka.protobuf.ByteString;
 import com.ververica.cdc.debezium.utils.TemporalConversions;
 import dm.jdbc.driver.DmdbClob;
-import dm.jdbc.driver.DmdbNClob;
 import lombok.extern.slf4j.Slf4j;
-import oracle.jdbc.internal.OracleClob;
 import oracle.sql.CHAR;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.data.DecimalData;
@@ -484,17 +482,9 @@ public class RowDataDMDeserializationSchema
                 if (object instanceof String) {
                     object = Timestamp.valueOf(cleanTime((String) object));
                 }
-                if (object instanceof Timestamp) {
-                    return TimestampData.fromTimestamp((Timestamp) object);
-                }
-                if (object instanceof LocalDateTime) {
-                    return TimestampData.fromLocalDateTime((LocalDateTime) object);
-                }
-                throw new IllegalArgumentException(
-                        "Unable to convert to TimestampData from unexpected value '"
-                                + object
-                                + "' of type "
-                                + object.getClass().getName());
+                LocalDateTime localDateTime =
+                        TemporalConversions.toLocalDateTime(object, ZoneId.systemDefault());
+                return TimestampData.fromLocalDateTime(localDateTime);
             }
         };
     }
@@ -537,9 +527,10 @@ public class RowDataDMDeserializationSchema
 
             @Override
             public Object convert(Object object) {
-                //support deserializing clob objects
+                // support deserializing clob objects
                 if (object instanceof DmdbClob) {
-                    return ((DmdbClob) object).getSubString(1L, (int) ((DmdbClob) object).length);
+                    return StringData
+                            .fromString(((DmdbClob) object).getSubString(1L, (int) ((DmdbClob) object).length));
                 }
 
                 String data = object.toString();
