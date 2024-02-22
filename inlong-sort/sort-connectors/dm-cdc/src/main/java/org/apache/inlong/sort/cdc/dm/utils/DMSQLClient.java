@@ -30,6 +30,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 // interact with DBMS_LOGMNR, one connection per client
@@ -42,6 +45,8 @@ public class DMSQLClient {
     private volatile long scn;
     // fetch size per scan
     private static final int BATCH_SIZE = 100000;
+    // current logminer file paths
+    private List<String> paths;
 
     public DMSQLClient(DMConnection globalConnection, String tablename) {
         this.connection = globalConnection;
@@ -68,7 +73,7 @@ public class DMSQLClient {
         boolean runnable = true;
 
         log.debug("selecting archived logs");
-        List<String> paths = new ArrayList<>();
+        paths = new CopyOnWriteArrayList<>();
         AtomicBoolean hasLatestLog = new AtomicBoolean(false);
         // then, find all redo log paths. Only those incremental logs which are after current scn are added
         String queryLogPaths =
@@ -82,8 +87,8 @@ public class DMSQLClient {
                             paths.add(rs.getString("NAME"));
                             Timestamp timestamp = rs.getTimestamp("FIRST_TIME");
                             LocalDateTime localDateTime = timestamp.toLocalDateTime();
-                            LocalDate today = LocalDate.now().atStartOfDay().toLocalDate();
-                            if (localDateTime.toLocalDate().equals(today)) {
+                            LocalDateTime today = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+                            if (localDateTime.isAfter(today) || localDateTime.isEqual(today)) {
                                 hasLatestLog.set(true);
                             }
                         }
@@ -163,6 +168,16 @@ public class DMSQLClient {
         String readSCNSql = "SELECT OPERATION, SCN, SQL_REDO, TIMESTAMP, TABLE_NAME FROM "
                 + "V$LOGMNR_CONTENTS WHERE TABLE_NAME = '" + tablename + "' AND SCN > " + scn + " LIMIT " + BATCH_SIZE;
 
+        //use a timer to throw runtime exception
+        Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                throw new RuntimeException("failed to read the following logminer files："+ paths + ", please contact dameng "
+                        + "official support");
+            }
+        }, 600000); // 600 seconds = 600000 milliseconds
+
         // read and process the records
         try {
             log.info("read scn sql is " + readSCNSql);
@@ -176,6 +191,8 @@ public class DMSQLClient {
         } catch (Throwable e) {
             log.error("process incremental snapshot failed ", e);
         }
+
+        timer.cancel();
 
         log.info("successfully fetched {} incremental records", list.size());
         return list;

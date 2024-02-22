@@ -317,18 +317,14 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
         LOG.info("starting to read change records");
         while (isRunning) {
             // TODO: make this multithreaded (one connection per thread), and improve performance
-            final CountDownLatch latch = new CountDownLatch(1);
             List<DMRecord> records = getNewRecords();
             // wait for timeout and restart logminer if current session has no incremental records.
-            if (!records.isEmpty()) {
-                latch.countDown();
-            } else {
+            if (records.isEmpty()) {
                 LOG.warn("no change detected, restarting logminer");
                 // if the last redo log is exhausted, no new change will come, so restart logminer.
                 try {
                     client.closelogminer();
                     client.openlogminer();
-                    latch.countDown();
                     LOG.info("restart logminer success");
                 } catch (Throwable e) {
                     LOG.error("restart logminer failed ", e);
