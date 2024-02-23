@@ -58,7 +58,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
 
 import static org.apache.inlong.sort.base.Constants.INLONG_METRIC_STATE_NAME;
 import static org.apache.inlong.sort.base.Constants.NUM_BYTES_IN;
@@ -348,7 +347,7 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
                         }
                     });
         } catch (Throwable e) {
-            LOG.error("read change records failed ", e);
+            throw new RuntimeException("read change records failed ", e);
         }
 
         // add record size, process specially for update records

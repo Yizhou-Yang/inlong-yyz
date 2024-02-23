@@ -49,8 +49,11 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -81,6 +84,9 @@ public class RowDataDMDeserializationSchema
      * A wrapped output collector which is used to append metadata columns after physical columns.
      */
     private final DMAppendMetadataCollector appendMetadataCollector;
+
+    private static final String TIMESTAMP_PATTERN =
+            "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})(?: ([+-]\\d{2}:\\d{2}))?";
 
     public static Builder newBuilder() {
         return new Builder();
@@ -479,11 +485,23 @@ public class RowDataDMDeserializationSchema
 
             @Override
             public Object convert(Object object) {
+                ZoneId zoneid = ZoneId.systemDefault();
                 if (object instanceof String) {
-                    object = Timestamp.valueOf(cleanTime((String) object));
+                    // if there is timezone, use that instead of system default timezone.
+                    String rawTimeStampString = cleanTime((String) object);
+                    Pattern pattern = Pattern.compile(TIMESTAMP_PATTERN);
+                    Matcher matcher = pattern.matcher(rawTimeStampString);
+                    if (matcher.find()) {
+                        String timestamp = matcher.group(1);
+                        String timezone = matcher.group(2);
+                        if (timezone != null) {
+                            zoneid = ZoneOffset.of(timezone).normalized();
+                        }
+                        object = Timestamp.valueOf(timestamp);
+                    }
                 }
                 LocalDateTime localDateTime =
-                        TemporalConversions.toLocalDateTime(object, ZoneId.systemDefault());
+                        TemporalConversions.toLocalDateTime(object, zoneid);
                 return TimestampData.fromLocalDateTime(localDateTime);
             }
         };

@@ -25,7 +25,6 @@ import org.apache.inlong.sort.protocol.ddl.enums.OperationType;
 
 import java.sql.ResultSet;
 import java.sql.Timestamp;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -87,7 +86,8 @@ public class DMSQLClient {
                             paths.add(rs.getString("NAME"));
                             Timestamp timestamp = rs.getTimestamp("FIRST_TIME");
                             LocalDateTime localDateTime = timestamp.toLocalDateTime();
-                            LocalDateTime today = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+                            LocalDateTime today =
+                                    LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
                             if (localDateTime.isAfter(today) || localDateTime.isEqual(today)) {
                                 hasLatestLog.set(true);
                             }
@@ -168,13 +168,15 @@ public class DMSQLClient {
         String readSCNSql = "SELECT OPERATION, SCN, SQL_REDO, TIMESTAMP, TABLE_NAME FROM "
                 + "V$LOGMNR_CONTENTS WHERE TABLE_NAME = '" + tablename + "' AND SCN > " + scn + " LIMIT " + BATCH_SIZE;
 
-        //use a timer to throw runtime exception
+        // use a timer to throw runtime exception
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
+
             @Override
             public void run() {
-                throw new RuntimeException("failed to read the following logminer files："+ paths + ", please contact dameng "
-                        + "official support");
+                throw new RuntimeException(
+                        "failed to read the following logminer files：" + paths + ", please contact dameng "
+                                + "official support");
             }
         }, 600000); // 600 seconds = 600000 milliseconds
 
@@ -185,7 +187,9 @@ public class DMSQLClient {
                     rs -> {
                         while (rs.next()) {
                             DMRecord record = generateDMRecord(database, schema, rs, parser);
-                            list.add(record);
+                            if(record != null) {
+                                list.add(record);
+                            }
                         }
                     });
         } catch (Throwable e) {
@@ -214,8 +218,7 @@ public class DMSQLClient {
             return new DMRecord(sourceInfo, opt, fields.get(0), fields.get(1), timestamp);
         } catch (Throwable e) {
             log.error("generate DM record failed ", e);
-            // for now, there is no error handling strategy, just throw the exception out.
-            throw new RuntimeException(e);
+            return null;
         }
     }
 
