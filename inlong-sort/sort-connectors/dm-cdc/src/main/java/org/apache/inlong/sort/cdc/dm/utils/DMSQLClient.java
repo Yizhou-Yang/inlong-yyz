@@ -187,7 +187,7 @@ public class DMSQLClient {
                     rs -> {
                         while (rs.next()) {
                             DMRecord record = generateDMRecord(database, schema, rs, parser);
-                            if(record != null) {
+                            if (record != null) {
                                 list.add(record);
                             }
                         }
