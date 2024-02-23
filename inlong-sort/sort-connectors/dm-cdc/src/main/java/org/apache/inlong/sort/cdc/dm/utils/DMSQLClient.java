@@ -198,7 +198,9 @@ public class DMSQLClient {
 
         timer.cancel();
 
-        log.info("successfully fetched {} incremental records", list.size());
+        if(list.size() > 0){
+            log.info("successfully fetched {} incremental records", list.size());
+        }
         return list;
     }
 

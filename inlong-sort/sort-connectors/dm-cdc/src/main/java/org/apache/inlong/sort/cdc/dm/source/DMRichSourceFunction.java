@@ -360,11 +360,14 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
             }
         }
 
-        if (metricData != null) {
-            metricData.outputMetrics(size, records.size() * 8L);
-            LOG.info("registering metrics {}", records.size());
+        if(records.size() > 0) {
+            if (metricData != null) {
+                metricData.outputMetrics(size, records.size() * 8L);
+                LOG.info("registering metrics {}", records.size());
+            }
+
+            LOG.info("finished processing {} incremental records", records.size());
         }
-        LOG.info("finished processing {} incremental records", records.size());
         return records;
     }
 
