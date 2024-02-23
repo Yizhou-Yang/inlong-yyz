@@ -118,6 +118,13 @@ public class DMTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "Integer port number of DM database server or DM proxy server.");
 
+    public static final ConfigOption<Integer> BATCH_SIZE =
+            ConfigOptions.key("source.batch.size")
+                    .intType()
+                    .defaultValue(10000)
+                    .withDescription(
+                            "the size of a batch per scan");
+
     public static final ConfigOption<String> JDBC_DRIVER =
             ConfigOptions.key("jdbc.driver")
                     .stringType()
@@ -154,6 +161,7 @@ public class DMTableSourceFactory implements DynamicTableSourceFactory {
 
         String hostname = config.get(HOSTNAME);
         Integer port = config.get(PORT);
+        Integer batchSize = config.get(BATCH_SIZE);
 
         Long startupTimestamp = config.get(SCAN_STARTUP_TIMESTAMP);
         String uid = config.getOptional(SOURCE_UID).orElse(null);
@@ -175,6 +183,7 @@ public class DMTableSourceFactory implements DynamicTableSourceFactory {
                 connectTimeout,
                 hostname,
                 port,
+                batchSize,
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 startupTimestamp,
                 inlongMetric,

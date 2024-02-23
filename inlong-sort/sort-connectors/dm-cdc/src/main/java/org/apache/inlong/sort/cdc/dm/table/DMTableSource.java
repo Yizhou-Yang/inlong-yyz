@@ -62,6 +62,7 @@ public class DMTableSource implements ScanTableSource, SupportsReadingMetadata {
     private final String serverTimeZone;
     private final String hostname;
     private final Integer port;
+    private final Integer batchSize;
     private final Properties jdbcProperties;
     private final Long startupTimestamp;
     private final String inlongMetrics;
@@ -90,6 +91,7 @@ public class DMTableSource implements ScanTableSource, SupportsReadingMetadata {
             Duration connectTimeout,
             String hostname,
             Integer port,
+            Integer batchSize,
             Properties jdbcProperties,
             Long startupTimestamp,
             String inlongMetrics,
@@ -107,6 +109,7 @@ public class DMTableSource implements ScanTableSource, SupportsReadingMetadata {
         this.connectTimeout = connectTimeout;
         this.hostname = hostname;
         this.port = port;
+        this.batchSize = batchSize;
         this.jdbcProperties = jdbcProperties;
         this.startupTimestamp = startupTimestamp;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
@@ -149,6 +152,7 @@ public class DMTableSource implements ScanTableSource, SupportsReadingMetadata {
                         .connectTimeout(connectTimeout)
                         .hostname(hostname)
                         .port(port)
+                        .batchSize(batchSize)
                         .jdbcProperties(jdbcProperties)
                         .startupTimestamp(startupTimestamp)
                         .deserializer(deserializer)
@@ -219,6 +223,7 @@ public class DMTableSource implements ScanTableSource, SupportsReadingMetadata {
                         connectTimeout,
                         hostname,
                         port,
+                        batchSize,
                         jdbcProperties,
                         startupTimestamp,
                         inlongMetrics,

@@ -111,6 +111,8 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
     private transient ListState<MetricState> metricStateListState;
     private MetricState metricState;
 
+    private final int batchSize;
+
     // reserved for whole db migration
     private final boolean sourceMultipleEnable = false;
     private final boolean createNewLogFiles = true;
@@ -126,6 +128,7 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
             Duration connectTimeout,
             String hostname,
             Integer port,
+            Integer batchSize,
             Properties jdbcProperties,
             DMDeserializationSchema<T> deserializer,
             String inlongMetric,
@@ -139,6 +142,7 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
         this.connectTimeout = connectTimeout;
         this.hostname = hostname;
         this.port = port;
+        this.batchSize = batchSize;
         this.jdbcProperties = jdbcProperties;
         this.deserializer = deserializer;
         this.inlongMetric = inlongMetric;
@@ -167,7 +171,7 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
                 getClass().getClassLoader());
 
         // logs related to this part are printed in dmsqlclient, not here.
-        this.client = new DMSQLClient(incrementalConnection, tableName);
+        this.client = new DMSQLClient(incrementalConnection, tableName, batchSize);
         outputCollector.context = ctx;
         try {
             LOG.info("Start to initialize table whitelist");
@@ -360,7 +364,7 @@ public class DMRichSourceFunction<T> extends RichSourceFunction<T>
             }
         }
 
-        if(records.size() > 0) {
+        if (records.size() > 0) {
             if (metricData != null) {
                 metricData.outputMetrics(size, records.size() * 8L);
                 LOG.info("registering metrics {}", records.size());

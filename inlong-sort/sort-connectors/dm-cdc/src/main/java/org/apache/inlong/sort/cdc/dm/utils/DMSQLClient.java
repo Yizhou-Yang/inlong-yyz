@@ -42,14 +42,15 @@ public class DMSQLClient {
     // the tables involved in incremental changes. for now implement only one table
     private final String tablename;
     private volatile long scn;
-    // fetch size per scan
-    private static final int BATCH_SIZE = 100000;
     // current logminer file paths
     private List<String> paths;
+    // fetch size per scan
+    private final int batchSize;
 
-    public DMSQLClient(DMConnection globalConnection, String tablename) {
+    public DMSQLClient(DMConnection globalConnection, String tablename, int batchSize) {
         this.connection = globalConnection;
         this.tablename = tablename;
+        this.batchSize = batchSize;
 
         // before the actual execution, first find the latest scn.
         String querySCN = "select CUR_LSN from v$rlog";
@@ -166,7 +167,7 @@ public class DMSQLClient {
 
         // limit the number of scns read to avoid oom
         String readSCNSql = "SELECT OPERATION, SCN, SQL_REDO, TIMESTAMP, TABLE_NAME FROM "
-                + "V$LOGMNR_CONTENTS WHERE TABLE_NAME = '" + tablename + "' AND SCN > " + scn + " LIMIT " + BATCH_SIZE;
+                + "V$LOGMNR_CONTENTS WHERE TABLE_NAME = '" + tablename + "' AND SCN > " + scn + " LIMIT " + batchSize;
 
         // use a timer to throw runtime exception
         Timer timer = new Timer();
@@ -187,18 +188,17 @@ public class DMSQLClient {
                     rs -> {
                         while (rs.next()) {
                             DMRecord record = generateDMRecord(database, schema, rs, parser);
-                            if (record != null) {
-                                list.add(record);
-                            }
+                            log.info("record is" + record);
+                            list.add(record);
                         }
                     });
         } catch (Throwable e) {
-            log.error("process incremental snapshot failed ", e);
+            throw new RuntimeException("process incremental snapshot failed ", e);
         }
 
         timer.cancel();
 
-        if(list.size() > 0){
+        if (list.size() > 0) {
             log.info("successfully fetched {} incremental records", list.size());
         }
         return list;
@@ -219,8 +219,7 @@ public class DMSQLClient {
             long timestamp = rs.getTime("TIMESTAMP").getTime();
             return new DMRecord(sourceInfo, opt, fields.get(0), fields.get(1), timestamp);
         } catch (Throwable e) {
-            log.error("generate DM record failed ", e);
-            return null;
+            throw new RuntimeException("generate DM record failed ", e);
         }
     }
 

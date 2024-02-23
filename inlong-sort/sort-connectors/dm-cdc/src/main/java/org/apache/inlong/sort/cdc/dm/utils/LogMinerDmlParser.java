@@ -81,9 +81,8 @@ public class LogMinerDmlParser {
                     throw new RuntimeException("operation type is not supported " + operation);
             }
         } catch (Throwable e) {
-            log.error("dm sql parse field error ", e);
+            throw new RuntimeException("dm sql parse field error ", e);
         }
-        return null;
     }
 
     /**

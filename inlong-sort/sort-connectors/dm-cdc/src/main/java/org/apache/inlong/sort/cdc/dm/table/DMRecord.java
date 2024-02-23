@@ -50,7 +50,7 @@ public class DMRecord implements Serializable {
         this.opt = opt;
         this.logMessageFieldsBefore = new HashMap<>();
         this.logMessageFieldsAfter = new HashMap<>();
-        this.timeProcessed = System.currentTimeMillis();
+        this.timeProcessed = 0;
     }
 
     public DMRecord(

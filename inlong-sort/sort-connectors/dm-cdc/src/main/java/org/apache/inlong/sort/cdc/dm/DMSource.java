@@ -57,6 +57,7 @@ public class DMSource {
         private Properties jdbcProperties;
         private DMDeserializationSchema<T> deserializer;
         private Long startupTimestamp;
+        private int batchSize;
 
         // metrics related
         private String inlongMetric;
@@ -112,6 +113,11 @@ public class DMSource {
 
         public Builder<T> hostname(String hostname) {
             this.hostname = hostname;
+            return this;
+        }
+
+        public Builder<T> batchSize(int batchSize) {
+            this.batchSize = batchSize;
             return this;
         }
 
@@ -177,7 +183,7 @@ public class DMSource {
             }
 
             if (serverTimeZone == null) {
-                serverTimeZone = "+00:00";
+                serverTimeZone = "+08:00";
             }
 
             if (connectTimeout == null) {
@@ -195,6 +201,7 @@ public class DMSource {
                     connectTimeout,
                     hostname,
                     port,
+                    batchSize,
                     jdbcProperties,
                     deserializer,
                     inlongMetric,

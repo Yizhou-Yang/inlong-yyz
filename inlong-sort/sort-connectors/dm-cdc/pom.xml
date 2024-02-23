@@ -33,6 +33,11 @@
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
+        <kafka.dm.version>2.7.1</kafka.dm.version>
+        <debezium.dm.version>1.9.7.Final</debezium.dm.version>
+        <dm.driver.version>8.1.2.79</dm.driver.version>
+        <debezium.oracle.version>2.3.0.Final</debezium.oracle.version>
+        <sort.base.version>1.6.0</sort.base.version>
     </properties>
 
     <dependencies>
@@ -56,7 +61,8 @@
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-streaming-java_2.12</artifactId>
-            <version>1.13.2</version>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -65,27 +71,27 @@
         <dependency>
             <groupId>io.debezium</groupId>
             <artifactId>debezium-core</artifactId>
-            <version>1.5.4.Final</version>
+            <version>${debezium.dm.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
-            <version>2.7.1</version>
+            <version>${kafka.dm.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>connect-api</artifactId>
-            <version>2.7.1</version>
+            <version>${kafka.dm.version}</version>
         </dependency>
         <dependency>
             <groupId>com.dameng</groupId>
             <artifactId>DmJdbcDriver18</artifactId>
-            <version>8.1.2.79</version>
+            <version>${dm.driver.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.inlong</groupId>
             <artifactId>sort-connector-cdc-base</artifactId>
-            <version>1.6.0</version>
+            <version>${sort.base.version}</version>
         </dependency>
         <dependency>
             <groupId>com.ververica</groupId>
@@ -94,12 +100,7 @@
         <dependency>
             <groupId>io.debezium</groupId>
             <artifactId>debezium-connector-oracle</artifactId>
-            <version>2.3.0.Final</version>
-        </dependency>
-        <dependency>
-            <groupId>io.debezium</groupId>
-            <artifactId>debezium-core</artifactId>
-            <version>1.9.7.Final</version>
+            <version>${debezium.oracle.version}</version>
         </dependency>
     </dependencies>
 

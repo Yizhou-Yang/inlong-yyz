@@ -49,7 +49,6 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -493,10 +492,6 @@ public class RowDataDMDeserializationSchema
                     Matcher matcher = pattern.matcher(rawTimeStampString);
                     if (matcher.find()) {
                         String timestamp = matcher.group(1);
-                        String timezone = matcher.group(2);
-                        if (timezone != null) {
-                            zoneid = ZoneOffset.of(timezone).normalized();
-                        }
                         object = Timestamp.valueOf(timestamp);
                     }
                 }
