@@ -49,6 +49,7 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -495,8 +496,8 @@ public class RowDataDMDeserializationSchema
                         object = Timestamp.valueOf(timestamp);
                     }
                 }
-                LocalDateTime localDateTime =
-                        TemporalConversions.toLocalDateTime(object, zoneid);
+                ZonedDateTime zonedDateTime = ZonedDateTime.ofInstant(((Timestamp) object).toInstant(), zoneid);
+                LocalDateTime localDateTime = zonedDateTime.toLocalDateTime();
                 return TimestampData.fromLocalDateTime(localDateTime);
             }
         };
